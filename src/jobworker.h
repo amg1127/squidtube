@@ -23,6 +23,8 @@ private:
     QNetworkAccessManager networkAccessManager;
 private slots:
     void jobConsumer (const jobWork& job);
+protected:
+    void run ();
 public:
     jobWorker();
     void addJob (const jobWork& job);

@@ -105,7 +105,7 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
             msgTransform.remove (0, 1);
         if (msgTransform.right(1) == "\"")
             msgTransform.chop(1);
-        QString msgLine (QString("[%1] %2: %3").arg(AppRuntime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss")).arg(prefix).arg(msgTransform.trimmed() + msgLineContext));
+        QString msgLine (QString("[%1] 0x%2 %3: %4").arg(AppRuntime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss")).arg((ulong) QThread::currentThread(), 16, 16, QChar('0')).arg(prefix).arg(msgTransform.trimmed() + msgLineContext));
         std::cerr << msgLine.toLocal8Bit().constData() << std::endl;
     }
     if (type == QtFatalMsg) {

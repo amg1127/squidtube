@@ -14,10 +14,10 @@ jobDispatcher::~jobDispatcher () {
     for (QList<jobWorker*>::iterator job = this->workers.begin(); job != this->workers.end(); job++) {
         delete (*job);
     }
+    qDebug() << "All request workers finished.";
 }
 
 void jobDispatcher::squidRequest (const QStringList &tokens) {
-#warning Nao implementado!
     // Expected format is [channel-ID] %URI property [-flag [-flag [...] ] ] criteria [criteria [criteria [...]]]
     if (tokens.isEmpty ()) {
         jobDispatcher::writeErrorAnswer ("", "an empty request was received");
@@ -77,8 +77,8 @@ void jobDispatcher::squidRequest (const QStringList &tokens) {
                     // Now, send the request to a worker
                     // Create if it does not exists yet
                     while (requestChannelNumber >= this->workers.count()) {
-                        qDebug() << "Starting a request worker...";
                         jobWorker* worker = new jobWorker ();
+#error It is important to remember that a QThread instance lives in the old thread that instantiated it, not in the new thread that calls run(). This means that all of QThread's queued slots will execute in the old thread. Thus, a developer who wishes to invoke slots in the new thread must use the worker-object approach; new slots should not be implemented directly into a subclassed QThread.
 #warning Connect signals to slots here
                         this->workers.append (worker);
                         worker->start ();

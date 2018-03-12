@@ -2,7 +2,13 @@
 
 jobWorker::jobWorker() {
     this->networkAccessManager.moveToThread (this);
-    QObject::connect (this, SIGNAL(jobAdded(jobWork)), this, SLOT(jobConsumer(jobWork)), Qt::QueuedConnection);
+    QObject::connect (this, SIGNAL(jobAdded(jobWork)), this, SLOT(jobConsumer(jobWork)));
+}
+
+void jobWorker::run () {
+    qDebug() << "stdinReader thread started.";
+    this->exec ();
+    qDebug() << "stdinReader thread finished.";
 }
 
 void jobWorker::addJob (const jobWork& job) {
