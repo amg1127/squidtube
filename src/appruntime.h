@@ -13,7 +13,6 @@ public:
     QString name;
     QString code;
     QHash<QString,QString> globalVariables;
-    static QMutex mutex;
 };
 
 class AppRuntime {

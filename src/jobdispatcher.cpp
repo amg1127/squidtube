@@ -1,7 +1,19 @@
 #include "jobdispatcher.h"
 
 jobDispatcher::jobDispatcher(QObject *parent) : QObject(parent) {
+}
 
+jobDispatcher::~jobDispatcher () {
+    qDebug() << "Finishing all request workers...";
+    for (QList<jobWorker*>::iterator job = this->workers.begin(); job != this->workers.end(); job++) {
+        (*job)->quit ();
+    }
+    for (QList<jobWorker*>::iterator job = this->workers.begin(); job != this->workers.end(); job++) {
+        (*job)->wait ();
+    }
+    for (QList<jobWorker*>::iterator job = this->workers.begin(); job != this->workers.end(); job++) {
+        delete (*job);
+    }
 }
 
 void jobDispatcher::squidRequest (const QStringList &tokens) {
@@ -10,57 +22,71 @@ void jobDispatcher::squidRequest (const QStringList &tokens) {
     if (tokens.isEmpty ()) {
         jobDispatcher::writeErrorAnswer ("", "an empty request was received");
     } else {
-        QStringList copyOfTokens (tokens);
+        jobWork request;
+        request.requestTokens = tokens;
         // Test whether the Squid administrator has set 'concurrency=' argument
         bool ok;
-        QString requestChannel (copyOfTokens.value(0));
-        int requestChannelNumber = requestChannelToken.toInt (&ok, 10);
+        request.requestChannel = request.requestTokens.value(0);
+        int requestChannelNumber = request.requestChannel.toInt (&ok, 10);
         if (ok) {
             if (requestChannelNumber < 0) {
                 // This is a protocol error
-                jobDispatcher::writeErrorAnswer (requestChannel, "protocol error");
+                jobDispatcher::writeErrorAnswer (request.requestChannel, "protocol error");
                 return;
             } else {
-                copyOfTokens.removeFirst ();
+                request.requestTokens.removeFirst ();
             }
         } else {
-            requestChannel = "";
+            request.requestChannel = "";
         }
-        if (copyOfTokens.isEmpty ()) {
-            jobDispatcher::writeErrorAnswer (requestChannel, "an empty URL was received");
+        if (request.requestTokens.isEmpty ()) {
+            jobDispatcher::writeErrorAnswer (request.requestChannel, "an empty URL was received");
         } else {
             // Check URL syntax
-            QUrl requestUri (copyOfTokens.takeFirst(), QUrl::StrictMode);
+            QUrl requestUri (request.requestTokens.takeFirst(), QUrl::StrictMode);
             if (requestUri.isValid ()) {
-                if (copyOfTokens.isEmpty ()) {
-                    jobDispatcher::writeErrorAnswer (requestChannel, "ACL specifies no property for comparison");
+                if (request.requestTokens.isEmpty ()) {
+                    jobDispatcher::writeErrorAnswer (request.requestChannel, "ACL specifies no property for comparison");
                 } else {
-                    QString requestProperty (copyOfTokens.takeFirst());
-                    Qt::CaseSensitivity requestCaseSensivity(Qt::CaseSensitive);
-                    QRegExp::PatternSyntax requestPatternSyntax(QRegExp::RegExp);
+                    request.requestProperty = request.requestTokens.takeFirst();
+                    request.requestCaseSensivity = Qt::CaseSensitive;
+                    request.requestPatternSyntax = QRegExp::RegExp;
                     // Check the flags that may have specified by the administrator
-                    for (QString requestFlag = copyOfTokens.takeFirst(); ! copyOfTokens.isEmpty(); requestFlag = copyOfTokens.takeFirst()) {
+                    for (QString requestFlag = request.requestTokens.takeFirst(); ! request.requestTokens.isEmpty(); requestFlag = request.requestTokens.takeFirst()) {
                         if (requestFlag.left(1) == "-") {
                             if (requestFlag == "-f" || requestFlag == "--fixed") {
-                                requestPatternSyntax = QRegExp::FixedString;
+                                request.requestPatternSyntax = QRegExp::FixedString;
                             } else if (requestFlag == "-w" || requestFlag == "--wildcard") {
-                                requestPatternSyntax = QRegExp::WildcardUnix;
+                                request.requestPatternSyntax = QRegExp::WildcardUnix;
                             } else if (requestFlag == "-i" || requestFlag == "--ignorecase") {
-                                requestCaseSensivity = Qt::CaseInsensitive;
+                                request.requestCaseSensivity = Qt::CaseInsensitive;
                             } else {
-                                jobDispatcher::writeErrorAnswer (requestChannel, QString("ACL specifies an invalid flag: ") + requestFlag);
+                                jobDispatcher::writeErrorAnswer (request.requestChannel, QString("ACL specifies an invalid flag: ") + requestFlag);
                                 return;
                             }
                         } else {
                             // No more flags to look for
-                            copyOfTokens.prepend (requestFlag);
+                            request.requestTokens.prepend (requestFlag);
                             break;
                         }
                     }
-#error Continue here
+                    // Decode the comparation texts
+                    for (QStringList::iterator token = request.requestTokens.begin(); token != request.requestTokens.end(); token++) {
+                        (*token) = QUrl::fromPercentEncoding ((*token).toUtf8());
+                    }
+                    // Now, send the request to a worker
+                    // Create if it does not exists yet
+                    while (requestChannelNumber >= this->workers.count()) {
+                        qDebug() << "Starting a request worker...";
+                        jobWorker* worker = new jobWorker ();
+#warning Connect signals to slots here
+                        this->workers.append (worker);
+                        worker->start ();
+                    }
+                    this->workers[requestChannelNumber]->addJob (request);
                 }
             } else {
-                jobDispatcher::writeErrorAnswer (requestChannel, "invalid URL was received");
+                jobDispatcher::writeErrorAnswer (request.requestChannel, "invalid URL was received");
             }
         }
     }
@@ -77,6 +103,6 @@ void jobDispatcher::writeErrorAnswer (const QString& channel, const QString &msg
         msgpart1 += channel + " ";
         msgpart2 += QString("from channel #") + channel;
     }
-    writeAnswerLine (msgpart1 + QString("BH message=%1 log=%1").arg(QUrl::toPercentEncoding (msg)));
+    writeAnswerLine (msgpart1 + QString("BH message=%1 log=%1").arg(QString::fromUtf8(QUrl::toPercentEncoding (msg))));
     qWarning() << QString("An internal error ocurred while processing the request") + msgpart2 + ": " + msg;
 }

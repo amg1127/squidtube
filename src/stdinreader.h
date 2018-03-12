@@ -12,8 +12,10 @@
 
 class stdinReader : public QThread {
     Q_OBJECT
+public:
+    explicit stdinReader (QObject *parent = 0);
 protected:
-    void run () override;
+    void run ();
 signals:
     void squidRequest (const QStringList& tokens);
 };

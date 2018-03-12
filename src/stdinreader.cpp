@@ -1,5 +1,8 @@
 #include "stdinreader.h"
 
+stdinReader::stdinReader (QObject *parent) : QThread (parent) {
+}
+
 void stdinReader::run () {
     qDebug() << "stdinReader thread started.";
     std::string stdinLine;

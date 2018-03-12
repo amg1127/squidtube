@@ -2,6 +2,7 @@
 #include "appconfig.h"
 #include "stdinreader.h"
 #include "jobdispatcher.h"
+#include "jobworker.h"
 
 #include <iostream>
 
@@ -37,6 +38,9 @@ int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
     qDebug() << "Starting...";
 
+    // This is needed to get my custom struct flowing across signals & slots mechanism
+    qRegisterMetaType<jobWork> ("jobWork");
+
     // Make sure that default program settings are valid
     // The validation code builds only if debug build is requested during compilation
 #ifndef QT_NO_DEBUG
@@ -58,7 +62,7 @@ int main(int argc, char *argv[]) {
     stdinReader stdinReader;
     QObject::connect (&stdinReader, SIGNAL(finished()), &app, SLOT(quit()));
     jobDispatcher jobDispatcher;
-    QObject::connect (&stdinReader, SIGNAL(SquidRequest(QStringList)), &jobDispatcher, SLOT(SquidRequest(QstringList)));
+    QObject::connect (&stdinReader, SIGNAL(squidRequest(QStringList)), &jobDispatcher, SLOT(squidRequest(QStringList)));
 
     qDebug() << "Startup finished. Entering main loop...";
     stdinReader.start ();

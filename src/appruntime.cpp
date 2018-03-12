@@ -26,8 +26,6 @@ QStringList AppRuntime::dbStartupQueries;
 QMutex AppRuntime::dbSettingsMutex;
 int AppRuntime::dbInstance = 0;
 
-QMutex AppHelper::mutex;
-
 QDateTime AppRuntime::currentDateTime () {
     static QMutex m (QMutex::Recursive);
     QMutexLocker m_lck (&m);
