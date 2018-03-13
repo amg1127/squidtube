@@ -32,3 +32,5 @@ QDateTime AppRuntime::currentDateTime () {
     QDateTime dateTime (QDateTime::currentDateTime());
     return (dateTime);
 }
+
+const QString AppHelper::AppHelperExtension(".js");

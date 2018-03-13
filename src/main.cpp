@@ -2,7 +2,6 @@
 #include "appconfig.h"
 #include "stdinreader.h"
 #include "jobdispatcher.h"
-#include "jobworker.h"
 
 #include <iostream>
 
@@ -38,8 +37,9 @@ int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
     qDebug() << "Starting...";
 
-    // This is needed to get my custom struct flowing across signals & slots mechanism
-    qRegisterMetaType<jobWork> ("jobWork");
+    // Manually register some QtMetaTypes, so I can queue variables of those types under QObject::connect
+    qRegisterMetaType<Qt::CaseSensitivity>("Qt::CaseSensitivity");
+    qRegisterMetaType<QRegExp::PatternSyntax>("QRegExp::PatternSyntax");
 
     // Make sure that default program settings are valid
     // The validation code builds only if debug build is requested during compilation
@@ -60,13 +60,16 @@ int main(int argc, char *argv[]) {
 
     // Initialize a separate thread to handle messages coming from SQUID through STDIN
     stdinReader stdinReader;
-    QObject::connect (&stdinReader, SIGNAL(finished()), &app, SLOT(quit()));
-    jobDispatcher jobDispatcher;
-    QObject::connect (&stdinReader, SIGNAL(squidRequest(QStringList)), &jobDispatcher, SLOT(squidRequest(QStringList)));
+    QObject::connect (&stdinReader, &stdinReader::finished, &app, &QCoreApplication::quit);
+    JobDispatcher jobDispatcher;
+    QObject::connect (&stdinReader, &stdinReader::writeAnswerLine, &jobDispatcher, &JobDispatcher::writeAnswerLine);
+    QObject::connect (&stdinReader, &stdinReader::squidRequest, &jobDispatcher, &JobDispatcher::squidRequest);
 
     qDebug() << "Startup finished. Entering main loop...";
     stdinReader.start ();
-    int r = app.exec();
+#error I have to make my jobDispatcher object process the last event from stdinReader.
+#error Currently, the queued event is permanently lost when the program receives an EOF.
+    int r = app.exec ();
     stdinReader.wait ();
     return (r);
 }
@@ -271,7 +274,7 @@ bool loadRuntimeVariables () {
     qDebug() << "Loading helper contents into memory...";
     bool helpersLoaded = true;
     for (QList<AppHelper>::iterator objHelper = AppRuntime::helperObjects.begin(); helpersLoaded && objHelper != AppRuntime::helperObjects.end(); objHelper++) {
-        QFile helperFile (QString(APP_install_share_dir) + "/" + objHelper->name + ".js");
+        QFile helperFile (QString(APP_install_share_dir) + "/" + objHelper->name + AppHelper::AppHelperExtension);
         if (helperFile.open (QIODevice::ReadOnly | QIODevice::Text)) {
             {
                 QTextStream helperFileStream (&helperFile);

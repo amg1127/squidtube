@@ -1,5 +1,5 @@
 QT -= gui
-QT += core network script sql
+QT += core network qml sql
 
 include(../project-defs.pri)
 
@@ -35,7 +35,7 @@ unix {
 }
 
 # Turn all warnings on
-QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion
+QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion -DQT_DEPRECATED_WARNINGS
 
 ###########################
 # Make project variables available inside the C++ code

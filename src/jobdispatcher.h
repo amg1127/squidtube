@@ -12,22 +12,18 @@
 #include <QtDebug>
 #include <QUrl>
 
-class jobDispatcher : public QObject {
+class JobDispatcher : public QObject {
     Q_OBJECT
 private:
-    QList<jobWorker*> workers;
-    void writeAnswerLine (const QString& msg);
-    void writeErrorAnswer (const QString& channel, const QString& msg);
-    void writeResultAnswer (const QString& channel, bool matched, const QString& msg);
+    QList<JobCarrier*> jobCarriers;
 
 public:
-    explicit jobDispatcher (QObject *parent = 0);
-    ~jobDispatcher ();
-
-signals:
+    explicit JobDispatcher (QObject *parent = 0);
+    ~JobDispatcher ();
 
 public slots:
-    void squidRequest (const QStringList& tokens);
+    void writeAnswerLine (const QString& channel, const QString& msg, bool isError, bool isMatch);
+    void squidRequest (const int requestChannelNumber, const QString& requestChannel, const QUrl& requestUrl, const QStringList& requestData);
 };
 
 #endif // JOBDISPATCHER_H

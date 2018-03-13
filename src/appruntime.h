@@ -13,6 +13,7 @@ public:
     QString name;
     QString code;
     QHash<QString,QString> globalVariables;
+    static const QString AppHelperExtension;
 };
 
 class AppRuntime {

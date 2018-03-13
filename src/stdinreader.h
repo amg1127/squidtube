@@ -9,6 +9,7 @@
 #include <QStringList>
 #include <QtDebug>
 #include <QThread>
+#include <QUrl>
 
 class stdinReader : public QThread {
     Q_OBJECT
@@ -17,7 +18,8 @@ public:
 protected:
     void run ();
 signals:
-    void squidRequest (const QStringList& tokens);
+    void writeAnswerLine (const QString& channel, const QString& msg, bool isError, bool isMatch);
+    void squidRequest (const int requestChannelNumber, const QString& requestChannel, const QUrl& requestUrl, const QStringList& requestData);
 };
 
 #endif // STDINREADER_H

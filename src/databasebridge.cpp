@@ -106,7 +106,7 @@ bool databaseBridge::warnSqlError (const QSqlError& err, const QString& prefix) 
             case QSqlError::TransactionError: msg += "TransactionError: "; break;
             default: msg += "UnknownError: "; break;
         }
-        msg += QString("%1: %2").arg(err.number()).arg(err.text());
+        msg += QString("%1: %2").arg(err.nativeErrorCode()).arg(err.text());
         if (et == QSqlError::StatementError)
             qCritical() << msg;
         else
