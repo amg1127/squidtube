@@ -287,7 +287,7 @@ bool databaseBridge::createTables (QSqlDatabase& database, QString helper) {
     if (! database.tables().contains (table, Qt::CaseInsensitive)) {
         returnValue = false;
         QSqlQuery query (database);
-        if (query.exec (QString("CREATE TABLE %1 (ktype VARCHAR(255) NOT NULL, kname VARCHAR(255) NOT NULL, value TEXT NULL, timestamp INTEGER NOT NULL, PRIMARY KEY (ktype, kname));").arg(table))) {
+        if (query.exec (QString("CREATE TABLE %1 (className VARCHAR(255) NOT NULL, id VARCHAR(255) NOT NULL, value TEXT NULL, timestamp INTEGER NOT NULL, PRIMARY KEY (className, id));").arg(table))) {
             returnValue = true;
         } else {
             databaseBridge::warnSqlError (query, QString("Unable to create table '%1'").arg(table));

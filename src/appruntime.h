@@ -12,7 +12,8 @@ class AppHelper {
 public:
     QString name;
     QString code;
-    QHash<QString,QString> globalVariables;
+    static const QString AppHelperCodeHeader;
+    static const QString AppHelperCodeFooter;
     static const QString AppHelperExtension;
 };
 

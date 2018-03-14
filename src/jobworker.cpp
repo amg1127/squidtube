@@ -11,7 +11,8 @@ JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
         for (QHash<QString,QString>::const_iterator globalVariable = appHelper->globalVariables.constBegin(); globalVariable != appHelper->globalVariables.constEnd(); globalVariable++) {
             appHelperInfo->environment.globalObject().setProperty (globalVariable.key(), globalVariable.value());
         }
-        if (! JobWorker::warnJsError (appHelperInfo->environment.evaluate (appHelper->code, appHelperInfo->name + AppHelper::AppHelperExtension), QString("A Javascript exception occurred while the helper '%1' was initializing. It will be disabled!").arg(appHelperInfo->name))) {
+#error This code must be refactored!
+        if (! JobWorker::warnJsError (appHelperInfo->environment.evaluate (QString("function ") + appHelperInfo->name + "() {\n" + appHelper->code + "}\n", appHelperInfo->name + AppHelper::AppHelperExtension, 0), QString("A Javascript exception occurred while the helper '%1' was initializing. It will be disabled!").arg(appHelperInfo->name))) {
             // The helper script must implement the supportedUrls() function and
             // must return an array of either string or regular expression elements
             QJSValue appHelperSupportedUrls (appHelperInfo->environment.evaluate ("supportedUrls();"));
@@ -22,7 +23,7 @@ JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
                         QJSValue appHelperSupportedUrl (appHelperSupportedUrls.property (pos));
                         QRegExp regExpSupportedUrl;
                         if (appHelperSupportedUrl.isString ()) {
-                            regExpSupportedUrl = QRegExp (appHelperSupportedUrl.toString(), Qt::CaseInsensitive, QRegExp::FixedString);
+                            regExpSupportedUrl = QRegExp (appHelperSupportedUrl.toString(), Qt::CaseInsensitive, QRegExp::WildcardUnix);
                         } else if (appHelperSupportedUrl.isRegExp ()) {
                             regExpSupportedUrl = appHelperSupportedUrl.toVariant().toRegExp();
                         }

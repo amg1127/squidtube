@@ -20,7 +20,6 @@ public:
     bool isAvailable;
     bool isBusy;
     QList<QRegExp> supportedURLs;
-    QQmlEngine environment;
 };
 
 class JobWorker : public QObject {
@@ -28,6 +27,7 @@ class JobWorker : public QObject {
 private:
     QString requestChannel;
     QList<AppHelperInfo*> helperInstances;
+    QQmlEngine runtimeEnvironment;
     static bool warnJsError (const QJSValue& jsValue, const QString& msg = QString());
 public:
     JobWorker (const QString& requestChannel, QObject* parent = Q_NULLPTR);
