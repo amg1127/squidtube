@@ -1,15 +1,15 @@
 #include "stdinreader.h"
 
-stdinReader::stdinReader (QObject *parent) : QThread (parent) {
+StdinReader::StdinReader (QObject *parent) : QThread (parent) {
 }
 
-void stdinReader::run () {
+void StdinReader::run () {
     qDebug() << "stdinReader thread started.";
     std::string stdinLine;
     while (! std::getline (std::cin, stdinLine).eof()) {
         // Expected format is [channel-ID] %URI property [-flag [-flag [...] ] ] criteria [criteria [criteria [...]]]
         QString tokens (QString::fromLocal8Bit(stdinLine.data(), (int) stdinLine.size()).trimmed ());
-        qDebug() << QString("Squid has sent an ACL matching request: %1").arg(tokens);
+        qInfo() << QString("Received an ACL matching request: %1").arg(tokens);
         if (tokens.isEmpty ()) {
             emit writeAnswerLine ("", "an empty request was received", true, false);
         } else {

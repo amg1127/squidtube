@@ -1,6 +1,5 @@
 #include "appruntime.h"
 #include "appconfig.h"
-#include "stdinreader.h"
 #include "jobdispatcher.h"
 
 #include <iostream>
@@ -58,20 +57,13 @@ int main(int argc, char *argv[]) {
     // Initialize networking environment
     QNetworkProxyFactory::setUseSystemConfiguration (true);
 
-    // Initialize a separate thread to handle messages coming from SQUID through STDIN
-    stdinReader stdinReader;
-    QObject::connect (&stdinReader, &stdinReader::finished, &app, &QCoreApplication::quit);
+    // Initialize the dispatcher object
     JobDispatcher jobDispatcher;
-    QObject::connect (&stdinReader, &stdinReader::writeAnswerLine, &jobDispatcher, &JobDispatcher::writeAnswerLine);
-    QObject::connect (&stdinReader, &stdinReader::squidRequest, &jobDispatcher, &JobDispatcher::squidRequest);
+    QObject::connect (&jobDispatcher, &JobDispatcher::finished, &app, &QCoreApplication::quit);
+    jobDispatcher.start ();
 
-    qDebug() << "Startup finished. Entering main loop...";
-    stdinReader.start ();
-#error I have to make my jobDispatcher object process the last event from stdinReader.
-#error Currently, the queued event is permanently lost when the program receives an EOF.
-    int r = app.exec ();
-    stdinReader.wait ();
-    return (r);
+    qDebug() << "Startup finished.Entering main loop...";
+    return (app.exec ());
 }
 
 #ifdef QT_NO_DEBUG
@@ -101,15 +93,18 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
 #ifdef QT_NO_DEBUG
         QString msgLineContext ("");
 #else
-        QString msgLineContext (QString(" (%1:%2, %3)").arg(context.file).arg(context.line).arg(context.function));
+        QString msgLineContext (QString(" (%1:%2%3)").arg(context.file).arg(context.line).arg((context.function[0]) ? (QString(", %1").arg(context.function)) : ""));
 #endif
-        QString msgTransform (msg.trimmed ());
-        if (msgTransform.left(1) == "\"")
-            msgTransform.remove (0, 1);
-        if (msgTransform.right(1) == "\"")
-            msgTransform.chop(1);
-        QString msgLine (QString("[%1] 0x%2 %3: %4").arg(AppRuntime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss")).arg((ulong) QThread::currentThread(), 16, 16, QChar('0')).arg(prefix).arg(msgTransform.trimmed() + msgLineContext));
-        std::cerr << msgLine.toLocal8Bit().constData() << std::endl;
+        QStringList msgLines (msg.split(QRegExp("[\\r\\n]+"), QString::SkipEmptyParts));
+        for (QStringList::const_iterator msgLine = msgLines.constBegin(); msgLine != msgLines.constEnd(); msgLine++) {
+            QString msgTransform ((*msgLine).trimmed ());
+            if (msgTransform.left(1) == "\"")
+                msgTransform.remove (0, 1);
+            if (msgTransform.right(1) == "\"")
+                msgTransform.chop(1);
+            QString msgLineFormatted (QString("[%1] 0x%2 %3: %4").arg(AppRuntime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss")).arg((ulong) QThread::currentThread(), 16, 16, QChar('0')).arg(prefix).arg(msgTransform.trimmed() + msgLineContext));
+            std::cerr << msgLineFormatted.toLocal8Bit().constData() << std::endl;
+        }
     }
     if (type == QtFatalMsg) {
         abort ();
@@ -208,6 +203,7 @@ bool loadRuntimeVariables () {
     helpersList.removeDuplicates();
     QStringList unknownOptionNames(optionsParser.unknownOptionNames());
     QStringList addOptionNames;
+    QHash<QString,QString> globalVariables;
     for (QStringList::iterator helper = helpersList.begin(); helper != helpersList.end(); helper++) {
         (*helper) = (*helper).trimmed ();
         for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
@@ -219,7 +215,7 @@ bool loadRuntimeVariables () {
         AppHelper objHelper;
         objHelper.name = (*helper);
         // Get helper variables from configuration file
-        configSettings.beginGroup (*helper);
+        configSettings.beginGroup (objHelper.name);
         QStringList globalVariableNames = configSettings.childKeys ();
         for (QStringList::const_iterator globalVariable = globalVariableNames.constBegin (); globalVariable != globalVariableNames.constEnd (); globalVariable++) {
             QVariant configValue (configSettings.value(*globalVariable));
@@ -228,12 +224,12 @@ bool loadRuntimeVariables () {
                 qCritical() << QString("Invalid value '%3' is set for config key '%1/%2'. Please, quote the parameter!").arg(*helper).arg(*globalVariable).arg(configValue.toStringList().join(",").trimmed());
                 return (false);
             }
-            objHelper.globalVariables[*globalVariable] = configValue.toString().trimmed();
+            globalVariables[objHelper.name + "." + (*globalVariable)] = configValue.toString().trimmed();
         }
         configSettings.endGroup ();
         for (QStringList::const_iterator optionName = unknownOptionNames.constBegin(); optionName != unknownOptionNames.constEnd(); optionName++) {
-            if ((*optionName).startsWith ((*helper) + ".")) {
-                objHelper.globalVariables.insert ((*optionName).mid((*helper).length() + 1), QString());
+            if ((*optionName).startsWith (objHelper.name + ".")) {
+                globalVariables.insert ((*optionName), QString());
                 addOptionNames << (*optionName);
             }
         }
@@ -262,7 +258,13 @@ bool loadRuntimeVariables () {
     for (QList<AppHelper>::iterator objHelper = AppRuntime::helperObjects.begin(); objHelper != AppRuntime::helperObjects.end(); objHelper++) {
         for (QStringList::const_iterator optionName = addOptionNames.constBegin(); optionName != addOptionNames.constEnd(); optionName++) {
             if ((*optionName).startsWith (objHelper->name + ".")) {
-                objHelper->globalVariables[(*optionName).mid(objHelper->name.length() + 1)] = optionsParser.value (*optionName).trimmed();
+                globalVariables[(*optionName)] = optionsParser.value (*optionName).trimmed();
+            }
+        }
+        objHelper->code = "";
+        for (QHash<QString,QString>::const_iterator variable = globalVariables.constBegin(); variable != globalVariables.constEnd(); variable++) {
+            if (variable.key().startsWith (objHelper->name + ".")) {
+                objHelper->code += "var " + variable.key().mid(objHelper->name.length() + 1) + " = unescape ('" + QString::fromUtf8(QUrl::toPercentEncoding (variable.value())) + "');\n";
             }
         }
     }
@@ -278,7 +280,7 @@ bool loadRuntimeVariables () {
         if (helperFile.open (QIODevice::ReadOnly | QIODevice::Text)) {
             {
                 QTextStream helperFileStream (&helperFile);
-                objHelper->code = helperFileStream.readAll ();
+                objHelper->code = AppHelper::AppHelperCodeHeader + objHelper->code + "\n" + helperFileStream.readAll() + AppHelper::AppHelperCodeFooter;
             }
             if (helperFile.error() != QFileDevice::NoError) {
                 qCritical() << QString("Error reading contents of file '%1': '%2'!").arg(helperFile.fileName()).arg(helperFile.errorString());

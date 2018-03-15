@@ -11,10 +11,10 @@
 #include <QThread>
 #include <QUrl>
 
-class stdinReader : public QThread {
+class StdinReader : public QThread {
     Q_OBJECT
 public:
-    explicit stdinReader (QObject *parent = 0);
+    StdinReader (QObject *parent = 0);
 protected:
     void run ();
 signals:

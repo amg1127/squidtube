@@ -64,9 +64,11 @@ const QString AppHelper::AppHelperCodeHeader (
         "\"use strict\";\n"
         "/* var global_variable_a = unescape ('foo'); */\n"
         "/* var global_variable_b = unescape ('bar'); */\n"
+        "\n"
 );
 
 const QString AppHelper::AppHelperCodeFooter (
+        "\n"
         "return (function (/* callback, context, method, args */) {\n"
             "try {\n"
                 "return ({\n"

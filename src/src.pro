@@ -20,14 +20,16 @@ SOURCES += main.cpp \
     databasebridge.cpp \
     stdinreader.cpp \
     jobdispatcher.cpp \
-    jobworker.cpp
+    jobworker.cpp \
+    javascriptbridge.cpp
 
 HEADERS  += appconfig.h \
     appruntime.h \
     databasebridge.h \
     stdinreader.h \
     jobdispatcher.h \
-    jobworker.h
+    jobworker.h \
+    javascriptbridge.h
 
 # Turn warnings into errors
 unix {

@@ -1,18 +1,42 @@
 #include "jobdispatcher.h"
 
-JobDispatcher::JobDispatcher (QObject *parent) : QObject(parent) {
+void JobDispatcher::jobWorkerFinished () {
+    this->numJobCarriers--;
+    if (this->numJobCarriers == 0) {
+        qDebug() << "Finishing all request workers...";
+        JobCarrier* jobCarrier;
+        while (! this->jobCarriers.isEmpty ()) {
+            jobCarrier = this->jobCarriers.takeLast ();
+            if (jobCarrier != Q_NULLPTR) {
+                delete (jobCarrier);
+            }
+        }
+        qDebug() << "All request workers finished.";
+        emit finished();
+    }
 }
 
-JobDispatcher::~JobDispatcher () {
-    qDebug() << "Finishing all request workers...";
-    JobCarrier* jobCarrier;
-    while (! this->jobCarriers.isEmpty ()) {
-        jobCarrier = this->jobCarriers.takeLast ();
-        if (jobCarrier != Q_NULLPTR) {
-            delete (jobCarrier);
-        }
+void JobDispatcher::stdinReaderFinished () {
+    emit finishWorkers ();
+}
+
+void JobDispatcher::writeAnswerLine (const QString& channel, const QString& msg, bool isError, bool isMatch) {
+    QString msgpart1("");
+    QString msgpart2("");
+    if (! channel.isEmpty()) {
+        msgpart1 += channel + " ";
+        msgpart2 += QString(" from channel #") + channel;
     }
-    qDebug() << "All request workers finished.";
+    std::cout << QString("%1%2 message=%3 log=%3")
+        .arg(msgpart1)
+        .arg((isError) ? "BH" : ((isMatch) ? "OK" : "ERR"))
+        .arg(QString::fromUtf8(QUrl::toPercentEncoding (msg)))
+        .toLocal8Bit().constData() << std::endl;
+    if (isError) {
+        qWarning() << QString("An internal error occurred while processing the request") + msgpart2 + ": " + msg;
+    } else {
+        qInfo() << QString("Channel #%1 answered: isMatch=%2 ; message=%3").arg(channel).arg((isMatch) ? "true" : "false").arg(msg);
+    }
 }
 
 void JobDispatcher::squidRequest (const int requestChannelNumber, const QString& requestChannel, const QUrl& requestUrl, const QStringList& requestData) {
@@ -52,11 +76,14 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
         }
         JobCarrier* carrier = this->jobCarriers[requestChannelNumber];
         if (carrier == Q_NULLPTR) {
-            qDebug() << QString("Creating a new handler for the channel #%1...").arg(requestChannelNumber);
+            qInfo() << QString("Creating a new handler for channel #%1...").arg(requestChannelNumber);
             carrier = new JobCarrier (requestChannel, this);
             QObject::connect (carrier->worker(), &JobWorker::writeAnswerLine, this, &JobDispatcher::writeAnswerLine);
-            carrier->start ();
+            QObject::connect (this, &JobDispatcher::finishWorkers, carrier->worker(), &JobWorker::quit);
+            QObject::connect (carrier, &JobCarrier::finished, this, &JobDispatcher::jobWorkerFinished);
             this->jobCarriers[requestChannelNumber] = carrier;
+            this->numJobCarriers++;
+            carrier->start ();
         }
         carrier->squidRequestIn (requestUrl, requestProperty, requestCaseSensivity, requestPatternSyntax, requestTokens);
     } else {
@@ -64,19 +91,26 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
     }
 }
 
-void JobDispatcher::writeAnswerLine (const QString& channel, const QString& msg, bool isError, bool isMatch) {
-    QString msgpart1("");
-    QString msgpart2("");
-    if (! channel.isEmpty()) {
-        msgpart1 += channel + " ";
-        msgpart2 += QString(" from channel #") + channel;
+JobDispatcher::JobDispatcher (QObject *parent) :
+    QObject (parent),
+    started (false),
+    numJobCarriers (0) {
+    QObject::connect (&this->stdinReader, &StdinReader::finished, this, &JobDispatcher::stdinReaderFinished);
+    QObject::connect (&this->stdinReader, &StdinReader::writeAnswerLine, this, &JobDispatcher::writeAnswerLine);
+    QObject::connect (&this->stdinReader, &StdinReader::squidRequest, this, &JobDispatcher::squidRequest);
+}
+
+JobDispatcher::~JobDispatcher () {
+    if (this->stdinReader.isRunning () || this->numJobCarriers || (! this->jobCarriers.isEmpty ())) {
+        qFatal("Program tried to destruct a JobDispatcher unexpectedly!");
     }
-    std::cout << QString("%1%2 message=%3 log=%3")
-        .arg(msgpart1)
-        .arg((isError) ? "BH" : ((isMatch) ? "OK" : "ERR"))
-        .arg(QString::fromUtf8(QUrl::toPercentEncoding (msg)))
-        .toLocal8Bit().constData() << std::endl;
-    if (isError) {
-        qWarning() << QString("An internal error occurred while processing the request") + msgpart2 + ": " + msg;
+}
+
+void JobDispatcher::start (QThread::Priority priority) {
+    if (this->started) {
+        qFatal("Invalid procedure call! This method must be called only once!");
+    } else {
+        this->stdinReader.start (priority);
+        this->started = true;
     }
 }
