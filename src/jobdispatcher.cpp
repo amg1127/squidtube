@@ -17,7 +17,12 @@ void JobDispatcher::jobWorkerFinished () {
 }
 
 void JobDispatcher::stdinReaderFinished () {
-    emit finishWorkers ();
+    if (this->numJobCarriers) {
+        emit finishWorkers ();
+    } else {
+        qDebug() << "There is no worker instances running. Immediate finish will take place.";
+        emit finished ();
+    }
 }
 
 void JobDispatcher::writeAnswerLine (const QString& channel, const QString& msg, bool isError, bool isMatch) {
@@ -35,40 +40,42 @@ void JobDispatcher::writeAnswerLine (const QString& channel, const QString& msg,
     if (isError) {
         qWarning() << QString("An internal error occurred while processing the request") + msgpart2 + ": " + msg;
     } else {
-        qInfo() << QString("Channel #%1 answered: isMatch=%2 ; message=%3").arg(channel).arg((isMatch) ? "true" : "false").arg(msg);
+        qInfo() << QString("Channel #%1 answered: isMatch=%2 ; message='%3'").arg(channel).arg((isMatch) ? "true" : "false").arg(msg);
     }
 }
 
 void JobDispatcher::squidRequest (const int requestChannelNumber, const QString& requestChannel, const QUrl& requestUrl, const QStringList& requestData) {
     if (requestChannelNumber >= 0 && requestUrl.isValid() && (! requestData.isEmpty())) {
-        QStringList requestTokens (requestData);
+        AppSquidRequest squidRequest;
+        squidRequest.url = requestUrl;
+        squidRequest.criteria = requestData;
+        squidRequest.property = squidRequest.criteria.takeFirst();
+        squidRequest.caseSensivity = Qt::CaseSensitive;
+        squidRequest.patternSyntax = QRegExp::RegExp;
         // Decode the tokens
-        for (QStringList::iterator token = requestTokens.begin(); token != requestTokens.end(); token++) {
+        for (QStringList::iterator token = squidRequest.criteria.begin(); token != squidRequest.criteria.end(); token++) {
             (*token) = QUrl::fromPercentEncoding ((*token).toUtf8());
         }
-        QString requestProperty (requestTokens.takeFirst());
-        Qt::CaseSensitivity requestCaseSensivity (Qt::CaseSensitive);
-        QRegExp::PatternSyntax requestPatternSyntax (QRegExp::RegExp);
         // Check the flags that may have specified by the administrator
-        for (QString requestFlag = requestTokens.takeFirst(); ! requestTokens.isEmpty(); requestFlag = requestTokens.takeFirst()) {
+        while (! squidRequest.criteria.isEmpty ()) {
+            QString requestFlag (squidRequest.criteria.takeFirst());
             if (requestFlag.left(1) == "-") {
                 if (requestFlag == "-f" || requestFlag == "--fixed") {
-                    requestPatternSyntax = QRegExp::FixedString;
+                    squidRequest.patternSyntax = QRegExp::FixedString;
                 } else if (requestFlag == "-w" || requestFlag == "--wildcard") {
-                    requestPatternSyntax = QRegExp::WildcardUnix;
+                    squidRequest.patternSyntax = QRegExp::WildcardUnix;
                 } else if (requestFlag == "-i" || requestFlag == "--ignorecase") {
-                    requestCaseSensivity = Qt::CaseInsensitive;
+                    squidRequest.caseSensivity = Qt::CaseInsensitive;
                 } else {
                     this->writeAnswerLine (requestChannel, QString("ACL specifies an invalid flag: ") + requestFlag, true, false);
                     return;
                 }
             } else {
                 // No more flags to look for
-                requestTokens.prepend (requestFlag);
+                squidRequest.criteria.prepend (requestFlag);
                 break;
             }
         }
-
         // Now, send the request to a worker
         // Create if it does not exists yet
         while (requestChannelNumber >= this->jobCarriers.count()) {
@@ -78,14 +85,14 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
         if (carrier == Q_NULLPTR) {
             qInfo() << QString("Creating a new handler for channel #%1...").arg(requestChannelNumber);
             carrier = new JobCarrier (requestChannel, this);
-            QObject::connect (carrier->worker(), &JobWorker::writeAnswerLine, this, &JobDispatcher::writeAnswerLine);
-            QObject::connect (this, &JobDispatcher::finishWorkers, carrier->worker(), &JobWorker::quit);
+            QObject::connect (carrier->worker(), &JobWorker::writeAnswerLine, this, &JobDispatcher::writeAnswerLine, Qt::QueuedConnection);
+            QObject::connect (this, &JobDispatcher::finishWorkers, carrier->worker(), &JobWorker::quit, Qt::QueuedConnection);
             QObject::connect (carrier, &JobCarrier::finished, this, &JobDispatcher::jobWorkerFinished);
             this->jobCarriers[requestChannelNumber] = carrier;
             this->numJobCarriers++;
             carrier->start ();
         }
-        carrier->squidRequestIn (requestUrl, requestProperty, requestCaseSensivity, requestPatternSyntax, requestTokens);
+        carrier->squidRequestIn (squidRequest);
     } else {
         qFatal("Invalid procedure call!");
     }
@@ -96,8 +103,8 @@ JobDispatcher::JobDispatcher (QObject *parent) :
     started (false),
     numJobCarriers (0) {
     QObject::connect (&this->stdinReader, &StdinReader::finished, this, &JobDispatcher::stdinReaderFinished);
-    QObject::connect (&this->stdinReader, &StdinReader::writeAnswerLine, this, &JobDispatcher::writeAnswerLine);
-    QObject::connect (&this->stdinReader, &StdinReader::squidRequest, this, &JobDispatcher::squidRequest);
+    QObject::connect (&this->stdinReader, &StdinReader::writeAnswerLine, this, &JobDispatcher::writeAnswerLine, Qt::QueuedConnection);
+    QObject::connect (&this->stdinReader, &StdinReader::squidRequest, this, &JobDispatcher::squidRequest, Qt::QueuedConnection);
 }
 
 JobDispatcher::~JobDispatcher () {

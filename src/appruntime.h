@@ -5,8 +5,10 @@
 #include <QHash>
 #include <QList>
 #include <QMutex>
+#include <QRegExp>
 #include <QSemaphore>
 #include <QString>
+#include <QUrl>
 
 class AppHelper {
 public:
@@ -16,6 +18,16 @@ public:
     static const QString AppHelperCodeFooter;
     static const QString AppHelperExtension;
 };
+
+class AppSquidRequest {
+public:
+    QUrl url;
+    QString property;
+    Qt::CaseSensitivity caseSensivity;
+    QRegExp::PatternSyntax patternSyntax;
+    QStringList criteria;
+};
+
 
 class AppRuntime {
 public:

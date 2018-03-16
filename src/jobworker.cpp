@@ -1,82 +1,65 @@
 #include "jobworker.h"
 
-bool JobWorker::warnJsError (const QJSValue& jsValue, const QString& msg) {
-    if (jsValue.isError ()) {
-        qInfo() << QString("Javascript exception at %1:%2: %3: %4")
-            .arg(jsValue.property("fileName").toString())
-            .arg(jsValue.property("lineNumber").toInt())
-            .arg(jsValue.property("name").toString())
-            .arg(jsValue.property("message").toString());
-        qDebug() << jsValue.property("stack").toString().toLocal8Bit().constData();
-        if (! msg.isEmpty ()) {
-            qWarning() << msg;
-        }
-        return (true);
-    } else {
-        return (false);
-    }
-}
-
 void JobWorker::squidResponseOut (const QString& msg, bool isError, bool isMatch) {
     emit writeAnswerLine (this->requestChannel, msg, isError, isMatch);
-    this->numPendingJobs--;
-    if (this->finishRequested && this->numPendingJobs == 0) {
+    if (this->finishRequested && this->pendingRequestIDs.isEmpty ()) {
         qInfo() << QString("No pending jobs now. Finished handler for channel #%1.").arg(this->requestChannel);
         emit finished ();
     }
 }
 
+void JobWorker::processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls) {
+    if (helperInstance > 0 && helperInstance <= this->helperInstances.count() && appHelperSupportedUrls.isArray()) {
+        AppHelperInfo* appHelperInfo (this->helperInstances[helperInstance - 1]);
+        qDebug() << QString("Received pattern list of supported URL's from helper '%1'.").arg(appHelperInfo->name);
+        appHelperInfo->supportedURLs.clear ();
+        QJSValueIterator appHelperSupportedUrlIterator (appHelperSupportedUrls);
+        while (appHelperSupportedUrlIterator.hasNext ()) {
+#error There is something wrong with this loop. It should run once, but it is running twice
+#error Besides... I must reject empty regular expressions here.
+            appHelperSupportedUrlIterator.next ();
+            QJSValue appHelperSupportedUrl (appHelperSupportedUrlIterator.value ());
+            QRegExp regExpSupportedUrl;
+            if (appHelperSupportedUrl.isString ()) {
+                regExpSupportedUrl = QRegExp (appHelperSupportedUrl.toString(), Qt::CaseInsensitive, QRegExp::WildcardUnix);
+            } else if (appHelperSupportedUrl.isRegExp ()) {
+                regExpSupportedUrl = appHelperSupportedUrl.toVariant().toRegExp();
+            }
+            if (regExpSupportedUrl.isValid ()) {
+                appHelperInfo->supportedURLs.append (regExpSupportedUrl);
+            } else {
+                qWarning() << QString("Helper '%1' returned an invalid item: '%2'").arg(appHelperInfo->name).arg(JavascriptBridge::QJS2QString(appHelperSupportedUrl));
+            }
+        }
+    } else {
+        qWarning() << QString("Invalid returned data: count=%1 , instance=%2 , data='%3'").arg(this->helperInstances.count()).arg(helperInstance).arg(JavascriptBridge::QJS2QString(appHelperSupportedUrls));
+    }
+}
+
 JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
     QObject (parent),
-    numPendingJobs (0),
     finishRequested (false),
     requestChannel (requestChannel),
-    runtimeEnvironment (new QQmlEngine (this)) {
+    runtimeEnvironment (new QQmlEngine (this)),
+    javascriptBridge (new JavascriptBridge ((*runtimeEnvironment), requestChannel)),
+    requestId (1) {
+    QObject::connect (this->javascriptBridge, &JavascriptBridge::valueReturnedFromJavascript, this, &JobWorker::valueReturnedFromJavascript);
     for (QList<AppHelper>::const_iterator appHelper = AppRuntime::helperObjects.constBegin(); appHelper != AppRuntime::helperObjects.constEnd(); appHelper++) {
         AppHelperInfo* appHelperInfo = new AppHelperInfo;
+        this->helperInstances.append (appHelperInfo);
         appHelperInfo->name = appHelper->name;
         appHelperInfo->isAvailable = false;
         appHelperInfo->entryPoint = this->runtimeEnvironment->evaluate (appHelper->code, appHelperInfo->name + AppHelper::AppHelperExtension), QString("A Javascript exception occurred while the helper '%1' was initializing. It will be disabled!").arg(appHelperInfo->name);
-        if (! JobWorker::warnJsError (appHelperInfo->entryPoint)) {
-            if (appHelperInfo->entryPoint.isCallable ()) {
+        if (! JavascriptBridge::warnJsError (appHelperInfo->entryPoint)) {
+            if (this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, this->helperInstances.count(), JavascriptMethod::getSupportedUrls)) {
                 appHelperInfo->isAvailable = true;
-                /*
-                // The helper script must implement the supportedUrls() function and
-                // must return an array of either string or regular expression elements
-                QJSValue appHelperSupportedUrls (appHelperInfo->environment.evaluate ("supportedUrls();"));
-                if (! JobWorker::warnJsError (appHelperSupportedUrls, QString("A Javascript exception occurred while collecting information from the helper '%1'. It will be disabled!").arg(appHelperInfo->name))) {
-                    if (appHelperSupportedUrls.isArray()) {
-                        quint32 appHelperSupportedUrlsLength = appHelperSupportedUrls.property("length").toUInt();
-                        for (quint32 pos = 0; pos < appHelperSupportedUrlsLength; pos++) {
-                            QJSValue appHelperSupportedUrl (appHelperSupportedUrls.property (pos));
-                            QRegExp regExpSupportedUrl;
-                            if (appHelperSupportedUrl.isString ()) {
-                                regExpSupportedUrl = QRegExp (appHelperSupportedUrl.toString(), Qt::CaseInsensitive, QRegExp::WildcardUnix);
-                            } else if (appHelperSupportedUrl.isRegExp ()) {
-                                regExpSupportedUrl = appHelperSupportedUrl.toVariant().toRegExp();
-                            }
-                            if (regExpSupportedUrl.isValid ()) {
-                                appHelperInfo->supportedURLs.append (regExpSupportedUrl);
-                            } else {
-                                qWarning() << QString("'supportedUrls();' function from helper %1 returned an invalid item at position #%2!").arg(appHelperInfo->name).arg(pos);
-                            }
-                        }
-                        // appHelperInfo->isAvailable = true;
-                    } else {
-                        qWarning() << QString("'supportedUrls();' function returned invalid data. The helper '%1' will be disabled!").arg(appHelperInfo->name);
-                    }
-                }
-                */
-            } else {
-                qWarning() << QString("Initialization returned '%1' instead of a function. The helper '%2' will be disabled!").arg(JavascriptBridge::QJS2QString(appHelperInfo->entryPoint)).arg(appHelperInfo->name);
             }
         }
-        this->helperInstances.append (appHelperInfo);
     }
 }
 
 JobWorker::~JobWorker () {
-    if (! (this->numPendingJobs == 0 && this->finishRequested)) {
+    if (! (this->pendingRequestIDs.isEmpty () && this->finishRequested)) {
         qFatal("Program tried to destruct a JobWorker unexpectedly!");
     }
     while (! this->helperInstances.isEmpty ()) {
@@ -85,24 +68,58 @@ JobWorker::~JobWorker () {
     delete (this->runtimeEnvironment);
 }
 
-void JobWorker::squidRequestIn (const QUrl& requestUrl, const QString& requestProperty, Qt::CaseSensitivity requestCaseSensivity, QRegExp::PatternSyntax requestPatternSyntax, const QStringList& requestData) {
-    qDebug() << QString("JobDispatcher has sent an ACL matching request to channel #%1.").arg(this->requestChannel);
-    this->numPendingJobs++;
+void JobWorker::valueReturnedFromJavascript (int context, const QString& method, const QJSValue& returnedValue) {
+    if (method == "getSupportedUrls") {
+        this->processSupportedUrls (context, returnedValue);
+    } else if (method == "getObjectFromUrl") {
+#warning TODO
+        qCritical() << "Answer to 'getObjectFromUrl();' is not ready yet!";
+    } else if (method == "getPropertiesFromObject") {
+#warning TODO
+        qCritical() << "Answer to 'getPropertiesFromObject();' is not ready yet!";
+    } else {
+        qCritical() << QString("Javascript returned value from an unexpected method invocation: context=%1 , method='%2' , returnedValue='%3'").arg(context).arg(method).arg(JavascriptBridge::QJS2QString (returnedValue));
+    }
+}
 
-#warning Testing
-    qDebug() << requestUrl << requestProperty << requestCaseSensivity << requestPatternSyntax << requestData;
-    this->squidResponseOut ("Not implemented yet!", true, false);
+void JobWorker::squidRequestIn (const AppSquidRequest& squidRequest) {
+    qDebug() << QString("JobDispatcher has sent an ACL matching request to channel #%1.").arg(this->requestChannel);
+    int numHelpers = this->helperInstances.count ();
+    QString urlString (squidRequest.url.toString ());
+    for (int helperPos = 0; helperPos < numHelpers; helperPos++) {
+        AppHelperInfo* appHelperInfo (this->helperInstances[helperPos]);
+        int numSupportedUrls = appHelperInfo->supportedURLs.count ();
+        for (int supportedUrlPos = 0; supportedUrlPos < numSupportedUrls; supportedUrlPos++) {
+            if (urlString.indexOf (appHelperInfo->supportedURLs[supportedUrlPos]) >= 0) {
+                int requestId (this->requestId);
+                this->requestId += 2;
+                this->pendingRequestIDs.append (requestId);
+                this->pendingRequests.append (squidRequest);
+                if (! this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, requestId, JavascriptMethod::getObjectFromUrl, urlString)) {
+                    requestId = this->pendingRequestIDs.indexOf (requestId);
+                    if (requestId >= 0) {
+                        this->pendingRequestIDs.removeAt (requestId);
+                        this->pendingRequests.removeAt (requestId);
+                    }
+                    this->squidResponseOut (QString("'%1.getObjectFromUrl ();' function returned an error!").arg(appHelperInfo->name), true, false);
+                }
+                return;
+            }
+        }
+    }
+    this->squidResponseOut ("Unable to find a helper that handles the requested URL.", false, false);
 }
 
 void JobWorker::quit () {
     this->finishRequested = true;
-    if (this->numPendingJobs == 0) {
+    int numPendingRequests (this->pendingRequestIDs.count ());
+    if (numPendingRequests == 0) {
         qInfo() << QString("Finished handler for channel #%1.").arg(this->requestChannel);
         emit finished ();
-    } else if (this->numPendingJobs == 1) {
+    } else if (numPendingRequests == 1) {
         qInfo() << QString("Finish request received by handler for channel #%1, but there is a pending answer.").arg(this->requestChannel);
     } else {
-        qInfo() << QString("Finish request received by handler for channel #%1, but there are %2 pending answers.").arg(this->requestChannel).arg(this->numPendingJobs);
+        qInfo() << QString("Finish request received by handler for channel #%1, but there are %2 pending answers.").arg(this->requestChannel).arg(numPendingRequests);
     }
 }
 
@@ -117,7 +134,7 @@ JobCarrier::JobCarrier (const QString& requestChannel, QObject* parent) :
     QObject::connect (this->workerObj, &JobWorker::finished, this->threadObj, &QThread::quit);
     QObject::connect (this->threadObj, &QThread::finished, this->workerObj, &QObject::deleteLater);
     QObject::connect (this->threadObj, &QThread::finished, this, &JobCarrier::finished);
-    QObject::connect (this, &JobCarrier::squidRequestOut, this->workerObj, &JobWorker::squidRequestIn);
+    QObject::connect (this, &JobCarrier::squidRequestOut, this->workerObj, &JobWorker::squidRequestIn, Qt::QueuedConnection);
 }
 
 JobCarrier::~JobCarrier () {
@@ -136,6 +153,6 @@ void JobCarrier::start (QThread::Priority priority) {
     }
 }
 
-void JobCarrier::squidRequestIn (const QUrl& requestUrl, const QString& requestProperty, Qt::CaseSensitivity requestCaseSensivity, QRegExp::PatternSyntax requestPatternSyntax, const QStringList& requestData) {
-    emit squidRequestOut (requestUrl, requestProperty, requestCaseSensivity, requestPatternSyntax, requestData);
+void JobCarrier::squidRequestIn (const AppSquidRequest& squidRequest) {
+    emit squidRequestOut (squidRequest);
 }

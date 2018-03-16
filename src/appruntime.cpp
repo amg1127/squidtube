@@ -104,9 +104,9 @@ const QString AppHelper::AppHelperCodeFooter (
  * * function getObjectFromUrl (callback, url) { }
  *
  *   Receives an URL that the helper declared to support. The helper must parse the URL and return an object
- *   with properties 'className' and 'id'. The C++ program then will search the database for cached data about
- *   the object. If there is no cached data, the helper will be asked to retrieve it through the function
- *   'getPropertiesFromObject()'.
+ *   (or a JSON object as a string) with properties 'className' and 'id' defined. The C++ program then will search
+ *   the database for cached data about the object. If there is no cached data, the helper will be asked to retrieve
+ *   it through the function 'getPropertiesFromObject()'.
  *
  * * function getPropertiesFromObject (callback, className, id) { }
  *

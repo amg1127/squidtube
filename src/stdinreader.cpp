@@ -9,7 +9,7 @@ void StdinReader::run () {
     while (! std::getline (std::cin, stdinLine).eof()) {
         // Expected format is [channel-ID] %URI property [-flag [-flag [...] ] ] criteria [criteria [criteria [...]]]
         QString tokens (QString::fromLocal8Bit(stdinLine.data(), (int) stdinLine.size()).trimmed ());
-        qInfo() << QString("Received an ACL matching request: %1").arg(tokens);
+        qInfo() << QString("Received an ACL matching request: '%1'").arg(tokens);
         if (tokens.isEmpty ()) {
             emit writeAnswerLine ("", "an empty request was received", true, false);
         } else {
@@ -41,7 +41,7 @@ void StdinReader::run () {
                         emit squidRequest (requestChannelNumber, requestChannel, requestUrl, requestTokens);
                     }
                 } else {
-                    emit writeAnswerLine (requestChannel, "invalid URL was received", true, false);
+                    emit writeAnswerLine (requestChannel, QString("invalid URL was received: %1").arg(requestUrl.errorString ()), true, false);
                 }
             }
         }

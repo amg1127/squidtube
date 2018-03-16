@@ -26,19 +26,24 @@ public:
 class JobWorker : public QObject {
     Q_OBJECT
 private:
-    unsigned int numPendingJobs;
     bool finishRequested;
     QString requestChannel;
     QList<AppHelperInfo*> helperInstances;
     QQmlEngine* runtimeEnvironment;
+    JavascriptBridge* javascriptBridge;
+    int requestId;
+    QList<AppSquidRequest> pendingRequests;
+    QList<int> pendingRequestIDs;
     void squidResponseOut (const QString& msg, bool isError, bool isMatch);
-    static bool warnJsError (const QJSValue& jsValue, const QString& msg = QString());
+    void processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls);
 public:
     JobWorker (const QString& requestChannel, QObject* parent = Q_NULLPTR);
     ~JobWorker();
+private slots:
+    void valueReturnedFromJavascript (int context, const QString& method, const QJSValue& returnedValue);
 public slots:
     void quit ();
-    void squidRequestIn (const QUrl& requestUrl, const QString& requestProperty, Qt::CaseSensitivity requestCaseSensivity, QRegExp::PatternSyntax requestPatternSyntax, const QStringList& requestData);
+    void squidRequestIn (const AppSquidRequest& squidRequest);
 signals:
     void writeAnswerLine (const QString& channel, const QString& msg, bool isError, bool isMatch);
     void finished();
@@ -56,9 +61,9 @@ public:
     inline JobWorker* worker () { return (this->workerObj); }
     void start (QThread::Priority priority = QThread::InheritPriority);
     inline bool wait (unsigned long time = ULONG_MAX) { return (this->threadObj->wait (time)); }
-    void squidRequestIn (const QUrl& requestUrl, const QString& requestProperty, Qt::CaseSensitivity requestCaseSensivity, QRegExp::PatternSyntax requestPatternSyntax, const QStringList& requestData);
+    void squidRequestIn (const AppSquidRequest& squidRequest);
 signals:
-    void squidRequestOut (const QUrl& requestUrl, const QString& requestProperty, Qt::CaseSensitivity requestCaseSensivity, QRegExp::PatternSyntax requestPatternSyntax, const QStringList& requestData);
+    void squidRequestOut (const AppSquidRequest& squidRequest);
     void finished ();
 };
 

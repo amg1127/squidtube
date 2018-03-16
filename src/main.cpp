@@ -27,11 +27,11 @@ bool loadRuntimeVariables ();
 void increaseMemoryLimit ();
 
 int main(int argc, char *argv[]) {
+    qInstallMessageHandler (messageHandlerFunction);
+
     QCoreApplication::setApplicationName(APP_project_name);
     QCoreApplication::setApplicationVersion(APP_project_version);
     QCoreApplication::setOrganizationName(APP_owner_name);
-
-    qInstallMessageHandler (messageHandlerFunction);
 
     QCoreApplication app(argc, argv);
     qDebug() << "Starting...";
@@ -39,6 +39,7 @@ int main(int argc, char *argv[]) {
     // Manually register some QtMetaTypes, so I can queue variables of those types under QObject::connect
     qRegisterMetaType<Qt::CaseSensitivity>("Qt::CaseSensitivity");
     qRegisterMetaType<QRegExp::PatternSyntax>("QRegExp::PatternSyntax");
+    qRegisterMetaType<AppSquidRequest>("AppSquidRequest");
 
     // Make sure that default program settings are valid
     // The validation code builds only if debug build is requested during compilation
@@ -59,10 +60,10 @@ int main(int argc, char *argv[]) {
 
     // Initialize the dispatcher object
     JobDispatcher jobDispatcher;
-    QObject::connect (&jobDispatcher, &JobDispatcher::finished, &app, &QCoreApplication::quit);
+    QObject::connect (&jobDispatcher, &JobDispatcher::finished, &app, &QCoreApplication::quit, Qt::QueuedConnection);
     jobDispatcher.start ();
 
-    qDebug() << "Startup finished.Entering main loop...";
+    qDebug() << "Startup finished. Entering main loop...";
     return (app.exec ());
 }
 
