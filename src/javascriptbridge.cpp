@@ -23,10 +23,9 @@ QJsonValue JavascriptBridge::QJS2QJsonValue (const QJSValue& value) {
         return (QJsonValue (value.toString()));
     } else if (value.isArray ()) {
         QJsonArray jsonArray;
-        QJSValueIterator i (value);
-        while (i.hasNext ()) {
-            i.next ();
-            jsonArray.append (JavascriptBridge::QJS2QJsonValue (i.value ()));
+        int length = value.property("length").toInt ();
+        for (int i = 0; i < length; i++) {
+            jsonArray.append (JavascriptBridge::QJS2QJsonValue (value.property (i)));
         }
         return (jsonArray);
     } else if (value.isObject ()) {

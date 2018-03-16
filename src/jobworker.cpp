@@ -11,14 +11,12 @@ void JobWorker::squidResponseOut (const QString& msg, bool isError, bool isMatch
 void JobWorker::processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls) {
     if (helperInstance > 0 && helperInstance <= this->helperInstances.count() && appHelperSupportedUrls.isArray()) {
         AppHelperInfo* appHelperInfo (this->helperInstances[helperInstance - 1]);
-        qDebug() << QString("Received pattern list of supported URL's from helper '%1'.").arg(appHelperInfo->name);
+        int length = appHelperSupportedUrls.property("length").toInt();
+        qDebug() << QString("Received %1 patterns of supported URL's from helper '%2'.").arg(length).arg(appHelperInfo->name);
+        qDebug() << JavascriptBridge::QJS2QString (appHelperSupportedUrls);
         appHelperInfo->supportedURLs.clear ();
-        QJSValueIterator appHelperSupportedUrlIterator (appHelperSupportedUrls);
-        while (appHelperSupportedUrlIterator.hasNext ()) {
-#error There is something wrong with this loop. It should run once, but it is running twice
-#error Besides... I must reject empty regular expressions here.
-            appHelperSupportedUrlIterator.next ();
-            QJSValue appHelperSupportedUrl (appHelperSupportedUrlIterator.value ());
+        for (int i = 0; i < length; i++) {
+            QJSValue appHelperSupportedUrl (appHelperSupportedUrls.property (i));
             QRegExp regExpSupportedUrl;
             if (appHelperSupportedUrl.isString ()) {
                 regExpSupportedUrl = QRegExp (appHelperSupportedUrl.toString(), Qt::CaseInsensitive, QRegExp::WildcardUnix);
@@ -26,7 +24,11 @@ void JobWorker::processSupportedUrls (int helperInstance, const QJSValue& appHel
                 regExpSupportedUrl = appHelperSupportedUrl.toVariant().toRegExp();
             }
             if (regExpSupportedUrl.isValid ()) {
-                appHelperInfo->supportedURLs.append (regExpSupportedUrl);
+                if (regExpSupportedUrl.isEmpty ()) {
+                    qWarning() << QString("Discarding the empty regular expression #%1 returned by helper '%2'...").arg(i).arg(appHelperInfo->name);
+                } else {
+                    appHelperInfo->supportedURLs.append (regExpSupportedUrl);
+                }
             } else {
                 qWarning() << QString("Helper '%1' returned an invalid item: '%2'").arg(appHelperInfo->name).arg(JavascriptBridge::QJS2QString(appHelperSupportedUrl));
             }
@@ -49,8 +51,8 @@ JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
         this->helperInstances.append (appHelperInfo);
         appHelperInfo->name = appHelper->name;
         appHelperInfo->isAvailable = false;
-        appHelperInfo->entryPoint = this->runtimeEnvironment->evaluate (appHelper->code, appHelperInfo->name + AppHelper::AppHelperExtension), QString("A Javascript exception occurred while the helper '%1' was initializing. It will be disabled!").arg(appHelperInfo->name);
-        if (! JavascriptBridge::warnJsError (appHelperInfo->entryPoint)) {
+        appHelperInfo->entryPoint = this->runtimeEnvironment->evaluate (appHelper->code, appHelperInfo->name + AppHelper::AppHelperExtension);
+        if (! JavascriptBridge::warnJsError (appHelperInfo->entryPoint, QString("A Javascript exception occurred while the helper '%1' was initializing. It will be disabled!").arg(appHelperInfo->name))) {
             if (this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, this->helperInstances.count(), JavascriptMethod::getSupportedUrls)) {
                 appHelperInfo->isAvailable = true;
             }
@@ -95,7 +97,9 @@ void JobWorker::squidRequestIn (const AppSquidRequest& squidRequest) {
                 this->requestId += 2;
                 this->pendingRequestIDs.append (requestId);
                 this->pendingRequests.append (squidRequest);
-                if (! this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, requestId, JavascriptMethod::getObjectFromUrl, urlString)) {
+                if (this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, requestId, JavascriptMethod::getObjectFromUrl, urlString)) {
+                    return;
+                } else {
                     requestId = this->pendingRequestIDs.indexOf (requestId);
                     if (requestId >= 0) {
                         this->pendingRequestIDs.removeAt (requestId);
@@ -103,7 +107,6 @@ void JobWorker::squidRequestIn (const AppSquidRequest& squidRequest) {
                     }
                     this->squidResponseOut (QString("'%1.getObjectFromUrl ();' function returned an error!").arg(appHelperInfo->name), true, false);
                 }
-                return;
             }
         }
     }

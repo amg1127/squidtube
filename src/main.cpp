@@ -273,6 +273,8 @@ bool loadRuntimeVariables () {
     // This will be used by the databaseBridge object
     AppRuntime::dbStartupQueries = AppRuntime::dbStartupQuery.split(";");
 
+#warning Create a 'common' directory, which will hold any Javascript libraries that an administrator wishes to load before the helpers.
+
     // Load helpers into the memory
     qDebug() << "Loading helper contents into memory...";
     bool helpersLoaded = true;
