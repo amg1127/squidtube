@@ -75,6 +75,8 @@ JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestC
     myself (jsEngine.newQObject (this)),
     requestChannel (requestChannel),
     transactionId (1) {
+    // "require();" function implementation
+    jsEngine.globalObject().setProperty ("require", this->myself.property ("require"));
 }
 
 QJSValue JavascriptBridge::QJson2QJS (QJSEngine& jsEngine, const QJsonDocument& value) {
@@ -186,5 +188,35 @@ void JavascriptBridge::receiveValue (int context, const QString& method, const Q
         emit valueReturnedFromJavascript (this->transactionContexts.takeAt(pos), method, returnedValue);
     } else {
         qWarning() << QString("Unexpected data '%1' received by a invocation of method '%2' on channel #%3! It will be discarded.").arg(JavascriptBridge::QJS2QString (returnedValue)).arg(method).arg(this->requestChannel);
+    }
+}
+
+void JavascriptBridge::require (const QJSValue& library) {
+    QJSEngine* jsEngine (qjsEngine (this));
+    if (jsEngine != Q_NULLPTR) {
+        if (library.isString ()) {
+            QString libraryName (library.toString ());
+            QString libraryCode;
+            if (! this->loadedLibraries.contains (libraryName)) {
+                {
+                    QMutexLocker sourcesMutexLocker (&AppRuntime::sourcesMutex);
+                    QHash<QString,QString>::const_iterator librarySource (AppRuntime::commonSources.find(libraryName));
+                    if (librarySource != AppRuntime::commonSources.constEnd()) {
+                        libraryCode = librarySource.value ();
+                    }
+                }
+                if (libraryCode.isNull ()) {
+                    qInfo() << QString("Library '%1' requested by a helper on channel #%2 was not found!").arg(libraryName).arg(this->requestChannel);
+                } else {
+                    qDebug() << QString("Loading library '%1' requested by a helper on channel #%2...").arg(libraryName).arg(this->requestChannel);
+                    this->loadedLibraries.append (libraryName);
+                    JavascriptBridge::warnJsError (jsEngine->evaluate(libraryCode, AppHelper::AppCommonSubDir + "/" + libraryName + AppHelper::AppHelperExtension), QString("Uncaught exception found while library '%1' was being loaded on channel #%2...").arg(libraryName).arg(this->requestChannel));
+                }
+            }
+        } else {
+            qInfo() << QString("Unable to load a library requested by a helper on channel #%1 because an invalid specification!").arg(this->requestChannel);
+        }
+    } else {
+        qFatal("JavascriptBridge object must be bound to a QJSEngine! Invoke 'QJSEngine::newQObject();'!");
     }
 }

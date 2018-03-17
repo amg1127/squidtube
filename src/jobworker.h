@@ -9,6 +9,7 @@
 #include <QQmlEngine>
 #include <QQmlNetworkAccessManagerFactory>
 #include <QRegExp>
+#include <QJsonDocument>
 #include <QJSValue>
 #include <QString>
 #include <QStringList>
@@ -34,8 +35,12 @@ private:
     int requestId;
     QList<AppSquidRequest> pendingRequests;
     QList<int> pendingRequestIDs;
-    void squidResponseOut (const QString& msg, bool isError, bool isMatch);
+    int appendRequest (const AppSquidRequest& squidRequest, const QString& helperName);
+    AppSquidRequest getRequest (int requestId);
+    AppSquidRequest takeRequest (int requestId);
+    void squidResponseOut (const int requestId, const QString& msg, bool isError, bool isMatch);
     void processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls);
+    void processObjectFromUrl (int helperInstance, const QJSValue& appHelperObjectFromUrl);
 public:
     JobWorker (const QString& requestChannel, QObject* parent = Q_NULLPTR);
     ~JobWorker();

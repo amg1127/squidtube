@@ -1,6 +1,8 @@
 #ifndef JAVASCRIPTBRIDGE_H
 #define JAVASCRIPTBRIDGE_H
 
+#include "appruntime.h"
+
 #include <QDateTime>
 #include <QJSEngine>
 #include <QJSValue>
@@ -9,6 +11,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QList>
+#include <QMutexLocker>
 #include <QObject>
 #include <QtDebug>
 
@@ -28,6 +31,7 @@ private:
     int transactionId;
     QList<int> pendingTransactions;
     QList<int> transactionContexts;
+    QStringList loadedLibraries;
     static QJsonValue QJS2QJsonValue (const QJSValue& value);
     static QJSValue QJson2QJS (QJSEngine& jsEngine, const QJsonValue& value);
 public:
@@ -39,6 +43,7 @@ public:
     bool invokeMethod (QJSValue& entryPoint, int context, int method, QJSValue args = QJSValue(QJSValue::UndefinedValue));
     bool invokeMethod (QJSValue& entryPoint, int context, const QString& method, QJSValue args = QJSValue(QJSValue::UndefinedValue));
     Q_INVOKABLE void receiveValue (int context, const QString& method, const QJSValue& returnedValue);
+    Q_INVOKABLE void require (const QJSValue& library);
 signals:
     void valueReturnedFromJavascript (int context, const QString& method, const QJSValue& returnedValue);
 };

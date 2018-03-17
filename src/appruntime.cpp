@@ -20,11 +20,13 @@ QString AppRuntime::dbStartupQuery("");
 
 // Default application settings go above
 
-QList<AppHelper> AppRuntime::helperObjects;
+QHash<QString,QString> AppRuntime::helperSources;
+QHash<QString,QString> AppRuntime::commonSources;
+QMutex AppRuntime::sourcesMutex;
 
+int AppRuntime::dbInstance = 0;
 QStringList AppRuntime::dbStartupQueries;
 QMutex AppRuntime::dbSettingsMutex;
-int AppRuntime::dbInstance = 0;
 
 QDateTime AppRuntime::currentDateTime () {
     static QMutex m (QMutex::Recursive);
@@ -33,6 +35,8 @@ QDateTime AppRuntime::currentDateTime () {
     return (dateTime);
 }
 
+const QString AppHelper::AppHelperSubDir("helpers");
+const QString AppHelper::AppCommonSubDir("common");
 const QString AppHelper::AppHelperExtension(".js");
 
 /*
@@ -65,8 +69,8 @@ const QString AppHelper::AppHelperExtension(".js");
 const QString AppHelper::AppHelperCodeHeader (
     "(function () {\n"
         "\"use strict\";\n"
-        "/* var global_variable_a = unescape ('foo'); */\n"
-        "/* var global_variable_b = unescape ('bar'); */\n"
+        "/* let global_variable_a = unescape ('foo'); */\n"
+        "/* let global_variable_b = unescape ('bar'); */\n"
         "\n"
 );
 

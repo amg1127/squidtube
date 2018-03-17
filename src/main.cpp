@@ -8,10 +8,12 @@
 #include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
+#include <QLinkedList>
 #include <QMutex>
 #include <QMutexLocker>
-#include <QNetworkAccessManager>
 #include <QNetworkProxyFactory>
 #include <QSettings>
 #include <QtDebug>
@@ -98,12 +100,15 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
 #endif
         QStringList msgLines (msg.split(QRegExp("[\\r\\n]+"), QString::SkipEmptyParts));
         for (QStringList::const_iterator msgLine = msgLines.constBegin(); msgLine != msgLines.constEnd(); msgLine++) {
-            QString msgTransform ((*msgLine).trimmed ());
+            QString msgTransform (*msgLine);
+            while ((! msgTransform.isEmpty ()) && msgTransform.right(1).at(0).isSpace()) {
+                msgTransform.chop(1);
+            }
             if (msgTransform.left(1) == "\"")
                 msgTransform.remove (0, 1);
             if (msgTransform.right(1) == "\"")
                 msgTransform.chop(1);
-            QString msgLineFormatted (QString("[%1] 0x%2 %3: %4").arg(AppRuntime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss")).arg((ulong) QThread::currentThread(), 16, 16, QChar('0')).arg(prefix).arg(msgTransform.trimmed() + msgLineContext));
+            QString msgLineFormatted (QString("[%1] 0x%2 %3: %4").arg(AppRuntime::currentDateTime().toString("yyyy-MM-dd'T'HH:mm:ss.zzzt")).arg((ulong) QThread::currentThread(), 16, 16, QChar('0')).arg(prefix).arg(msgTransform.trimmed() + msgLineContext));
             std::cerr << msgLineFormatted.toLocal8Bit().constData() << std::endl;
         }
     }
@@ -206,17 +211,15 @@ bool loadRuntimeVariables () {
     QStringList addOptionNames;
     QHash<QString,QString> globalVariables;
     for (QStringList::iterator helper = helpersList.begin(); helper != helpersList.end(); helper++) {
-        (*helper) = (*helper).trimmed ();
+        (*helper) = helper->trimmed ();
         for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
             if (! i->configSection.compare (*helper, Qt::CaseInsensitive)) {
                 qCritical() << QString("Invalid helper specification: '%1'!").arg(*helper);
                 return (false);
             }
         }
-        AppHelper objHelper;
-        objHelper.name = (*helper);
         // Get helper variables from configuration file
-        configSettings.beginGroup (objHelper.name);
+        configSettings.beginGroup (*helper);
         QStringList globalVariableNames = configSettings.childKeys ();
         for (QStringList::const_iterator globalVariable = globalVariableNames.constBegin (); globalVariable != globalVariableNames.constEnd (); globalVariable++) {
             QVariant configValue (configSettings.value(*globalVariable));
@@ -225,16 +228,15 @@ bool loadRuntimeVariables () {
                 qCritical() << QString("Invalid value '%3' is set for config key '%1/%2'. Please, quote the parameter!").arg(*helper).arg(*globalVariable).arg(configValue.toStringList().join(",").trimmed());
                 return (false);
             }
-            globalVariables[objHelper.name + "." + (*globalVariable)] = configValue.toString().trimmed();
+            globalVariables[(*helper) + "." + (*globalVariable)] = configValue.toString().trimmed();
         }
         configSettings.endGroup ();
         for (QStringList::const_iterator optionName = unknownOptionNames.constBegin(); optionName != unknownOptionNames.constEnd(); optionName++) {
-            if ((*optionName).startsWith (objHelper.name + ".")) {
+            if (optionName->startsWith ((*helper) + ".")) {
                 globalVariables.insert ((*optionName), QString());
                 addOptionNames << (*optionName);
             }
         }
-        AppRuntime::helperObjects << objHelper;
     }
 
     // Parse command line arguments again, considering variables set for helpers
@@ -256,16 +258,17 @@ bool loadRuntimeVariables () {
         optionsParser.showHelp (); return (false);
     }
     addOptionNames = optionsParser.optionNames ();
-    for (QList<AppHelper>::iterator objHelper = AppRuntime::helperObjects.begin(); objHelper != AppRuntime::helperObjects.end(); objHelper++) {
+
+    for (QStringList::iterator helper = helpersList.begin(); helper != helpersList.end(); helper++) {
         for (QStringList::const_iterator optionName = addOptionNames.constBegin(); optionName != addOptionNames.constEnd(); optionName++) {
-            if ((*optionName).startsWith (objHelper->name + ".")) {
+            if ((*optionName).startsWith ((*helper) + ".")) {
                 globalVariables[(*optionName)] = optionsParser.value (*optionName).trimmed();
             }
         }
-        objHelper->code = "";
+        QHash<QString,QString>::iterator helperCode (AppRuntime::helperSources.insert ((*helper), ""));
         for (QHash<QString,QString>::const_iterator variable = globalVariables.constBegin(); variable != globalVariables.constEnd(); variable++) {
-            if (variable.key().startsWith (objHelper->name + ".")) {
-                objHelper->code += "var " + variable.key().mid(objHelper->name.length() + 1) + " = unescape ('" + QString::fromUtf8(QUrl::toPercentEncoding (variable.value())) + "');\n";
+            if (variable.key().startsWith ((*helper) + ".")) {
+                helperCode.value() += "let " + variable.key().mid(helper->length() + 1) + " = unescape ('" + QString::fromUtf8(QUrl::toPercentEncoding (variable.value())) + "');\n";
             }
         }
     }
@@ -273,17 +276,57 @@ bool loadRuntimeVariables () {
     // This will be used by the databaseBridge object
     AppRuntime::dbStartupQueries = AppRuntime::dbStartupQuery.split(";");
 
-#warning Create a 'common' directory, which will hold any Javascript libraries that an administrator wishes to load before the helpers.
-
+    // Load common libraries into the memory
+    qDebug() << "Loading common library contents into memory...";
+    bool librariesLoaded = true;
+    QLinkedList<QFileInfo> libraries;
+    QFileInfo libraryRoot (QString(APP_install_share_dir) + "/" + AppHelper::AppCommonSubDir);
+    int libraryRootPathLength (libraryRoot.filePath().length());
+    libraries.prepend (libraryRoot);
+    while (! libraries.isEmpty ()) {
+        QFileInfo library (libraries.takeFirst ());
+        if (library.isDir() && library.fileName() != "." && library.fileName() != "..") {
+            QDir libraryDir (library.filePath ());
+            QFileInfoList libraryDirContents (libraryDir.entryInfoList ());
+            for (QFileInfoList::const_iterator libraryFile = libraryDirContents.constBegin(); libraryFile != libraryDirContents.constEnd(); libraryFile++) {
+                libraries.prepend (*libraryFile);
+            }
+        } else if (library.isFile() && library.fileName().endsWith(AppHelper::AppHelperExtension)) {
+            QFile libraryFile (library.filePath ());
+            if (libraryFile.open (QIODevice::ReadOnly | QIODevice::Text)) {
+                {
+                    QTextStream libraryFileStream (&libraryFile);
+                    QString libraryName (library.filePath().mid(libraryRootPathLength + 1));
+                    libraryName.chop (AppHelper::AppHelperExtension.length());
+                    AppRuntime::commonSources.insert (libraryName, libraryFileStream.readAll());
+                }
+                if (libraryFile.error() != QFileDevice::NoError) {
+                    qCritical() << QString("Error reading contents of file '%1': '%2'!").arg(libraryFile.fileName()).arg(libraryFile.errorString());
+                    librariesLoaded = false;
+                }
+                if (! libraryFile.atEnd ()) {
+                    qWarning() << QString("The file '%1' was not read completely!").arg(libraryFile.fileName());
+                    librariesLoaded = false;
+                }
+                libraryFile.close ();
+            } else {
+                qCritical() << QString("Unable to open file '%1' for reading: '%2'!").arg(libraryFile.fileName()).arg(libraryFile.errorString());
+                librariesLoaded = false;
+            }
+        }
+    }
+    if (! librariesLoaded) {
+        return (false);
+    }
     // Load helpers into the memory
     qDebug() << "Loading helper contents into memory...";
     bool helpersLoaded = true;
-    for (QList<AppHelper>::iterator objHelper = AppRuntime::helperObjects.begin(); helpersLoaded && objHelper != AppRuntime::helperObjects.end(); objHelper++) {
-        QFile helperFile (QString(APP_install_share_dir) + "/" + objHelper->name + AppHelper::AppHelperExtension);
+    for (QStringList::iterator helper = helpersList.begin(); helper != helpersList.end(); helper++) {
+        QFile helperFile (QString(APP_install_share_dir) + "/" + AppHelper::AppHelperSubDir + "/" + (*helper) + AppHelper::AppHelperExtension);
         if (helperFile.open (QIODevice::ReadOnly | QIODevice::Text)) {
             {
                 QTextStream helperFileStream (&helperFile);
-                objHelper->code = AppHelper::AppHelperCodeHeader + objHelper->code + "\n" + helperFileStream.readAll() + AppHelper::AppHelperCodeFooter;
+                AppRuntime::helperSources[(*helper)] = AppHelper::AppHelperCodeHeader + AppRuntime::helperSources[(*helper)] + "\n" + helperFileStream.readAll() + AppHelper::AppHelperCodeFooter;
             }
             if (helperFile.error() != QFileDevice::NoError) {
                 qCritical() << QString("Error reading contents of file '%1': '%2'!").arg(helperFile.fileName()).arg(helperFile.errorString());

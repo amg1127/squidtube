@@ -12,11 +12,11 @@
 
 class AppHelper {
 public:
-    QString name;
-    QString code;
+    static const QString AppHelperSubDir;
+    static const QString AppCommonSubDir;
+    static const QString AppHelperExtension;
     static const QString AppHelperCodeHeader;
     static const QString AppHelperCodeFooter;
-    static const QString AppHelperExtension;
 };
 
 class AppSquidRequest {
@@ -26,6 +26,8 @@ public:
     Qt::CaseSensitivity caseSensivity;
     QRegExp::PatternSyntax patternSyntax;
     QStringList criteria;
+    qint64 timestamp;
+    QString helperName;
 };
 
 
@@ -47,7 +49,9 @@ public:
 
     // Runtime configuration
     // Helpers information
-    static QList<AppHelper> helperObjects;
+    static QHash<QString,QString> helperSources;
+    static QHash<QString,QString> commonSources;
+    static QMutex sourcesMutex;
     // Database information
     static int dbInstance;
     static QStringList dbStartupQueries;

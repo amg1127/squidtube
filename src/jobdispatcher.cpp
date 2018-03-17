@@ -54,7 +54,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
         squidRequest.patternSyntax = QRegExp::RegExp;
         // Decode the tokens
         for (QStringList::iterator token = squidRequest.criteria.begin(); token != squidRequest.criteria.end(); token++) {
-            (*token) = QUrl::fromPercentEncoding ((*token).toUtf8());
+            (*token) = QUrl::fromPercentEncoding (token->toUtf8());
         }
         // Check the flags that may have specified by the administrator
         while (! squidRequest.criteria.isEmpty ()) {
@@ -92,6 +92,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
             this->numJobCarriers++;
             carrier->start ();
         }
+        squidRequest.timestamp = (AppRuntime::currentDateTime().toMSecsSinceEpoch() / 1000);
         carrier->squidRequestIn (squidRequest);
     } else {
         qFatal("Invalid procedure call!");
