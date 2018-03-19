@@ -92,7 +92,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
             this->numJobCarriers++;
             carrier->start ();
         }
-        squidRequest.timestamp = (AppRuntime::currentDateTime().toMSecsSinceEpoch() / 1000);
+        squidRequest.timestampNow = (AppRuntime::currentDateTime().toMSecsSinceEpoch() / 1000);
         carrier->squidRequestIn (squidRequest);
     } else {
         qFatal("Invalid procedure call!");

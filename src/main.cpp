@@ -26,6 +26,7 @@
 
 void messageHandlerFunction (QtMsgType, const QMessageLogContext&, const QString&);
 bool loadRuntimeVariables ();
+void unloadRuntimeVariables ();
 void increaseMemoryLimit ();
 
 int main(int argc, char *argv[]) {
@@ -51,22 +52,26 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
-    if (! loadRuntimeVariables ()) {
-        return (1);
+    int returnValue = 1;
+
+    if (loadRuntimeVariables ()) {
+        increaseMemoryLimit ();
+
+        // Initialize networking environment
+        QNetworkProxyFactory::setUseSystemConfiguration (true);
+
+        // Initialize the dispatcher object
+        JobDispatcher jobDispatcher;
+        QObject::connect (&jobDispatcher, &JobDispatcher::finished, &app, &QCoreApplication::quit, Qt::QueuedConnection);
+        jobDispatcher.start ();
+
+        qDebug() << "Startup finished. Entering main loop...";
+        returnValue = app.exec ();
     }
 
-    increaseMemoryLimit ();
-
-    // Initialize networking environment
-    QNetworkProxyFactory::setUseSystemConfiguration (true);
-
-    // Initialize the dispatcher object
-    JobDispatcher jobDispatcher;
-    QObject::connect (&jobDispatcher, &JobDispatcher::finished, &app, &QCoreApplication::quit, Qt::QueuedConnection);
-    jobDispatcher.start ();
-
-    qDebug() << "Startup finished. Entering main loop...";
-    return (app.exec ());
+    qDebug() << "Performing final cleaning and finishing program...";
+    unloadRuntimeVariables ();
+    return (returnValue);
 }
 
 #ifdef QT_NO_DEBUG
@@ -81,7 +86,7 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
     case QtFatalMsg:
         prefix = "FATAL" ; break;
     case QtCriticalMsg:
-        prefix = "CRITICAL" ; break;
+        prefix = "ERROR" ; break;
     case QtWarningMsg:
         prefix = "WARNING" ; break;
     case QtInfoMsg:
@@ -91,12 +96,14 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
     default:
         prefix = "UNKNOWN";
     }
-    QString possibleLevels ("DIWCFU");
+    static QString possibleLevels ("DIWEFU");
     if (! (possibleLevels.indexOf (AppRuntime::loglevel[0]) > possibleLevels.indexOf (prefix[0]))) {
 #ifdef QT_NO_DEBUG
         QString msgLineContext ("");
+        QString dateTimeFormat ("yyyy-MM-dd'T'HH:mm:sst");
 #else
-        QString msgLineContext (QString(" (%1:%2%3)").arg(context.file).arg(context.line).arg((context.function[0]) ? (QString(", %1").arg(context.function)) : ""));
+        QString msgLineContext (QString(" (%1:%2%3)").arg((context.file) ? ((context.file[0]) ? context.file : "(unknown)") : "(unknown)").arg((context.line) ? context.line : 0).arg((context.function) ? ((context.function[0]) ? (QString(", %1").arg(context.function)) : "") : ""));
+        QString dateTimeFormat ("yyyy-MM-dd'T'HH:mm:ss.zzzt");
 #endif
         QStringList msgLines (msg.split(QRegExp("[\\r\\n]+"), QString::SkipEmptyParts));
         for (QStringList::const_iterator msgLine = msgLines.constBegin(); msgLine != msgLines.constEnd(); msgLine++) {
@@ -108,7 +115,7 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
                 msgTransform.remove (0, 1);
             if (msgTransform.right(1) == "\"")
                 msgTransform.chop(1);
-            QString msgLineFormatted (QString("[%1] 0x%2 %3: %4").arg(AppRuntime::currentDateTime().toString("yyyy-MM-dd'T'HH:mm:ss.zzzt")).arg((ulong) QThread::currentThread(), 16, 16, QChar('0')).arg(prefix).arg(msgTransform.trimmed() + msgLineContext));
+            QString msgLineFormatted (QString("[%1] 0x%2 %3: %4").arg(AppRuntime::currentDateTime().toString(dateTimeFormat)).arg((ulong) QThread::currentThreadId(), 16, 16, QChar('0')).arg(prefix).arg(msgTransform.trimmed() + msgLineContext));
             std::cerr << msgLineFormatted.toLocal8Bit().constData() << std::endl;
         }
     }
@@ -142,7 +149,7 @@ bool loadRuntimeVariables () {
     qDebug() << "Parsing command line options...";
     QStringList arguments(QCoreApplication::arguments());
     QCommandLineParser optionsParser;
-    optionsParser.setApplicationDescription ("An external ACL helper that enables control over accesses to videos.");
+    optionsParser.setApplicationDescription ("An external Squid ACL class helper that provides control over access to videos (through my own helpers).");
     optionsParser.addOption (QCommandLineOption ("config", "Path of the program configuration file.", "config", QString("%1/%2.conf").arg(APP_install_etc_dir).arg(APP_project_name)));
     for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
         optionsParser.addOption (QCommandLineOption (i->configSection + "." + i->configName, i->configDescription, i->configName, *(i->configValue)));
@@ -273,60 +280,109 @@ bool loadRuntimeVariables () {
         }
     }
 
-    // This will be used by the databaseBridge object
-    AppRuntime::dbStartupQueries = AppRuntime::dbStartupQuery.split(";");
+    // This will be used by the DatabaseBridge object
+    AppRuntime::dbStartupQueries = AppRuntime::dbStartupQuery.split(QRegExp("\\s*;\\s*"), QString::SkipEmptyParts);
+    int length = AppRuntime::dbStartupQueries.count();
+    for (int index = 0; index < length; index++) {
+        AppRuntime::dbStartupQueries[index] = AppRuntime::dbStartupQueries[index].trimmed ();
+        if (AppRuntime::dbStartupQueries[index].isEmpty()) {
+            AppRuntime::dbStartupQueries.removeAt (index);
+            index--;
+            length--;
+        }
+    }
+
+    // This will be used by all JobWorker objects
+    AppRuntime::registryTTLint = AppRuntime::registryTTL.toLongLong (Q_NULLPTR, 10);
 
     // Load common libraries into the memory
     qDebug() << "Loading common library contents into memory...";
     bool librariesLoaded = true;
     QLinkedList<QFileInfo> libraries;
-    QFileInfo libraryRoot (QString(APP_install_share_dir) + "/" + AppHelper::AppCommonSubDir);
+
+    // Search libraries from the architecture-independent data directory first
+    QFileInfo libraryRoot (QString(APP_install_share_dir) + "/" + AppConstants::AppCommonSubDir);
     int libraryRootPathLength (libraryRoot.filePath().length());
+    libraries.prepend (libraryRoot);
+    QHash<QString,QString> libraryCandidates;
+    while (! libraries.isEmpty ()) {
+        QFileInfo library (libraries.takeFirst ());
+        if (library.isDir()) {
+            if (library.fileName() != "." && library.fileName() != "..") {
+                QDir libraryDir (library.filePath ());
+                QFileInfoList libraryDirContents (libraryDir.entryInfoList ());
+                for (QFileInfoList::const_iterator libraryFile = libraryDirContents.constBegin(); libraryFile != libraryDirContents.constEnd(); libraryFile++) {
+                    libraries.prepend (*libraryFile);
+                }
+            }
+        } else if (library.isFile() && library.fileName().endsWith(AppConstants::AppHelperExtension)) {
+            QString libraryName (library.filePath().mid(libraryRootPathLength + 1));
+            libraryName.chop (AppConstants::AppHelperExtension.length());
+            libraryCandidates.insert (libraryName, library.filePath ());
+        }
+    }
+    // Figure which libraries were overriden by administrator
+    QString configurationDir (QFileInfo(configFile).path());
+    libraryRoot.setFile (configurationDir + "/" + AppConstants::AppCommonSubDir);
+    libraryRootPathLength = libraryRoot.filePath().length();
     libraries.prepend (libraryRoot);
     while (! libraries.isEmpty ()) {
         QFileInfo library (libraries.takeFirst ());
-        if (library.isDir() && library.fileName() != "." && library.fileName() != "..") {
-            QDir libraryDir (library.filePath ());
-            QFileInfoList libraryDirContents (libraryDir.entryInfoList ());
-            for (QFileInfoList::const_iterator libraryFile = libraryDirContents.constBegin(); libraryFile != libraryDirContents.constEnd(); libraryFile++) {
-                libraries.prepend (*libraryFile);
+        if (library.isDir()) {
+            if (library.fileName() != "." && library.fileName() != "..") {
+                QDir libraryDir (library.filePath ());
+                QFileInfoList libraryDirContents (libraryDir.entryInfoList ());
+                for (QFileInfoList::const_iterator libraryFile = libraryDirContents.constBegin(); libraryFile != libraryDirContents.constEnd(); libraryFile++) {
+                    libraries.prepend (*libraryFile);
+                }
             }
-        } else if (library.isFile() && library.fileName().endsWith(AppHelper::AppHelperExtension)) {
-            QFile libraryFile (library.filePath ());
-            if (libraryFile.open (QIODevice::ReadOnly | QIODevice::Text)) {
-                {
-                    QTextStream libraryFileStream (&libraryFile);
-                    QString libraryName (library.filePath().mid(libraryRootPathLength + 1));
-                    libraryName.chop (AppHelper::AppHelperExtension.length());
-                    AppRuntime::commonSources.insert (libraryName, libraryFileStream.readAll());
-                }
-                if (libraryFile.error() != QFileDevice::NoError) {
-                    qCritical() << QString("Error reading contents of file '%1': '%2'!").arg(libraryFile.fileName()).arg(libraryFile.errorString());
-                    librariesLoaded = false;
-                }
-                if (! libraryFile.atEnd ()) {
-                    qWarning() << QString("The file '%1' was not read completely!").arg(libraryFile.fileName());
-                    librariesLoaded = false;
-                }
-                libraryFile.close ();
-            } else {
-                qCritical() << QString("Unable to open file '%1' for reading: '%2'!").arg(libraryFile.fileName()).arg(libraryFile.errorString());
+        } else if (library.isFile() && library.fileName().endsWith(AppConstants::AppHelperExtension)) {
+            QString libraryName (library.filePath().mid(libraryRootPathLength + 1));
+            libraryName.chop (AppConstants::AppHelperExtension.length());
+            libraryCandidates.insert (libraryName, library.filePath ());
+        }
+    }
+    // Now load library contents
+    for (QHash<QString,QString>::const_iterator library = libraryCandidates.constBegin(); librariesLoaded && library != libraryCandidates.constEnd(); library++) {
+        QFile libraryFile (library.value ());
+        if (libraryFile.open (QIODevice::ReadOnly | QIODevice::Text)) {
+            {
+                QTextStream libraryFileStream (&libraryFile);
+                AppRuntime::commonSources.insert (library.key(), libraryFileStream.readAll());
+                qDebug() << QString("Loaded library '%1' from script file '%2'.").arg(library.key()).arg(library.value());
+            }
+            if (libraryFile.error() != QFileDevice::NoError) {
+                qCritical() << QString("Error reading contents of file '%1': '%2'!").arg(library.value()).arg(libraryFile.errorString());
                 librariesLoaded = false;
             }
+            if (! libraryFile.atEnd ()) {
+                qWarning() << QString("The file '%1' was not read completely!").arg(library.value());
+                librariesLoaded = false;
+            }
+            libraryFile.close ();
+        } else {
+            qCritical() << QString("Unable to open file '%1' for reading: '%2'!").arg(library.value()).arg(libraryFile.errorString());
+            librariesLoaded = false;
         }
     }
     if (! librariesLoaded) {
         return (false);
     }
+
     // Load helpers into the memory
     qDebug() << "Loading helper contents into memory...";
     bool helpersLoaded = true;
-    for (QStringList::iterator helper = helpersList.begin(); helper != helpersList.end(); helper++) {
-        QFile helperFile (QString(APP_install_share_dir) + "/" + AppHelper::AppHelperSubDir + "/" + (*helper) + AppHelper::AppHelperExtension);
+    for (QStringList::iterator helper = helpersList.begin(); helpersLoaded && helper != helpersList.end(); helper++) {
+        QFile helperFile (configurationDir + "/" + AppConstants::AppHelperSubDir + "/" + (*helper) + AppConstants::AppHelperExtension);
+        if (! helperFile.exists ()) {
+            helperFile.setFileName (QString(APP_install_share_dir) + "/" + AppConstants::AppHelperSubDir + "/" + (*helper) + AppConstants::AppHelperExtension);
+        }
         if (helperFile.open (QIODevice::ReadOnly | QIODevice::Text)) {
             {
                 QTextStream helperFileStream (&helperFile);
-                AppRuntime::helperSources[(*helper)] = AppHelper::AppHelperCodeHeader + AppRuntime::helperSources[(*helper)] + "\n" + helperFileStream.readAll() + AppHelper::AppHelperCodeFooter;
+                AppRuntime::helperSources[(*helper)] = AppConstants::AppHelperCodeHeader + AppRuntime::helperSources[(*helper)] + "\n" + helperFileStream.readAll() + AppConstants::AppHelperCodeFooter;
+                AppRuntime::helperMemoryCache.insert ((*helper), new AppHelperObjectCache());
+                qDebug() << QString("Loaded helper '%1' from script file '%2'.").arg(*helper).arg(helperFile.fileName());
             }
             if (helperFile.error() != QFileDevice::NoError) {
                 qCritical() << QString("Error reading contents of file '%1': '%2'!").arg(helperFile.fileName()).arg(helperFile.errorString());
@@ -347,4 +403,14 @@ bool loadRuntimeVariables () {
     }
 
     return (true);
+}
+
+void unloadRuntimeVariables () {
+    for (QHash<QString,AppHelperObjectCache*>::iterator helperMemoryCache = AppRuntime::helperMemoryCache.begin(); helperMemoryCache != AppRuntime::helperMemoryCache.end(); helperMemoryCache++) {
+        delete (*helperMemoryCache);
+    }
+    AppRuntime::helperMemoryCache.clear ();
+    AppRuntime::helperSources.clear ();
+    AppRuntime::commonSources.clear ();
+    AppRuntime::dbStartupQueries.clear ();
 }

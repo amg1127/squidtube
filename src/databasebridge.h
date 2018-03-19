@@ -24,12 +24,11 @@ public:
     static bool warnSqlError (const QSqlQuery& query, const QString& prefix = QString());
     static bool warnSqlError (const QSqlError& err, const QString& prefix = QString());
     static bool genericInsert (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& fields);
-    static QHash<QString,QVariant> genericSelect (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QString fieldList);
-    static QHash<QString,QVariant> genericSelect (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QStringList fields);
+    static QHash<QString,QVariant> genericSelect (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QString& fieldList);
+    static QHash<QString,QVariant> genericSelect (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QStringList& fields);
     static bool genericUpdate (QSqlDatabase& database, const QString& table, const QString& searchColumnName, const QVariant& searchColumnValue, const QString& updateColumnName, const QVariant& updateColumnValue, const bool& callGenericInsert = false);
     static bool genericUpdate (QSqlDatabase& database, const QString& table, const QString& searchColumnName, const QVariant& searchColumnValue, const QHash<QString,QVariant>& updateFields, const bool& callGenericInsert = false);
     static bool genericUpdate (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QHash<QString,QVariant>& updateFields, const bool& callGenericInsert = false);
-    static bool createTables (QSqlDatabase& database, QString helper);
 };
 
 #endif // DATABASEBRIDGE_H

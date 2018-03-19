@@ -7,8 +7,8 @@
 
 QList<AppConfigValidSetting> AppConfig::AppConfigValidSettings = QList<AppConfigValidSetting>()
 
-    << AppConfigValidSetting("main", "loglevel", "Logging level used by the program. One of: DEBUG, INFO, WARNING, CRITICAL",
-        QRegExp("(CRITICAL|WARNING|INFO|DEBUG)"), AppRuntime::loglevel)
+    << AppConfigValidSetting("main", "loglevel", "Logging level used by the program. One of: DEBUG, INFO, WARNING, ERROR",
+        QRegExp("(DEBUG|INFO|WARNING|ERROR)"), AppRuntime::loglevel)
 
     << AppConfigValidSetting("main", "helpers", "Comma-separated list of helpers that the program will load from the architecture independent data directory.",
         QRegExp("([\\w-_]+(\\s*,\\s*[\\w-_]+)*)?"), AppRuntime::helpers)
@@ -38,7 +38,10 @@ QList<AppConfigValidSetting> AppConfig::AppConfigValidSettings = QList<AppConfig
         QRegExp(".*"), AppRuntime::dbName)
 
     << AppConfigValidSetting("db", "startup", "Semicolon-separated list of SQL queries that the database driver will run before issuing normal queries.",
-        QRegExp("([^;]+;)*"), AppRuntime::dbStartupQuery);
+        QRegExp("([^;]+;)*"), AppRuntime::dbStartupQuery)
+
+    << AppConfigValidSetting("db", "tableprefix", "Prefix used to name tables managed by the program.",
+        QRegExp("\\w+"), AppRuntime::dbTblPrefix);
 
 // Rules that dictate valid configuration parameters and their syntaxes go above
 

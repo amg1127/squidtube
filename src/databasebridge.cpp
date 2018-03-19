@@ -14,16 +14,17 @@ QSqlDatabase databaseBridge::database () {
     QStringList dbStartupQueries;
     {
         QMutexLocker locker (&AppRuntime::dbSettingsMutex);
-        dbDriver = AppRuntime::dbDriver;
-        dbHost = AppRuntime::dbHost;
-        dbPort = AppRuntime::dbPort;
-        dbUser = AppRuntime::dbUser;
-        dbPassword = AppRuntime::dbPassword;
-        dbOptions = AppRuntime::dbOptions;
-        dbStartupQueries = AppRuntime::dbStartupQueries;
         myDbInstance = AppRuntime::dbInstance++;
+        // Force a deep copy of the database configuration
+        // http://doc.qt.io/qt-5/implicit-sharing.html
+        dbDriver = QString("%1").arg(AppRuntime::dbDriver);
+        dbHost = QString("%1").arg(AppRuntime::dbHost);
+        dbPort = QString("%1").arg(AppRuntime::dbPort);
+        dbUser = QString("%1").arg(AppRuntime::dbUser);
+        dbPassword = QString("%1").arg(AppRuntime::dbPassword);
+        dbOptions = QString("%1").arg(AppRuntime::dbOptions);
+        dbStartupQueries << AppRuntime::dbStartupQueries;
     }
-
     QSqlDatabase sqldb (QSqlDatabase::addDatabase (dbDriver, QString("dbconn_%1").arg(myDbInstance)));
     if (sqldb.isValid()) {
         sqldb.setHostName (dbHost);
@@ -148,11 +149,11 @@ bool databaseBridge::genericInsert (QSqlDatabase& database, const QString& table
     return (false);
 }
 
-QHash<QString,QVariant> databaseBridge::genericSelect (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QString fieldList) {
+QHash<QString,QVariant> databaseBridge::genericSelect (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QString& fieldList) {
     return (databaseBridge::genericSelect (database, table, searchFields, fieldList.split(",")));
 }
 
-QHash<QString,QVariant> databaseBridge::genericSelect (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QStringList fields) {
+QHash<QString,QVariant> databaseBridge::genericSelect (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QStringList& fields) {
     QHash<QString,QVariant> returnValue;
     QString sqlinstr ("SELECT %1 FROM %2 WHERE %3;");
     QStringList placeholders;
@@ -185,10 +186,10 @@ QHash<QString,QVariant> databaseBridge::genericSelect (QSqlDatabase& database, c
                         returnValue[fields[pos]] = fields.value(pos);
                     }
                     if (query.next ()) {
-                        qWarning() << QString("Data retrieval from table '%1' returned more than a single result").arg(table);
+                        qInfo() << QString("Data retrieval from table '%1' returned more than a single result").arg(table);
                     }
                 } else {
-                    qWarning() << QString("Data retrieval from table '%1' returned no result").arg(table);
+                    qDebug() << QString("Data retrieval from table '%1' returned no result").arg(table);
                 }
             } else {
                 databaseBridge::warnSqlError (query, QString("Unable to execute data retrieval from table '%1'").arg(table));
@@ -240,7 +241,7 @@ bool databaseBridge::genericUpdate (QSqlDatabase& database, const QString& table
         }
 
         QSqlQuery query (database);
-        if (query.prepare (sqlinstr.arg(table).arg(placeholdersUpdate.join(", ").arg(placeholdersSearch.join(" AND "))))) {
+        if (query.prepare (sqlinstr.arg(table).arg(placeholdersUpdate.join(", ")).arg(placeholdersSearch.join(" AND ")))) {
             for (pos = 0; pos < numSearchFields; pos++) {
                 if (! searchFields[searchFieldsKeys[pos]].isNull()) {
                     query.bindValue(databaseBridge::placeholderPattern.arg(pos + numUpdateFields), searchFields[searchFieldsKeys[pos]]);
@@ -275,22 +276,6 @@ bool databaseBridge::genericUpdate (QSqlDatabase& database, const QString& table
             }
         } else {
             databaseBridge::warnSqlError (query, QString("Unable to prepare data update from table '%1'").arg(table));
-        }
-        query.clear ();
-    }
-    return (returnValue);
-}
-
-bool databaseBridge::createTables (QSqlDatabase& database, QString helper) {
-    bool returnValue = true;
-    QString table(QString("helper_") + helper);
-    if (! database.tables().contains (table, Qt::CaseInsensitive)) {
-        returnValue = false;
-        QSqlQuery query (database);
-        if (query.exec (QString("CREATE TABLE %1 (className VARCHAR(255) NOT NULL, id VARCHAR(255) NOT NULL, value TEXT NULL, timestamp INTEGER NOT NULL, PRIMARY KEY (className, id));").arg(table))) {
-            returnValue = true;
-        } else {
-            databaseBridge::warnSqlError (query, QString("Unable to create table '%1'").arg(table));
         }
         query.clear ();
     }

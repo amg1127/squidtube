@@ -53,12 +53,24 @@ function getObjectFromUrl (returnValue, url) {
                 };
             }
         }
-        returnValue (answer);
+        setTimeout (function () {
+            returnValue (answer);
+        }, 1000);
     } else {
         throw new URIError ("Invalid URL: '" + url + "'!");
     }
 }
 
 function getPropertiesFromObject (returnValue, className, id) {
-    throw new TypeError ("'getPropertiesFromObject (returnValue, className, id);' is not implemented yet!");
+    // throw new TypeError ("'getPropertiesFromObject (returnValue, className, id);' is not implemented yet!");
+    // This function drops repeated calls.
+    // I must reimplement setTimeout(), setInterval(), clearTimeout() and clearInterval()
+    console.warn ("late call requested.");
+    setTimeout (function () {
+        console.warn ("late call done.");
+        returnValue ({
+            "foo": "bar",
+            "id": 2345
+        });
+    }, 1000);
 }

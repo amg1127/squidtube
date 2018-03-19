@@ -10,6 +10,40 @@ const QStringList JavascriptMethod::requiredMethods (
         << "getPropertiesFromObject"
 );
 
+//////////////////////////////////////////////////////////////////
+
+JavascriptTimer::JavascriptTimer (QJSEngine& jsEngine, int timerId, bool repeat, int timeout, const QJSValue& callback) :
+    QTimer (&jsEngine),
+    timerId (timerId),
+    jsEngine (&jsEngine),
+    callback (callback) {
+    this->setSingleShot (! repeat);
+    QObject::connect (this, &QTimer::timeout, this, &JavascriptTimer::timerTimeout);
+    this->setInterval (timeout);
+}
+
+void JavascriptTimer::timerTimeout () {
+    bool finishTimer = false;
+    QJSValue returnValue;
+    if (this->callback.isCallable ()) {
+        returnValue = this->callback.call ();
+    } else if (this->callback.isString ()) {
+        returnValue = this->jsEngine->evaluate (this->callback.toString ());
+    } else {
+        qWarning() << "JavascriptTimer triggered, but callback value is not a function nor a string.";
+        finishTimer = true;
+    }
+    if (JavascriptBridge::warnJsError (returnValue, "Uncaught exception received while calling method specified as either 'setTimeout();' or 'setInterval();' argument!")) {
+        finishTimer = true;
+    }
+    if (this->isSingleShot () || finishTimer) {
+        this->stop ();
+        emit timerFinished (timerId);
+    }
+}
+
+//////////////////////////////////////////////////////////////////
+
 QJsonValue JavascriptBridge::QJS2QJsonValue (const QJSValue& value) {
     if (value.isBool ()) {
         return (QJsonValue (value.toBool ()));
@@ -70,13 +104,35 @@ QJSValue JavascriptBridge::QJson2QJS (QJSEngine& jsEngine, const QJsonValue& val
     }
 }
 
+QJSValue JavascriptBridge::createTimer (const bool repeat, const QJSValue& callback, const int interval) {
+    QJSEngine* jsEngine (qjsEngine (this));
+    if (jsEngine != Q_NULLPTR) {
+        int timerId (this->javascriptTimerId);
+        this->javascriptTimerId += 2;
+        JavascriptTimer* newTimer = new JavascriptTimer ((*jsEngine), timerId, repeat, ((interval > 1) ? interval : 1), callback);
+        this->javascriptTimers.insert (timerId, newTimer);
+        QObject::connect (newTimer, &JavascriptTimer::timerFinished, this, &JavascriptBridge::timerFinished);
+        newTimer->start ();
+        return (timerId);
+    } else {
+        qFatal("JavascriptBridge object must be bound to a QJSEngine! Invoke 'QJSEngine::newQObject();'!");
+        return (0);
+    }
+}
+
 JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestChannel) :
     QObject (Q_NULLPTR),
     myself (jsEngine.newQObject (this)),
     requestChannel (requestChannel),
-    transactionId (1) {
+    transactionId (1),
+    javascriptTimerId (1) {
     // "require();" function implementation
     jsEngine.globalObject().setProperty ("require", this->myself.property ("require"));
+    // "set/clear Timeout/Interval" functions implementation
+    jsEngine.globalObject().setProperty ("setTimeout", this->myself.property ("setTimeout"));
+    jsEngine.globalObject().setProperty ("setInterval", this->myself.property ("setInterval"));
+    jsEngine.globalObject().setProperty ("clearTimeout", this->myself.property ("clearTimeout"));
+    jsEngine.globalObject().setProperty ("clearInterval", this->myself.property ("clearInterval"));
 }
 
 QJSValue JavascriptBridge::QJson2QJS (QJSEngine& jsEngine, const QJsonDocument& value) {
@@ -152,6 +208,14 @@ bool JavascriptBridge::warnJsError (const QJSValue& jsValue, const QString& msg)
     }
 }
 
+/*
+ * A reminder: Javascript::invokeMethod must be the last call of every calling function.
+ * C++ methods will run out of the expected order if Javascript method returns values immediately, because
+ * QQmlEngine will call back the C++ method before the code flow returns to the event loop.
+ *
+ * Following a call to Javascript::invokeMethod, there should be error handling statements only.
+ */
+
 bool JavascriptBridge::invokeMethod (QJSValue& entryPoint, int context, int method, QJSValue args) {
     return (this->invokeMethod (entryPoint, context, JavascriptMethod::requiredMethods.value (method), args));
 }
@@ -160,15 +224,10 @@ bool JavascriptBridge::invokeMethod (QJSValue& entryPoint, int context, const QS
     if (entryPoint.isCallable ()) {
         int transactionId (this->transactionId);
         this->transactionId += 2;
-        this->pendingTransactions.prepend (transactionId);
-        this->transactionContexts.prepend (context);
+        this->pendingTransactions[transactionId] = context;
         QJSValue callReturn (entryPoint.call (QJSValueList() << this->myself.property("receiveValue") << transactionId << method << args));
         if (JavascriptBridge::warnJsError (callReturn, QString("Uncaught exception received while calling method '%1' on channel #%2!").arg(method).arg(this->requestChannel))) {
-            int pos = this->pendingTransactions.indexOf (transactionId);
-            if (pos >= 0) {
-                this->pendingTransactions.removeAt (pos);
-                this->transactionContexts.removeAt (pos);
-            }
+            this->pendingTransactions.remove (transactionId);
         } else {
             if (! callReturn.isUndefined ()) {
                 qWarning() << QString("Value '%1' returned from a call to method '%2' on channel #%3 will be discarded. Please, return values by using the following statement: 'arguments[0].call (returnValue);' !").arg(JavascriptBridge::QJS2QString (entryPoint)).arg(method).arg(this->requestChannel);
@@ -181,11 +240,9 @@ bool JavascriptBridge::invokeMethod (QJSValue& entryPoint, int context, const QS
     return (false);
 }
 
-void JavascriptBridge::receiveValue (int context, const QString& method, const QJSValue& returnedValue) {
-    int pos = this->pendingTransactions.indexOf (context);
-    if (pos >= 0) {
-        this->pendingTransactions.removeAt (context);
-        emit valueReturnedFromJavascript (this->transactionContexts.takeAt(pos), method, returnedValue);
+void JavascriptBridge::receiveValue (int transactionId, const QString& method, const QJSValue& returnedValue) {
+    if (this->pendingTransactions.contains (transactionId)) {
+        emit valueReturnedFromJavascript (this->pendingTransactions.take(transactionId), method, returnedValue);
     } else {
         qWarning() << QString("Unexpected data '%1' received by a invocation of method '%2' on channel #%3! It will be discarded.").arg(JavascriptBridge::QJS2QString (returnedValue)).arg(method).arg(this->requestChannel);
     }
@@ -199,10 +256,12 @@ void JavascriptBridge::require (const QJSValue& library) {
             QString libraryCode;
             if (! this->loadedLibraries.contains (libraryName)) {
                 {
-                    QMutexLocker sourcesMutexLocker (&AppRuntime::sourcesMutex);
+                    QMutexLocker m_lck (&AppRuntime::commonSourcesMutex);
                     QHash<QString,QString>::const_iterator librarySource (AppRuntime::commonSources.find(libraryName));
                     if (librarySource != AppRuntime::commonSources.constEnd()) {
-                        libraryCode = librarySource.value ();
+                        // Force a deep copy of the library source code
+                        // http://doc.qt.io/qt-5/implicit-sharing.html
+                        libraryCode = QString("%1").arg(librarySource.value());
                     }
                 }
                 if (libraryCode.isNull ()) {
@@ -210,7 +269,7 @@ void JavascriptBridge::require (const QJSValue& library) {
                 } else {
                     qDebug() << QString("Loading library '%1' requested by a helper on channel #%2...").arg(libraryName).arg(this->requestChannel);
                     this->loadedLibraries.append (libraryName);
-                    JavascriptBridge::warnJsError (jsEngine->evaluate(libraryCode, AppHelper::AppCommonSubDir + "/" + libraryName + AppHelper::AppHelperExtension), QString("Uncaught exception found while library '%1' was being loaded on channel #%2...").arg(libraryName).arg(this->requestChannel));
+                    JavascriptBridge::warnJsError (jsEngine->evaluate(libraryCode, AppConstants::AppCommonSubDir + "/" + libraryName + AppConstants::AppHelperExtension), QString("Uncaught exception found while library '%1' was being loaded on channel #%2...").arg(libraryName).arg(this->requestChannel));
                 }
             }
         } else {
@@ -218,5 +277,28 @@ void JavascriptBridge::require (const QJSValue& library) {
         }
     } else {
         qFatal("JavascriptBridge object must be bound to a QJSEngine! Invoke 'QJSEngine::newQObject();'!");
+    }
+}
+
+QJSValue JavascriptBridge::setTimeout (const QJSValue& callback, const int interval) {
+    return (this->createTimer (false, callback, interval));
+}
+
+QJSValue JavascriptBridge::setInterval (const QJSValue& callback, const int interval) {
+    return (this->createTimer (true, callback, interval));
+}
+
+void JavascriptBridge::clearTimeout (int timerId) {
+    this->timerFinished (timerId);
+}
+
+void JavascriptBridge::clearInterval (int timerId) {
+    this->timerFinished (timerId);
+}
+
+void JavascriptBridge::timerFinished (int timerId) {
+    if (this->javascriptTimers.contains (timerId)) {
+        JavascriptTimer* oldTimer = this->javascriptTimers.take (timerId);
+        oldTimer->deleteLater ();
     }
 }

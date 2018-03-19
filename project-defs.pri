@@ -13,7 +13,7 @@ isEmpty (install_bin_dir) {
 
 # Default path for configuration files
 isEmpty (install_etc_dir) {
-    unix:install_etc_dir = /usr/local/etc
+    unix:install_etc_dir = $$sprintf("/usr/local/etc/%1", $${project_name})
     win32:install_etc_dir = $$sprintf("C:/Program Files/%2/%1", $${project_name}, ${{owner_name})
 }
 

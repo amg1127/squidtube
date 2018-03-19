@@ -21,7 +21,8 @@ SOURCES += main.cpp \
     stdinreader.cpp \
     jobdispatcher.cpp \
     jobworker.cpp \
-    javascriptbridge.cpp
+    javascriptbridge.cpp \
+    objectcache.cpp
 
 HEADERS  += appconfig.h \
     appruntime.h \
@@ -29,7 +30,8 @@ HEADERS  += appconfig.h \
     stdinreader.h \
     jobdispatcher.h \
     jobworker.h \
-    javascriptbridge.h
+    javascriptbridge.h \
+    objectcache.h
 
 # Turn warnings into errors
 unix {
