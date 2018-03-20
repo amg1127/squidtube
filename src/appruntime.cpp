@@ -1,5 +1,6 @@
 #include "appruntime.h"
 
+//////////////////////////////////////////////////////////////////
 // Default application settings go below
 
 #ifdef QT_NO_DEBUG
@@ -8,30 +9,34 @@ QString AppRuntime::loglevel("INFO");
 QString AppRuntime::loglevel("DEBUG");
 #endif
 QString AppRuntime::helpers("");
-QString AppRuntime::registryTTL("2592000");
+QString AppRuntime::positiveTTL("2592000");
+QString AppRuntime::negativeTTL("600");
 QString AppRuntime::dbDriver("QSQLITE");
 QString AppRuntime::dbHost("");
 QString AppRuntime::dbPort("0");
 QString AppRuntime::dbUser("");
 QString AppRuntime::dbPassword("");
 QString AppRuntime::dbOptions("");
-QString AppRuntime::dbName("");
+QString AppRuntime::dbName(":memory:");
 QString AppRuntime::dbStartupQuery("");
 QString AppRuntime::dbTblPrefix("tblHelper_");
 
 // Default application settings go above
+//////////////////////////////////////////////////////////////////
 
 QMutex AppRuntime::helperMemoryCacheMutex;
-QHash<QString,AppHelperObjectCache*> AppRuntime::helperMemoryCache;
-QHash<QString,QString> AppRuntime::helperSources;
+QList<AppHelperObjectCache*> AppRuntime::helperMemoryCache;
+QHash<QString,QString> AppRuntime::helperSourcesByName;
+QStringList AppRuntime::helperNames;
 QMutex AppRuntime::commonSourcesMutex;
 QHash<QString,QString> AppRuntime::commonSources;
 
-int AppRuntime::dbInstance = 0;
+int AppRuntime::dbInstance = 1;
 QStringList AppRuntime::dbStartupQueries;
 QMutex AppRuntime::dbSettingsMutex;
 
-qint64 AppRuntime::registryTTLint = 0;
+qint64 AppRuntime::positiveTTLint = 0;
+qint64 AppRuntime::negativeTTLint = 0;
 
 QDateTime AppRuntime::currentDateTime () {
     static QMutex m (QMutex::Recursive);
@@ -44,7 +49,7 @@ QDateTime AppRuntime::currentDateTime () {
 
 // Constants used by the memory cache system
 // The maximum time in miliseconds for the memory cache mutex to become available
-const int AppConstants::AppHelperMutexTimeout = 1000;
+const int AppConstants::AppHelperMutexTimeout = 30000;
 // How many objects at most the cache is allowed to store
 const int AppConstants::AppHelperCacheMaxSize = 8192;
 // How many elements will be dropped from the cache if it has reached the maximum size
@@ -60,7 +65,7 @@ const int AppConstants::AppHelperTimerTimeout = 1000;
 // How long the program will wait for such thread or process. If this timer expires,
 // The program will by itself fetch data from the object
 // Unit is seconds.
-const int AppConstants::AppHelperMaxWait = 5; // 300;
+const int AppConstants::AppHelperMaxWait = 300;
 
 // Path component where common libraries will be searched for
 const QString AppConstants::AppCommonSubDir("common");
@@ -96,6 +101,7 @@ const QString AppConstants::AppHelperExtension(".js");
  *   to download remote data through XMLHttpRequest() object), the functions transfer the callback
  *   received as its first parameter to the other callbacks which will receive the data. Then, such
  *   callbacks invoke the function.
+ *
  */
 
 const QString AppConstants::AppHelperCodeHeader (
@@ -148,6 +154,7 @@ const QString AppConstants::AppHelperCodeFooter (
  *
  *   Returns either an object or a JSON string with data associated to an object whose type is <className> and
  *   name is <id>.
+ *
  */
 
 //////////////////////////////////////////////////////////////////
@@ -173,12 +180,14 @@ AppHelperObjectCache::~AppHelperObjectCache () {
 // Method that forces a deep copy of the object
 AppSquidRequest AppSquidRequest::deepCopy () const {
     AppSquidRequest returnValue;
-    returnValue.url = QUrl::fromEncoded (this->url.toEncoded(QUrl::FullyEncoded), QUrl::StrictMode);
-    returnValue.property = QString("%1").arg (this->property);
-    returnValue.caseSensivity = this->caseSensivity;
-    returnValue.patternSyntax = this->patternSyntax;
-    returnValue.criteria << this->criteria;
-    returnValue.timestampNow = this->timestampNow;
-    returnValue.helperName = QString("%1").arg (this->helperName);
+    returnValue.requestUrl = QUrl::fromEncoded (this->requestUrl.toEncoded(QUrl::FullyEncoded), QUrl::StrictMode);
+    returnValue.requestProperty = QString("%1").arg (this->requestProperty);
+    returnValue.requestCaseSensivity = this->requestCaseSensivity;
+    returnValue.requestPatternSyntax = this->requestPatternSyntax;
+    returnValue.requestCriteria << this->requestCriteria;
+    returnValue.requestHelperName = QString("%1").arg (this->requestHelperName);
+    returnValue.requestHelperId = this->requestHelperId;
+    returnValue.objectClassName = QString("%1").arg (this->objectClassName);
+    returnValue.objectId = QString("%1").arg (this->objectId);
     return (returnValue);
 }

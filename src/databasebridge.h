@@ -14,7 +14,7 @@
 #include <QtDebug>
 #include <QThread>
 
-class databaseBridge {
+class DatabaseBridge {
 private:
     const static QString placeholderPattern;
 public:

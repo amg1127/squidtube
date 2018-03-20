@@ -2,10 +2,10 @@
 
 void JobWorker::squidResponseOut (const int requestId, const QString& msg, bool isError, bool isMatch) {
     AppSquidRequest squidRequest (this->runningRequests.take (requestId));
-    if (squidRequest.helperName.isEmpty ()) {
+    if (squidRequest.requestHelperName.isEmpty ()) {
         emit writeAnswerLine (this->requestChannel, msg, isError, isMatch);
     } else {
-        emit writeAnswerLine (this->requestChannel, QString("[") + squidRequest.helperName + "] " + msg, isError, isMatch);
+        emit writeAnswerLine (this->requestChannel, QString("[") + squidRequest.requestHelperName + "] " + msg, isError, isMatch);
     }
     if (this->finishRequested && this->runningRequests.isEmpty () && this->incomingRequests.isEmpty ()) {
         qInfo() << QString("No pending jobs now. Finished handler for channel #%1.").arg(this->requestChannel);
@@ -51,71 +51,97 @@ void JobWorker::processSupportedUrls (int helperInstance, const QJSValue& appHel
 void JobWorker::processObjectFromUrl (int requestId, const QJSValue& appHelperObjectFromUrl) {
     if (this->runningRequests.contains (requestId)) {
         AppSquidRequest squidRequest (this->runningRequests[requestId]);
-        QString objectClassName, objectId;
         if (appHelperObjectFromUrl.isObject ()) {
-            objectClassName = appHelperObjectFromUrl.property("className").toString ();
-            objectId = appHelperObjectFromUrl.property("id").toString ();
+            squidRequest.objectClassName = appHelperObjectFromUrl.property("className").toString ();
+            squidRequest.objectId = appHelperObjectFromUrl.property("id").toString ();
         } else if (appHelperObjectFromUrl.isString ()) {
-            QJsonDocument jsonHelperObjectFromUrl (QJsonDocument::fromJson (appHelperObjectFromUrl.toString().toUtf8()));
-            objectClassName = jsonHelperObjectFromUrl.object().value("className").toString();
-            objectId = jsonHelperObjectFromUrl.object().value("id").toString();
+            QJsonParseError jsonParseError;
+            QJsonDocument jsonHelperObjectFromUrl (QJsonDocument::fromJson (appHelperObjectFromUrl.toString().toUtf8(), &jsonParseError));
+            if (jsonParseError.error != QJsonParseError::NoError) {
+                qInfo() << QString("[%1] Data returned by the helper could not be parsed as JSON: 'URL=%2, offset=%3, errorString=%4'!").arg(squidRequest.requestHelperName).arg(squidRequest.requestUrl.toString()).arg(jsonParseError.offset).arg(jsonParseError.errorString());
+            }
+            squidRequest.objectClassName = jsonHelperObjectFromUrl.object().value("className").toString();
+            squidRequest.objectId = jsonHelperObjectFromUrl.object().value("id").toString();
         }
-        if (objectClassName.isEmpty() || objectId.isEmpty ()) {
+        if (squidRequest.objectClassName.isEmpty() || squidRequest.objectId.isEmpty ()) {
             this->squidResponseOut (requestId, "Unable to determine an object that matches the supplied URL.", false, false);
         } else {
-            for (QList<AppHelperInfo*>::const_iterator appHelperInfo = this->helperInstances.constBegin(); appHelperInfo != this->helperInstances.constEnd(); appHelperInfo++) {
-                if ((*appHelperInfo)->name == squidRequest.helperName) {
-                    qDebug() << QString("[%1] Searching for information concerning 'className=%2, id=%3'...").arg(squidRequest.helperName).arg(objectClassName).arg(objectId);
-                    QJsonDocument objectData;
-                    qint64 objectTimestamp;
-                    CacheStatus cacheStatus = (*appHelperInfo)->memoryCache->read (objectClassName, objectId, squidRequest.timestampNow - AppRuntime::registryTTLint, objectData, objectTimestamp);
-                    if (cacheStatus == CacheStatus::CacheHit) {
-                        qDebug() << QString("[%1] Information retrieved from the cache concerning 'className=%2, id=%3' is fresh. Now the matching test begins.").arg(squidRequest.helperName).arg(objectClassName).arg(objectId);
-                        this->processCriteria (requestId, objectData);
-                        return;
-                    } else if (cacheStatus == CacheStatus::CacheOnProgress) {
-                        if (objectTimestamp >= (this->currentTimestamp - AppConstants::AppHelperMaxWait)) {
-                            qDebug() << QString("[%1] Another thread or process is currently fetching information concerning 'className=%2, id=%3'. I will try to wait for it...").arg(squidRequest.helperName).arg(objectClassName).arg(objectId);
-                            this->incomingRequests.prepend (squidRequest);
-                            this->runningRequests.remove (requestId);
-                            if (this->rngdInitialized) {
-                                this->retryTimer->start (AppConstants::AppHelperTimerTimeout + ((int) ((((double) qrand()) / ((double) RAND_MAX)) * ((double) AppConstants::AppHelperTimerTimeout))));
-                            } else {
-                                this->retryTimer->start (AppConstants::AppHelperTimerTimeout);
-                            }
-                            return;
-                        }
-                    }
-                    /*
-                     * If multiple threads or processes are waiting for an answer and the worker which took that job times out,
-                     * a race condition begins. It will not crash the program, fortunately. However, the race condition will
-                     * produce concurrent calls to helper's 'getPropertiesFromObject ();' function, so duplicated API calls will
-                     * be issued.
-                     *
-                     * Such race condition may be triggered by a network outage. In this scenario, the helper returns error
-                     * codes to the program and the race ends.
-                     */
-                    qDebug() << QString("[%1] Information concerning 'className=%2, id=%3' was not found in the cache. Invoking 'getPropertiesFromObject ();' - RequestID #%4").arg(squidRequest.helperName).arg(objectClassName).arg(objectId).arg(requestId);
-                    QJSValue params = this->runtimeEnvironment->newArray (2);
-                    params.setProperty (0, objectClassName);
-                    params.setProperty (1, objectId);
-                    (*appHelperInfo)->memoryCache->write (objectClassName, objectId, QJsonDocument::fromJson("{}"), this->currentTimestamp);
-                    if (! this->javascriptBridge->invokeMethod ((*appHelperInfo)->entryPoint, requestId, JavascriptMethod::getPropertiesFromObject, params)) {
-                        this->squidResponseOut (requestId, "'getPropertiesFromObject ();' function returned an error!", true, false);
-                    }
-                    return;
+            AppHelperInfo* appHelperInfo (this->helperInstances[squidRequest.requestHelperId]);
+            qDebug() << QString("[%1] Searching for information concerning 'className=%2, id=%3'...").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
+            QJsonDocument objectData;
+            qint64 objectTimestamp;
+            CacheStatus cacheStatus = appHelperInfo->memoryCache->read (squidRequest.objectClassName, squidRequest.objectId, this->currentTimestamp, objectData, objectTimestamp);
+            if (cacheStatus == CacheStatus::CacheHitPositive) {
+                qInfo() << QString("[%1] Information retrieved from the cache concerning 'className=%2, id=%3' is fresh. Now the matching test begins.").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
+                this->processCriteria (requestId, objectData);
+            } else if (cacheStatus == CacheStatus::CacheHitNegative) {
+                qInfo() << QString("[%1] Information retrieved from the cache concerning 'className=%2, id=%3' is unusable.").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
+                this->squidResponseOut (requestId, "Another thread or process have already tried to fetch information concerning the object and failed to do so.", true, false);
+            } else if (cacheStatus == CacheStatus::CacheOnProgress) {
+                qDebug() << QString("[%1] Another thread or process is currently fetching information concerning 'className=%2, id=%3'. I will try to wait for it...").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
+                this->incomingRequests.prepend (this->runningRequests.take (requestId));
+                if (this->rngdInitialized) {
+                    this->retryTimer->start (AppConstants::AppHelperTimerTimeout + ((int) ((((double) qrand()) / ((double) RAND_MAX)) * ((double) AppConstants::AppHelperTimerTimeout))));
+                } else {
+                    this->retryTimer->start (AppConstants::AppHelperTimerTimeout);
+                }
+            } else /* if (cacheStatus == CacheStatus::CacheMiss) */ {
+                qInfo() << QString("[%1] Information concerning 'className=%2, id=%3' was not found in the cache. Invoking 'getPropertiesFromObject ();', RequestID #%4").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(requestId);
+                this->runningRequests[requestId] = squidRequest;
+                // Note: remember the reminder saved into 'objectcache.cpp'...
+                QJsonDocument empty;
+                empty.setArray (QJsonArray ());
+                // Should a failure during a database write prevent me to request object information from a helper?
+                // In this moment, i guess it should not. So, errors from ObjectCache::write() are being ignored for now.
+                appHelperInfo->memoryCache->write (squidRequest.objectClassName, squidRequest.objectId, empty, this->currentTimestamp);
+                QJSValue params = this->runtimeEnvironment->newArray (2);
+                params.setProperty (0, squidRequest.objectClassName);
+                params.setProperty (1, squidRequest.objectId);
+                if (! this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, requestId, JavascriptMethod::getPropertiesFromObject, params)) {
+                    // Register a failure into the database, so the negative TTL can count.
+                    appHelperInfo->memoryCache->write (squidRequest.objectClassName, squidRequest.objectId, QJsonDocument(), this->currentTimestamp);
+                    this->squidResponseOut (requestId, "'getPropertiesFromObject ();' function returned an error!", true, false);
                 }
             }
-            qFatal("A helper name shall not disappear from the program memory! This is really bad...");
         }
     } else {
         qWarning() << QString("Invalid returned data: requestId=%1 , data='%2'").arg(requestId).arg(JavascriptBridge::QJS2QString(appHelperObjectFromUrl));
     }
 }
 
+void JobWorker::processPropertiesFromObject (int requestId, const QJSValue& appHelperPropertiesFromObject) {
+    if (this->runningRequests.contains (requestId)) {
+        AppSquidRequest squidRequest (this->runningRequests[requestId]);
+        AppHelperInfo* appHelperInfo (this->helperInstances[squidRequest.requestHelperId]);
+        QJsonDocument objectData;
+        if (appHelperPropertiesFromObject.isObject ()) {
+            objectData = JavascriptBridge::QJS2QJsonDocument (appHelperPropertiesFromObject);
+        } else if (appHelperPropertiesFromObject.isString ()) {
+            QJsonParseError jsonParseError;
+            objectData = QJsonDocument::fromJson (appHelperPropertiesFromObject.toString().toUtf8());
+            if (jsonParseError.error != QJsonParseError::NoError) {
+                qInfo() << QString("[%1] Data returned by the helper could not be parsed as JSON: 'className=%2, id=%3, offset=%4, errorString=%5'!").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(jsonParseError.offset).arg(jsonParseError.errorString());
+            }
+        }
+        if (! objectData.object().count()) {
+            qWarning() << QString("[%1] Data returned by the helper either is not an object or has no properties: 'className=%2, id=%3, rawData=%4'!").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(QString::fromUtf8 (objectData.toJson(QJsonDocument::Compact)));
+            objectData = QJsonDocument();
+        }
+#error Normalize the JSON object!
+        if (! appHelperInfo->memoryCache->write (squidRequest.objectClassName, squidRequest.objectId, objectData, this->currentTimestamp)) {
+            qCritical() << QString("[%1] Failed to save object information! 'className=%2, id=%3, rawData=%4'!").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(QString::fromUtf8 (objectData.toJson (QJsonDocument::Compact)));
+        }
+        this->processCriteria (requestId, objectData);
+    } else {
+        qWarning() << QString("Invalid returned data: requestId=%1 , data='%2'").arg(requestId).arg(JavascriptBridge::QJS2QString(appHelperPropertiesFromObject));
+    }
+}
+
 void JobWorker::processCriteria (int requestId, const QJsonDocument& data) {
 #warning I believe that I will need to create a recursive function.
 #warning I do not believe the signature will be like this...
+    this->squidResponseOut (requestId, "Answer is not ready yet!", true, false);
+    qCritical() << data.toJson (QJsonDocument::Indented);
 }
 
 JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
@@ -131,13 +157,13 @@ JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
     QObject::connect (this->javascriptBridge, &JavascriptBridge::valueReturnedFromJavascript, this, &JobWorker::valueReturnedFromJavascript);
     QObject::connect (this->retryTimer, &QTimer::timeout, this, &JobWorker::setCurrentTimestamp);
     QObject::connect (this->retryTimer, &QTimer::timeout, this, &JobWorker::processIncomingRequest);
-    for (QHash<QString,QString>::const_iterator appHelper = AppRuntime::helperSources.constBegin(); appHelper != AppRuntime::helperSources.constEnd(); appHelper++) {
+    for (QStringList::const_iterator appHelperName = AppRuntime::helperNames.constBegin(); appHelperName != AppRuntime::helperNames.constEnd(); appHelperName++) {
         AppHelperInfo* appHelperInfo = new AppHelperInfo;
         this->helperInstances.append (appHelperInfo);
-        appHelperInfo->name = appHelper.key();
+        appHelperInfo->name = (*appHelperName);
         appHelperInfo->databaseCache = new ObjectCacheDatabase (appHelperInfo->name, AppRuntime::dbTblPrefix);
         appHelperInfo->memoryCache = new ObjectCacheMemory (appHelperInfo->name, (*(appHelperInfo->databaseCache)));
-        appHelperInfo->entryPoint = this->runtimeEnvironment->evaluate (appHelper.value(), appHelperInfo->name + AppConstants::AppHelperExtension);
+        appHelperInfo->entryPoint = this->runtimeEnvironment->evaluate (AppRuntime::helperSourcesByName[appHelperInfo->name], AppConstants::AppHelperSubDir + "/" + appHelperInfo->name + AppConstants::AppHelperExtension);
         if (! JavascriptBridge::warnJsError (appHelperInfo->entryPoint, QString("A Javascript exception occurred while the helper '%1' was initializing. It will be disabled!").arg(appHelperInfo->name))) {
             this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, this->helperInstances.count(), JavascriptMethod::getSupportedUrls);
         }
@@ -164,12 +190,7 @@ void JobWorker::valueReturnedFromJavascript (int context, const QString& method,
     } else if (method == "getObjectFromUrl") {
         this->processObjectFromUrl (context, returnedValue);
     } else if (method == "getPropertiesFromObject") {
-#warning TODO
-#warning Remember not to process objects without properties from the helper
-#warning It is used internally...
-        this->squidResponseOut (context, "Answer to 'getPropertiesFromObject();' is not ready yet!", true, false);
-        qCritical() << JavascriptBridge::QJS2QString (returnedValue);
-        qCritical() << "Answer to 'getPropertiesFromObject();' is not ready yet!";
+        this->processPropertiesFromObject (context, returnedValue);
     } else {
         qCritical() << QString("Javascript returned value from an unexpected method invocation: context=%1 , method='%2' , returnedValue='%3'").arg(context).arg(method).arg(JavascriptBridge::QJS2QString (returnedValue));
     }
@@ -180,17 +201,18 @@ void JobWorker::processIncomingRequest () {
     if (this->incomingRequests.isEmpty ()) {
         this->retryTimer->stop ();
     }
-    QString urlString (squidRequest.url.toString ());
+    QString urlString (squidRequest.requestUrl.toString ());
     AppHelperInfo* appHelperInfo = Q_NULLPTR;
     int numHelpers = this->helperInstances.count ();
-    if (squidRequest.helperName.isEmpty ()) {
+    if (squidRequest.requestHelperName.isEmpty ()) {
         for (int helperPos = 0; helperPos < numHelpers; helperPos++) {
             appHelperInfo = this->helperInstances[helperPos];
             if (appHelperInfo->entryPoint.isCallable ()) {
                 int numSupportedUrls = appHelperInfo->supportedURLs.count ();
                 for (int supportedUrlPos = 0; supportedUrlPos < numSupportedUrls; supportedUrlPos++) {
                     if (urlString.indexOf (appHelperInfo->supportedURLs[supportedUrlPos]) >= 0) {
-                        squidRequest.helperName = appHelperInfo->name;
+                        squidRequest.requestHelperName = appHelperInfo->name;
+                        squidRequest.requestHelperId = helperPos;
                         supportedUrlPos = numSupportedUrls;
                         helperPos = numHelpers;
                     }
@@ -198,20 +220,15 @@ void JobWorker::processIncomingRequest () {
             }
         }
     } else {
-        for (int helperPos = 0; helperPos < numHelpers; helperPos++) {
-            appHelperInfo = this->helperInstances[helperPos];
-            if (appHelperInfo->name == squidRequest.helperName) {
-                helperPos = numHelpers;
-            }
-        }
+        appHelperInfo = this->helperInstances[squidRequest.requestHelperId];
     }
-    if (squidRequest.helperName.isEmpty ()) {
+    if (squidRequest.requestHelperName.isEmpty ()) {
         this->squidResponseOut (0, "Unable to find a helper that handles the requested URL.", false, false);
     } else {
         int requestId (this->requestId);
         this->requestId += 2;
         this->runningRequests[requestId] = squidRequest;
-        qDebug() << QString("[%1] Invoking 'getObjectFromUrl ();' - RequestID #%2").arg(appHelperInfo->name).arg(requestId);
+        qDebug() << QString("[%1] Invoking 'getObjectFromUrl ();', RequestID #%2").arg(appHelperInfo->name).arg(requestId);
         if (! this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, requestId, JavascriptMethod::getObjectFromUrl, urlString)) {
             this->squidResponseOut (requestId, "'getObjectFromUrl ();' function returned an error!", true, false);
         }
@@ -230,10 +247,10 @@ void JobWorker::setCurrentTimestamp () {
     this->currentTimestamp = (currentTimestamp / 1000);
 }
 
-void JobWorker::squidRequestIn (const AppSquidRequest& squidRequest) {
+void JobWorker::squidRequestIn (const AppSquidRequest& squidRequest, const qint64 timestampNow) {
     qDebug() << QString("JobDispatcher has sent an ACL matching request to channel #%1.").arg(this->requestChannel);
-    if (this->currentTimestamp < squidRequest.timestampNow) {
-        this->currentTimestamp = squidRequest.timestampNow;
+    if (this->currentTimestamp < timestampNow) {
+        this->currentTimestamp = timestampNow;
     }
     this->incomingRequests.prepend (squidRequest);
     this->processIncomingRequest ();
@@ -282,6 +299,6 @@ void JobCarrier::start (QThread::Priority priority) {
     }
 }
 
-void JobCarrier::squidRequestIn (const AppSquidRequest& squidRequest) {
-    emit squidRequestOut (squidRequest.deepCopy ());
+void JobCarrier::squidRequestIn (const AppSquidRequest& squidRequest, const qint64 timestampNow) {
+    emit squidRequestOut (squidRequest.deepCopy (), timestampNow);
 }

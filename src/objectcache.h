@@ -5,8 +5,8 @@
 #include "appruntime.h"
 #include "databasebridge.h"
 
+#include <QJsonArray>
 #include <QJsonDocument>
-#include <QJsonObject>
 #include <QJsonParseError>
 #include <QMultiMap>
 #include <QMutex>
@@ -16,7 +16,8 @@
 enum class CacheStatus {
     CacheMiss = 1,
     CacheOnProgress = 2,
-    CacheHit = 3
+    CacheHitNegative = 3,
+    CacheHitPositive = 4
 };
 
 class ObjectCache {
@@ -27,13 +28,14 @@ protected:
     QString cacheType;
     virtual bool lock () = 0;
     virtual bool unlock () = 0;
-    virtual CacheStatus unlockedRead (const QString& className, const QString& id, const qint64 timestampMinimum, QJsonDocument& data, qint64& timestampCreated) = 0;
+    virtual bool unlockedRead (const QString& className, const QString& id, QJsonDocument& data, qint64& timestampCreated) = 0;
     virtual bool unlockedWrite (const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated) = 0;
 public:
-    inline static bool validateJsonData (const QJsonDocument& data) { return ((! data.isNull()) && (! data.isEmpty()) && (! data.isArray()) && data.isObject ()); }
     ObjectCache (const QString& helperName, ObjectCache* lowerCache = Q_NULLPTR);
-    virtual CacheStatus read (const QString& className, const QString& id, const qint64 timestampMinimum, QJsonDocument& data, qint64& timestampCreated);
+    virtual CacheStatus read (const QString& className, const QString& id, const qint64 timestampNow, QJsonDocument& data, qint64& timestampCreated);
     virtual bool write (const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated);
+    static bool jsonDocumentIsValid (const QJsonDocument& data);
+    static CacheStatus jsonDocumentIsFresh (const QJsonDocument& data, const qint64 timestampCreated, const qint64 timestampNow);
 };
 
 class ObjectCacheDatabase : public ObjectCache {
@@ -42,7 +44,7 @@ private:
     QSqlDatabase dbConnection;
     virtual bool lock ();
     virtual bool unlock ();
-    virtual CacheStatus unlockedRead (const QString& className, const QString& id, const qint64 timestampMinimum, QJsonDocument& data, qint64& timestampCreated);
+    virtual bool unlockedRead (const QString& className, const QString& id, QJsonDocument& data, qint64& timestampCreated);
     virtual bool unlockedWrite (const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated);
 public:
     ObjectCacheDatabase (const QString& helperName, const QString& dbTblPrefix);
@@ -51,10 +53,11 @@ public:
 
 class ObjectCacheMemory : public ObjectCache {
 private:
+    int cacheSize;
     AppHelperObjectCache* objectCache;
     virtual bool lock ();
     virtual bool unlock ();
-    virtual CacheStatus unlockedRead (const QString& className, const QString& id, const qint64 timestampMinimum, QJsonDocument& data, qint64& timestampCreated);
+    virtual bool unlockedRead (const QString& className, const QString& id, QJsonDocument& data, qint64& timestampCreated);
     virtual bool unlockedWrite (const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated);
 public:
     ObjectCacheMemory (const QString& helperName, ObjectCacheDatabase& databaseCache);

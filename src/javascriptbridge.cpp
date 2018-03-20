@@ -214,6 +214,7 @@ bool JavascriptBridge::warnJsError (const QJSValue& jsValue, const QString& msg)
  * QQmlEngine will call back the C++ method before the code flow returns to the event loop.
  *
  * Following a call to Javascript::invokeMethod, there should be error handling statements only.
+ *
  */
 
 bool JavascriptBridge::invokeMethod (QJSValue& entryPoint, int context, int method, QJSValue args) {

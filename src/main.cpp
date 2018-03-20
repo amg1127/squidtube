@@ -166,8 +166,10 @@ bool loadRuntimeVariables () {
             optionsParser.showHelp (1); return (false);
         } else if (optionsParser.isSet ("main.loglevel")) {
             // Apply loglevel option in advance if it is specified
+            QString defaultLogLevel (AppRuntime::loglevel);
             AppRuntime::loglevel = optionsParser.value("main.loglevel").trimmed();
             if (! AppConfig::validateSettings ()) {
+                AppRuntime::loglevel = defaultLogLevel;
                 return (false);
             }
         }
@@ -178,28 +180,49 @@ bool loadRuntimeVariables () {
     // The configuration file must be read before parsing command line options,
     // because they must override settings found in configuration file
     QString configFile(optionsParser.value ("config"));
-    qDebug() << QString("Reading config options from file '%1'...").arg(configFile);
+    qDebug() << QString("Reading configuration options from file '%1'...").arg(configFile);
     QSettings configSettings (configFile, QSettings::IniFormat);
     QSettings::Status configStatus(configSettings.status());
     if (configStatus == QSettings::NoError) {
         QVariant configValue;
+        QStringList validConfigSections;
         for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
+            if (! validConfigSections.contains (i->configSection)) {
+                validConfigSections.append (i->configSection);
+            }
             configValue = configSettings.value (i->configSection + "/" + i->configName);
             if (configValue.isValid() && (! configValue.isNull())) {
                 // https://stackoverflow.com/a/27558297
                 if (configValue.toStringList().count() != 1) {
-                    qCritical() << QString("Invalid value '%3' is set for config key '%1/%2'. Please, quote the parameter!").arg(configValue.toStringList().join(",").trimmed()).arg(i->configSection).arg(i->configName);
+                    qCritical() << QString("Invalid value '%3' is set for configuration key '%1/%2'. Please, quote the parameter!").arg(configValue.toStringList().join(",").trimmed()).arg(i->configSection).arg(i->configName);
                     return (false);
                 }
                 *(i->configValue) = configValue.toString().trimmed();
             }
+        }
+        for (QStringList::const_iterator group = validConfigSections.constBegin(); group != validConfigSections.constEnd(); group++) {
+            configSettings.beginGroup (*group);
+            QStringList configNames (configSettings.childKeys ());
+            for (QStringList::const_iterator configName = configNames.constBegin(); configName != configNames.constEnd(); configName++) {
+                bool configNameIsValid = false;
+                for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
+                    if (i->configSection == (*group) && i->configName == (*configName)) {
+                        configNameIsValid = true;
+                        break;
+                    }
+                }
+                if (! configNameIsValid) {
+                    qWarning() << QString("Invalid configuration key '%1/%2' found in the configuration file!").arg(*group).arg(*configName);
+                }
+            }
+            configSettings.endGroup ();
         }
     } else {
         qWarning() << QString("Error #%1 while reading configuration file '%2'!").arg(configStatus).arg(configFile);
     }
 
     // Override definitions specified in command line
-    qDebug() << "Overriding config options specified in command line...";
+    qDebug() << "Overriding configuration options specified in command line...";
     for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
         if (optionsParser.isSet (i->configSection + "." + i->configName)) {
             *(i->configValue) = optionsParser.value(i->configSection + "." + i->configName).trimmed();
@@ -212,12 +235,13 @@ bool loadRuntimeVariables () {
 
     // Now figure what helpers are enabled
     qDebug() << "Detecting active helpers...";
-    QStringList helpersList = AppRuntime::helpers.split(",", QString::SkipEmptyParts);
-    helpersList.removeDuplicates();
+    QString configurationDir (QFileInfo(configFile).path());
+    AppRuntime::helperNames = AppRuntime::helpers.split(",", QString::SkipEmptyParts);
+    AppRuntime::helperNames.removeDuplicates();
     QStringList unknownOptionNames(optionsParser.unknownOptionNames());
-    QStringList addOptionNames;
+    // QStringList addOptionNames;
     QHash<QString,QString> globalVariables;
-    for (QStringList::iterator helper = helpersList.begin(); helper != helpersList.end(); helper++) {
+    for (QStringList::iterator helper = AppRuntime::helperNames.begin(); helper != AppRuntime::helperNames.end(); helper++) {
         (*helper) = helper->trimmed ();
         for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
             if (! i->configSection.compare (*helper, Qt::CaseInsensitive)) {
@@ -225,14 +249,18 @@ bool loadRuntimeVariables () {
                 return (false);
             }
         }
+        if (! (QFile::exists (QString(APP_install_share_dir) + "/" + AppConstants::AppHelperSubDir + "/" + (*helper) + AppConstants::AppHelperExtension) || QFile::exists (configurationDir + "/" + AppConstants::AppHelperSubDir + "/" + (*helper) + AppConstants::AppHelperExtension))) {
+            qCritical() << QString("Helper name '%1' is not defined!").arg(*helper);
+            return (false);
+        }
         // Get helper variables from configuration file
         configSettings.beginGroup (*helper);
-        QStringList globalVariableNames = configSettings.childKeys ();
+        QStringList globalVariableNames (configSettings.childKeys ());
         for (QStringList::const_iterator globalVariable = globalVariableNames.constBegin (); globalVariable != globalVariableNames.constEnd (); globalVariable++) {
             QVariant configValue (configSettings.value(*globalVariable));
             // https://stackoverflow.com/a/27558297
             if (configValue.toStringList().count() != 1) {
-                qCritical() << QString("Invalid value '%3' is set for config key '%1/%2'. Please, quote the parameter!").arg(*helper).arg(*globalVariable).arg(configValue.toStringList().join(",").trimmed());
+                qCritical() << QString("Invalid value '%3' is set for configuration key '%1/%2'. Please, quote the parameter!").arg(*helper).arg(*globalVariable).arg(configValue.toStringList().join(",").trimmed());
                 return (false);
             }
             globalVariables[(*helper) + "." + (*globalVariable)] = configValue.toString().trimmed();
@@ -241,7 +269,6 @@ bool loadRuntimeVariables () {
         for (QStringList::const_iterator optionName = unknownOptionNames.constBegin(); optionName != unknownOptionNames.constEnd(); optionName++) {
             if (optionName->startsWith ((*helper) + ".")) {
                 globalVariables.insert ((*optionName), QString());
-                addOptionNames << (*optionName);
             }
         }
     }
@@ -249,8 +276,8 @@ bool loadRuntimeVariables () {
     // Parse command line arguments again, considering variables set for helpers
     // This time, parse errors are fatal
     qDebug() << "Parsing command line options again...";
-    for (QStringList::const_iterator optionName = addOptionNames.constBegin(); optionName != addOptionNames.constEnd(); optionName++) {
-        optionsParser.addOption (QCommandLineOption ((*optionName), QString("Value for a global variable '%1'").arg(*optionName), (*optionName), (*optionName)));
+    for (QHash<QString,QString>::const_iterator globalVariable = globalVariables.constBegin(); globalVariable != globalVariables.constEnd(); globalVariable++) {
+        optionsParser.addOption (QCommandLineOption (globalVariable.key(), QString("Custom value for a global variable '%1'").arg(globalVariable.key()), (globalVariable.key()), (globalVariable.key())));
     }
     if (optionsParser.parse (arguments)) {
         if (optionsParser.isSet (helpOption)) {
@@ -264,15 +291,15 @@ bool loadRuntimeVariables () {
     } else {
         optionsParser.showHelp (); return (false);
     }
-    addOptionNames = optionsParser.optionNames ();
 
-    for (QStringList::iterator helper = helpersList.begin(); helper != helpersList.end(); helper++) {
-        for (QStringList::const_iterator optionName = addOptionNames.constBegin(); optionName != addOptionNames.constEnd(); optionName++) {
+    QStringList foundOptionNames (optionsParser.optionNames ());
+    for (QStringList::iterator helper = AppRuntime::helperNames.begin(); helper != AppRuntime::helperNames.end(); helper++) {
+        for (QStringList::const_iterator optionName = foundOptionNames.constBegin(); optionName != foundOptionNames.constEnd(); optionName++) {
             if ((*optionName).startsWith ((*helper) + ".")) {
                 globalVariables[(*optionName)] = optionsParser.value (*optionName).trimmed();
             }
         }
-        QHash<QString,QString>::iterator helperCode (AppRuntime::helperSources.insert ((*helper), ""));
+        QHash<QString,QString>::iterator helperCode (AppRuntime::helperSourcesByName.insert ((*helper), ""));
         for (QHash<QString,QString>::const_iterator variable = globalVariables.constBegin(); variable != globalVariables.constEnd(); variable++) {
             if (variable.key().startsWith ((*helper) + ".")) {
                 helperCode.value() += "let " + variable.key().mid(helper->length() + 1) + " = unescape ('" + QString::fromUtf8(QUrl::toPercentEncoding (variable.value())) + "');\n";
@@ -293,7 +320,8 @@ bool loadRuntimeVariables () {
     }
 
     // This will be used by all JobWorker objects
-    AppRuntime::registryTTLint = AppRuntime::registryTTL.toLongLong (Q_NULLPTR, 10);
+    AppRuntime::positiveTTLint = AppRuntime::positiveTTL.toLongLong (Q_NULLPTR, 10);
+    AppRuntime::negativeTTLint = AppRuntime::negativeTTL.toLongLong (Q_NULLPTR, 10);
 
     // Load common libraries into the memory
     qDebug() << "Loading common library contents into memory...";
@@ -322,7 +350,6 @@ bool loadRuntimeVariables () {
         }
     }
     // Figure which libraries were overriden by administrator
-    QString configurationDir (QFileInfo(configFile).path());
     libraryRoot.setFile (configurationDir + "/" + AppConstants::AppCommonSubDir);
     libraryRootPathLength = libraryRoot.filePath().length();
     libraries.prepend (libraryRoot);
@@ -372,7 +399,7 @@ bool loadRuntimeVariables () {
     // Load helpers into the memory
     qDebug() << "Loading helper contents into memory...";
     bool helpersLoaded = true;
-    for (QStringList::iterator helper = helpersList.begin(); helpersLoaded && helper != helpersList.end(); helper++) {
+    for (QStringList::iterator helper = AppRuntime::helperNames.begin(); helpersLoaded && helper != AppRuntime::helperNames.end(); helper++) {
         QFile helperFile (configurationDir + "/" + AppConstants::AppHelperSubDir + "/" + (*helper) + AppConstants::AppHelperExtension);
         if (! helperFile.exists ()) {
             helperFile.setFileName (QString(APP_install_share_dir) + "/" + AppConstants::AppHelperSubDir + "/" + (*helper) + AppConstants::AppHelperExtension);
@@ -380,8 +407,8 @@ bool loadRuntimeVariables () {
         if (helperFile.open (QIODevice::ReadOnly | QIODevice::Text)) {
             {
                 QTextStream helperFileStream (&helperFile);
-                AppRuntime::helperSources[(*helper)] = AppConstants::AppHelperCodeHeader + AppRuntime::helperSources[(*helper)] + "\n" + helperFileStream.readAll() + AppConstants::AppHelperCodeFooter;
-                AppRuntime::helperMemoryCache.insert ((*helper), new AppHelperObjectCache());
+                AppRuntime::helperSourcesByName[(*helper)] = AppConstants::AppHelperCodeHeader + AppRuntime::helperSourcesByName[(*helper)] + "\n" + helperFileStream.readAll() + AppConstants::AppHelperCodeFooter;
+                AppRuntime::helperMemoryCache.append (new AppHelperObjectCache());
                 qDebug() << QString("Loaded helper '%1' from script file '%2'.").arg(*helper).arg(helperFile.fileName());
             }
             if (helperFile.error() != QFileDevice::NoError) {
@@ -406,11 +433,12 @@ bool loadRuntimeVariables () {
 }
 
 void unloadRuntimeVariables () {
-    for (QHash<QString,AppHelperObjectCache*>::iterator helperMemoryCache = AppRuntime::helperMemoryCache.begin(); helperMemoryCache != AppRuntime::helperMemoryCache.end(); helperMemoryCache++) {
+    for (QList<AppHelperObjectCache*>::iterator helperMemoryCache = AppRuntime::helperMemoryCache.begin(); helperMemoryCache != AppRuntime::helperMemoryCache.end(); helperMemoryCache++) {
         delete (*helperMemoryCache);
     }
     AppRuntime::helperMemoryCache.clear ();
-    AppRuntime::helperSources.clear ();
+    AppRuntime::helperSourcesByName.clear ();
+    AppRuntime::helperNames.clear ();
     AppRuntime::commonSources.clear ();
     AppRuntime::dbStartupQueries.clear ();
 }

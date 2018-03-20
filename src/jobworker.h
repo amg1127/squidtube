@@ -5,6 +5,10 @@
 #include "javascriptbridge.h"
 #include "objectcache.h"
 
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonParseError>
+#include <QJSValue>
 #include <QLinkedList>
 #include <QList>
 #include <QMap>
@@ -12,8 +16,6 @@
 #include <QQmlEngine>
 #include <QQmlNetworkAccessManagerFactory>
 #include <QRegExp>
-#include <QJsonDocument>
-#include <QJSValue>
 #include <QString>
 #include <QStringList>
 #include <QTimer>
@@ -45,7 +47,8 @@ private:
     qint64 currentTimestamp;
     void squidResponseOut (const int requestId, const QString& msg, bool isError, bool isMatch);
     void processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls);
-    void processObjectFromUrl (int helperInstance, const QJSValue& appHelperObjectFromUrl);
+    void processObjectFromUrl (int requestId, const QJSValue& appHelperObjectFromUrl);
+    void processPropertiesFromObject (int requestId, const QJSValue& appHelperPropertiesFromObject);
     void processCriteria (int requestId, const QJsonDocument& data);
 public:
     JobWorker (const QString& requestChannel, QObject* parent = Q_NULLPTR);
@@ -55,7 +58,7 @@ private slots:
     void processIncomingRequest ();
     void setCurrentTimestamp ();
 public slots:
-    void squidRequestIn (const AppSquidRequest& squidRequest);
+    void squidRequestIn (const AppSquidRequest& squidRequest, const qint64 timestampNow);
     void quit ();
 signals:
     void writeAnswerLine (const QString& channel, const QString& msg, bool isError, bool isMatch);
@@ -74,9 +77,9 @@ public:
     inline JobWorker* worker () { return (this->workerObj); }
     void start (QThread::Priority priority = QThread::InheritPriority);
     inline bool wait (unsigned long time = ULONG_MAX) { return (this->threadObj->wait (time)); }
-    void squidRequestIn (const AppSquidRequest& squidRequest);
+    void squidRequestIn (const AppSquidRequest& squidRequest, const qint64 timestampNow);
 signals:
-    void squidRequestOut (const AppSquidRequest& squidRequest);
+    void squidRequestOut (const AppSquidRequest& squidRequest, const qint64 timestampNow);
     void finished ();
 };
 

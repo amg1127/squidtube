@@ -1,8 +1,8 @@
 #include "databasebridge.h"
 
-const QString databaseBridge::placeholderPattern(":val%1");
+const QString DatabaseBridge::placeholderPattern(":val%1");
 
-QSqlDatabase databaseBridge::database () {
+QSqlDatabase DatabaseBridge::database () {
     int myDbInstance;
     QString dbDriver;
     QString dbHost;
@@ -22,39 +22,73 @@ QSqlDatabase databaseBridge::database () {
         dbPort = QString("%1").arg(AppRuntime::dbPort);
         dbUser = QString("%1").arg(AppRuntime::dbUser);
         dbPassword = QString("%1").arg(AppRuntime::dbPassword);
+        dbName = QString("%1").arg(AppRuntime::dbName);
         dbOptions = QString("%1").arg(AppRuntime::dbOptions);
         dbStartupQueries << AppRuntime::dbStartupQueries;
     }
-    QSqlDatabase sqldb (QSqlDatabase::addDatabase (dbDriver, QString("dbconn_%1").arg(myDbInstance)));
+    qDebug() << QString("Opening a new database connection #%1...").arg(myDbInstance);
+    QSqlDatabase sqldb (QSqlDatabase::addDatabase (dbDriver, QString("C%1").arg(myDbInstance)));
     if (sqldb.isValid()) {
-        sqldb.setHostName (dbHost);
-        sqldb.setPort (dbPort.toInt ());
-        sqldb.setUserName (dbUser);
-        sqldb.setPassword (dbPassword);
-        sqldb.setConnectOptions (dbOptions);
-        sqldb.setDatabaseName (dbName);
+        if (! dbHost.isEmpty ()) {
+            sqldb.setHostName (dbHost);
+        }
+        int port = dbPort.toInt ();
+        if (port) {
+            sqldb.setPort (dbPort.toInt ());
+        }
+        if (! dbUser.isEmpty ()) {
+            sqldb.setUserName (dbUser);
+        }
+        if (! dbPassword.isEmpty ()) {
+            sqldb.setPassword (dbPassword);
+        }
+        if (! dbName.isEmpty ()) {
+            sqldb.setDatabaseName (dbName);
+        }
+        if (! dbOptions.isEmpty ()) {
+            sqldb.setConnectOptions (dbOptions);
+        }
+        if (! dbName.isEmpty ()) {
+            sqldb.setDatabaseName (dbName);
+        }
         if (sqldb.open ()) {
+            int posQuery = 0;
             while (! dbStartupQueries.isEmpty ()) {
+                posQuery++;
                 QString queryString(dbStartupQueries.takeFirst());
+                qDebug() << QString("Running startup query #%1 against the database...").arg(posQuery);
                 QSqlQuery query (sqldb.exec (queryString + ";"));
-                if (databaseBridge::warnSqlError (query, "Unable to submit startup queries onto database connection")) {
+                if (DatabaseBridge::warnSqlError (query, "Unable to submit startup queries onto database connection")) {
                     query.clear ();
                     dbStartupQueries.prepend (queryString);
                     break;
+                } else {
+                    QVariant field;
+                    QStringList values;
+                    int posField = 0;
+                    while (query.next ()) {
+                        for (field = query.value (posField); field.isValid(); field = query.value (++posField)) {
+                            values.append (field.toString());
+                        }
+                        qDebug() << QString("Startup query #%1 returned the following value(s): '%2'").arg(posQuery).arg(values.join("', '"));
+                        posField = 0;
+                        values.clear ();
+                    }
+                    query.clear ();
                 }
             }
             if (dbStartupQueries.isEmpty ()) {
                 return (sqldb);
             }
         } else {
-            databaseBridge::warnSqlError (sqldb.lastError(), "Unable to open a connection to the database");
+            DatabaseBridge::warnSqlError (sqldb.lastError(), "Unable to open a connection to the database");
         }
-        databaseBridge::closeDatabase (sqldb);
+        DatabaseBridge::closeDatabase (sqldb);
     }
     return (sqldb);
 }
 
-bool databaseBridge::commitTransaction (QSqlDatabase& db, const QString& msg) {
+bool DatabaseBridge::commitTransaction (QSqlDatabase& db, const QString& msg) {
     for (int ntries = 0; ntries < 10; ntries++) {
         if (ntries) {
             QThread::msleep (500);
@@ -62,27 +96,28 @@ bool databaseBridge::commitTransaction (QSqlDatabase& db, const QString& msg) {
         if (db.commit ()) {
             return (true);
         } else {
-            databaseBridge::warnSqlError (db.lastError(), QString("Unable to commit %1 transaction").arg(msg.isEmpty() ? "a" : msg));
+            DatabaseBridge::warnSqlError (db.lastError(), QString("Unable to commit %1 transaction").arg(msg.isEmpty() ? "a" : msg));
         }
     }
     if (! db.rollback ()) {
-        databaseBridge::warnSqlError (db.lastError(), QString("Unable to rollback %1 transaction").arg(msg.isEmpty() ? "a" : msg));
+        DatabaseBridge::warnSqlError (db.lastError(), QString("Unable to rollback %1 transaction").arg(msg.isEmpty() ? "a" : msg));
     }
     return (false);
 }
 
-void databaseBridge::closeDatabase (QSqlDatabase& db) {
+void DatabaseBridge::closeDatabase (QSqlDatabase& db) {
     QSqlDatabase invalid;
     QString dbConnectionName (db.connectionName ());
     if (db.isOpen()) {
         db.close ();
+        qDebug() << QString("Database connection '%1' is now closed.").arg(dbConnectionName);
     }
     db = invalid;
     QSqlDatabase::removeDatabase (dbConnectionName);
 }
 
-bool databaseBridge::warnSqlError (const QSqlQuery& query, const QString& prefix) {
-    bool status = databaseBridge::warnSqlError (query.lastError(), prefix);
+bool DatabaseBridge::warnSqlError (const QSqlQuery& query, const QString& prefix) {
+    bool status = DatabaseBridge::warnSqlError (query.lastError(), prefix);
     if (status) {
         QString q_sql (query.lastQuery());
         if (! q_sql.isEmpty ())
@@ -91,7 +126,7 @@ bool databaseBridge::warnSqlError (const QSqlQuery& query, const QString& prefix
     return (status);
 }
 
-bool databaseBridge::warnSqlError (const QSqlError& err, const QString& prefix) {
+bool DatabaseBridge::warnSqlError (const QSqlError& err, const QString& prefix) {
     QString msg;
     if (err.isValid ()) {
         QSqlError::ErrorType et = err.type ();
@@ -118,7 +153,7 @@ bool databaseBridge::warnSqlError (const QSqlError& err, const QString& prefix) 
     }
 }
 
-bool databaseBridge::genericInsert (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& fields) {
+bool DatabaseBridge::genericInsert (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& fields) {
     QString sqlinstr ("INSERT INTO %1 (%2) VALUES (%3);");
     QStringList placeHolders;
     const QStringList fieldKeys (fields.uniqueKeys ());
@@ -129,7 +164,7 @@ bool databaseBridge::genericInsert (QSqlDatabase& database, const QString& table
     }
     int pos;
     for (pos = 0; pos < numFields; pos++) {
-        placeHolders.append(databaseBridge::placeholderPattern.arg(pos));
+        placeHolders.append(DatabaseBridge::placeholderPattern.arg(pos));
     }
     QSqlQuery query (database);
     if (query.prepare (sqlinstr.arg(table).arg(fieldKeys.join(", ")).arg(placeHolders.join(", ")))) {
@@ -140,20 +175,20 @@ bool databaseBridge::genericInsert (QSqlDatabase& database, const QString& table
             query.clear ();
             return (true);
         } else {
-            databaseBridge::warnSqlError (query, QString("Unable to execute insertion into table '%1'").arg(table));
+            DatabaseBridge::warnSqlError (query, QString("Unable to execute insertion into table '%1'").arg(table));
         }
     } else {
-        databaseBridge::warnSqlError (query, QString("Unable to prepare insertion into table '%1'").arg(table));
+        DatabaseBridge::warnSqlError (query, QString("Unable to prepare insertion into table '%1'").arg(table));
     }
     query.clear ();
     return (false);
 }
 
-QHash<QString,QVariant> databaseBridge::genericSelect (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QString& fieldList) {
-    return (databaseBridge::genericSelect (database, table, searchFields, fieldList.split(",")));
+QHash<QString,QVariant> DatabaseBridge::genericSelect (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QString& fieldList) {
+    return (DatabaseBridge::genericSelect (database, table, searchFields, fieldList.split(",")));
 }
 
-QHash<QString,QVariant> databaseBridge::genericSelect (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QStringList& fields) {
+QHash<QString,QVariant> DatabaseBridge::genericSelect (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QStringList& fields) {
     QHash<QString,QVariant> returnValue;
     QString sqlinstr ("SELECT %1 FROM %2 WHERE %3;");
     QStringList placeholders;
@@ -169,21 +204,21 @@ QHash<QString,QVariant> databaseBridge::genericSelect (QSqlDatabase& database, c
             if (searchFields[fieldKeys[pos]].isNull ()) {
                 placeholders.append (fieldKeys[pos] + " IS NULL");
             } else {
-                placeholders.append (fieldKeys[pos] + " = " + databaseBridge::placeholderPattern.arg(pos));
+                placeholders.append (fieldKeys[pos] + " = " + DatabaseBridge::placeholderPattern.arg(pos));
             }
         }
         QSqlQuery query (database);
         if (query.prepare (sqlinstr.arg(fields.join(", ")).arg(table).arg(placeholders.join(" AND ")))) {
             for (pos = 0; pos < numFields; pos++) {
                 if (! searchFields[fieldKeys[pos]].isNull ()) {
-                    query.bindValue (databaseBridge::placeholderPattern.arg(pos), searchFields[fieldKeys[pos]]);
+                    query.bindValue (DatabaseBridge::placeholderPattern.arg(pos), searchFields[fieldKeys[pos]]);
                 }
             }
             if (query.exec ()) {
                 if (query.next ()) {
                     numFields = fields.count ();
                     for (pos = 0; pos < numFields; pos++) {
-                        returnValue[fields[pos]] = fields.value(pos);
+                        returnValue[fields[pos]] = query.value(pos);
                     }
                     if (query.next ()) {
                         qInfo() << QString("Data retrieval from table '%1' returned more than a single result").arg(table);
@@ -192,29 +227,29 @@ QHash<QString,QVariant> databaseBridge::genericSelect (QSqlDatabase& database, c
                     qDebug() << QString("Data retrieval from table '%1' returned no result").arg(table);
                 }
             } else {
-                databaseBridge::warnSqlError (query, QString("Unable to execute data retrieval from table '%1'").arg(table));
+                DatabaseBridge::warnSqlError (query, QString("Unable to execute data retrieval from table '%1'").arg(table));
             }
         } else {
-            databaseBridge::warnSqlError (query, QString("Unable to prepare data retrieval from table '%1'").arg(table));
+            DatabaseBridge::warnSqlError (query, QString("Unable to prepare data retrieval from table '%1'").arg(table));
         }
         query.clear ();
     }
     return (returnValue);
 }
 
-bool databaseBridge::genericUpdate (QSqlDatabase& database, const QString& table, const QString& searchColumnName, const QVariant& searchColumnValue, const QString& updateColumnName, const QVariant& updateColumnValue, const bool& callGenericInsert) {
+bool DatabaseBridge::genericUpdate (QSqlDatabase& database, const QString& table, const QString& searchColumnName, const QVariant& searchColumnValue, const QString& updateColumnName, const QVariant& updateColumnValue, const bool& callGenericInsert) {
     QHash<QString,QVariant> updateFields;
     updateFields.insert (updateColumnName, updateColumnValue);
-    return (databaseBridge::genericUpdate (database, table, searchColumnName, searchColumnValue, updateFields, callGenericInsert));
+    return (DatabaseBridge::genericUpdate (database, table, searchColumnName, searchColumnValue, updateFields, callGenericInsert));
 }
 
-bool databaseBridge::genericUpdate (QSqlDatabase& database, const QString& table, const QString& searchColumnName, const QVariant& searchColumnValue, const QHash<QString,QVariant>& updateFields, const bool& callGenericInsert) {
+bool DatabaseBridge::genericUpdate (QSqlDatabase& database, const QString& table, const QString& searchColumnName, const QVariant& searchColumnValue, const QHash<QString,QVariant>& updateFields, const bool& callGenericInsert) {
     QHash<QString,QVariant> searchFields;
     searchFields.insert (searchColumnName, searchColumnValue);
-    return (databaseBridge::genericUpdate (database, table, searchFields, updateFields, callGenericInsert));
+    return (DatabaseBridge::genericUpdate (database, table, searchFields, updateFields, callGenericInsert));
 }
 
-bool databaseBridge::genericUpdate (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QHash<QString,QVariant>& updateFields, const bool& callGenericInsert) {
+bool DatabaseBridge::genericUpdate (QSqlDatabase& database, const QString& table, const QHash<QString,QVariant>& searchFields, const QHash<QString,QVariant>& updateFields, const bool& callGenericInsert) {
     int pos;
     bool returnValue = false;
     QString fieldName;
@@ -233,22 +268,22 @@ bool databaseBridge::genericUpdate (QSqlDatabase& database, const QString& table
             if (searchFields[searchFieldsKeys[pos]].isNull()) {
                 placeholdersSearch.append (searchFieldsKeys[pos] + " IS NULL");
             } else {
-                placeholdersSearch.append (searchFieldsKeys[pos] + " = " + databaseBridge::placeholderPattern.arg(pos + numUpdateFields));
+                placeholdersSearch.append (searchFieldsKeys[pos] + " = " + DatabaseBridge::placeholderPattern.arg(pos + numUpdateFields));
             }
         }
         for (pos = 0; pos < numUpdateFields; pos++) {
-            placeholdersUpdate.append (updateFieldsKeys[pos] + " = " + databaseBridge::placeholderPattern.arg(pos));
+            placeholdersUpdate.append (updateFieldsKeys[pos] + " = " + DatabaseBridge::placeholderPattern.arg(pos));
         }
 
         QSqlQuery query (database);
         if (query.prepare (sqlinstr.arg(table).arg(placeholdersUpdate.join(", ")).arg(placeholdersSearch.join(" AND ")))) {
             for (pos = 0; pos < numSearchFields; pos++) {
                 if (! searchFields[searchFieldsKeys[pos]].isNull()) {
-                    query.bindValue(databaseBridge::placeholderPattern.arg(pos + numUpdateFields), searchFields[searchFieldsKeys[pos]]);
+                    query.bindValue(DatabaseBridge::placeholderPattern.arg(pos + numUpdateFields), searchFields[searchFieldsKeys[pos]]);
                 }
             }
             for (pos = 0; pos < numUpdateFields; pos++) {
-                query.bindValue(databaseBridge::placeholderPattern.arg(pos), updateFields[updateFieldsKeys[pos]]);
+                query.bindValue(DatabaseBridge::placeholderPattern.arg(pos), updateFields[updateFieldsKeys[pos]]);
             }
             if (query.exec ()) {
                 returnValue = true;
@@ -269,13 +304,13 @@ bool databaseBridge::genericUpdate (QSqlDatabase& database, const QString& table
                     for (pos = 0; pos < numUpdateFields; pos++) {
                         fields[updateFieldsKeys[pos]] = updateFields[updateFieldsKeys[pos]];
                     }
-                    return (databaseBridge::genericInsert (database, table, fields));
+                    return (DatabaseBridge::genericInsert (database, table, fields));
                 }
             } else {
-                databaseBridge::warnSqlError (query, QString("Unable to execute data update from table '%1'").arg(table));
+                DatabaseBridge::warnSqlError (query, QString("Unable to execute data update from table '%1'").arg(table));
             }
         } else {
-            databaseBridge::warnSqlError (query, QString("Unable to prepare data update from table '%1'").arg(table));
+            DatabaseBridge::warnSqlError (query, QString("Unable to prepare data update from table '%1'").arg(table));
         }
         query.clear ();
     }

@@ -11,10 +11,13 @@ QList<AppConfigValidSetting> AppConfig::AppConfigValidSettings = QList<AppConfig
         QRegExp("(DEBUG|INFO|WARNING|ERROR)"), AppRuntime::loglevel)
 
     << AppConfigValidSetting("main", "helpers", "Comma-separated list of helpers that the program will load from the architecture independent data directory.",
-        QRegExp("([\\w-_]+(\\s*,\\s*[\\w-_]+)*)?"), AppRuntime::helpers)
+        QRegExp("\\s*([a-zA-Z_]\\w*(\\s*,\\s*[a-zA-Z_]\\w*)*)?\\s*"), AppRuntime::helpers)
 
-    << AppConfigValidSetting("main", "registryTTL", "Video information collected from helpers are saved into the application database. This value specifies how many seconds the information is valid for.",
-        QRegExp("\\d+"), AppRuntime::registryTTL)
+    << AppConfigValidSetting("main", "positiveTTL", "Video information collected from helpers are saved into the application database. This value specifies how many seconds the information is valid for.",
+        QRegExp("\\d+"), AppRuntime::positiveTTL)
+
+    << AppConfigValidSetting("main", "negativeTTL", "When a failure is registered while collecting video information from helpers, this value specifies how many seconds that failure registry is valid for.",
+        QRegExp("\\d+"), AppRuntime::negativeTTL)
 
     << AppConfigValidSetting("db", "driver", "SQL driver to use for database access. See documentation for QSqlDatabase::addDatabase() for driver names.",
         QRegExp("Q[A-Z]+"), AppRuntime::dbDriver)
@@ -38,10 +41,10 @@ QList<AppConfigValidSetting> AppConfig::AppConfigValidSettings = QList<AppConfig
         QRegExp(".*"), AppRuntime::dbName)
 
     << AppConfigValidSetting("db", "startup", "Semicolon-separated list of SQL queries that the database driver will run before issuing normal queries.",
-        QRegExp("([^;]+;)*"), AppRuntime::dbStartupQuery)
+        QRegExp(".*"), AppRuntime::dbStartupQuery)
 
     << AppConfigValidSetting("db", "tableprefix", "Prefix used to name tables managed by the program.",
-        QRegExp("\\w+"), AppRuntime::dbTblPrefix);
+        QRegExp("[a-zA-Z_]\\w*"), AppRuntime::dbTblPrefix);
 
 // Rules that dictate valid configuration parameters and their syntaxes go above
 
@@ -51,10 +54,10 @@ bool AppConfig::validateSettings () {
             if (i->configSyntax.exactMatch(*(i->configValue))) {
                 continue;
             } else {
-                qWarning() << QString("Invalid value '%3' is set for config key '%1/%2'.").arg(i->configSection).arg(i->configName).arg(*(i->configValue));
+                qCritical() << QString("Invalid value '%3' is set for configuration key '%1/%2'.").arg(i->configSection).arg(i->configName).arg(*(i->configValue));
             }
         } else {
-            qCritical() << QString("Syntax check validator for config key '%1/%2' does not work!").arg(i->configSection).arg(i->configName);
+            qCritical() << QString("Syntax check validator for configuration key '%1/%2' does not work!").arg(i->configSection).arg(i->configName);
         }
         return (false);
     }

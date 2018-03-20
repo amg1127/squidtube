@@ -47,32 +47,32 @@ void JobDispatcher::writeAnswerLine (const QString& channel, const QString& msg,
 void JobDispatcher::squidRequest (const int requestChannelNumber, const QString& requestChannel, const QUrl& requestUrl, const QStringList& requestData) {
     if (requestChannelNumber >= 0 && requestUrl.isValid() && (! requestData.isEmpty())) {
         AppSquidRequest squidRequest;
-        squidRequest.url = requestUrl;
-        squidRequest.criteria = requestData;
-        squidRequest.property = squidRequest.criteria.takeFirst();
-        squidRequest.caseSensivity = Qt::CaseSensitive;
-        squidRequest.patternSyntax = QRegExp::RegExp;
+        squidRequest.requestUrl = requestUrl;
+        squidRequest.requestCriteria = requestData;
+        squidRequest.requestProperty = QUrl::fromPercentEncoding (squidRequest.requestCriteria.takeFirst().toUtf8());
+        squidRequest.requestCaseSensivity = Qt::CaseSensitive;
+        squidRequest.requestPatternSyntax = QRegExp::RegExp;
         // Decode the tokens
-        for (QStringList::iterator token = squidRequest.criteria.begin(); token != squidRequest.criteria.end(); token++) {
+        for (QStringList::iterator token = squidRequest.requestCriteria.begin(); token != squidRequest.requestCriteria.end(); token++) {
             (*token) = QUrl::fromPercentEncoding (token->toUtf8());
         }
         // Check the flags that may have specified by the administrator
-        while (! squidRequest.criteria.isEmpty ()) {
-            QString requestFlag (squidRequest.criteria.takeFirst());
+        while (! squidRequest.requestCriteria.isEmpty ()) {
+            QString requestFlag (squidRequest.requestCriteria.takeFirst());
             if (requestFlag.left(1) == "-") {
                 if (requestFlag == "-f" || requestFlag == "--fixed") {
-                    squidRequest.patternSyntax = QRegExp::FixedString;
+                    squidRequest.requestPatternSyntax = QRegExp::FixedString;
                 } else if (requestFlag == "-w" || requestFlag == "--wildcard") {
-                    squidRequest.patternSyntax = QRegExp::WildcardUnix;
+                    squidRequest.requestPatternSyntax = QRegExp::WildcardUnix;
                 } else if (requestFlag == "-i" || requestFlag == "--ignorecase") {
-                    squidRequest.caseSensivity = Qt::CaseInsensitive;
+                    squidRequest.requestCaseSensivity = Qt::CaseInsensitive;
                 } else {
                     this->writeAnswerLine (requestChannel, QString("ACL specifies an invalid flag: ") + requestFlag, true, false);
                     return;
                 }
             } else {
                 // No more flags to look for
-                squidRequest.criteria.prepend (requestFlag);
+                squidRequest.requestCriteria.prepend (requestFlag);
                 break;
             }
         }
@@ -92,20 +92,28 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
             this->numJobCarriers++;
             carrier->start ();
         }
-        squidRequest.timestampNow = (AppRuntime::currentDateTime().toMSecsSinceEpoch() / 1000);
-        carrier->squidRequestIn (squidRequest);
+        carrier->squidRequestIn (squidRequest, this->currentTimestamp);
     } else {
         qFatal("Invalid procedure call!");
     }
 }
 
+void JobDispatcher::setCurrentTimestamp () {
+    this->currentTimestamp = AppRuntime::currentDateTime().toMSecsSinceEpoch() / 1000;
+}
+
 JobDispatcher::JobDispatcher (QObject *parent) :
     QObject (parent),
     started (false),
-    numJobCarriers (0) {
+    numJobCarriers (0),
+    clockTimer (new QTimer (this)),
+    currentTimestamp (0) {
+    this->clockTimer->setSingleShot (false);
+    this->clockTimer->setInterval (AppConstants::AppHelperTimerTimeout);
     QObject::connect (&this->stdinReader, &StdinReader::finished, this, &JobDispatcher::stdinReaderFinished);
     QObject::connect (&this->stdinReader, &StdinReader::writeAnswerLine, this, &JobDispatcher::writeAnswerLine, Qt::QueuedConnection);
     QObject::connect (&this->stdinReader, &StdinReader::squidRequest, this, &JobDispatcher::squidRequest, Qt::QueuedConnection);
+    QObject::connect (this->clockTimer, &QTimer::timeout, this, &JobDispatcher::setCurrentTimestamp);
 }
 
 JobDispatcher::~JobDispatcher () {
@@ -118,6 +126,8 @@ void JobDispatcher::start (QThread::Priority priority) {
     if (this->started) {
         qFatal("Invalid procedure call! This method must be called only once!");
     } else {
+        this->setCurrentTimestamp ();
+        this->clockTimer->start ();
         this->stdinReader.start (priority);
         this->started = true;
     }
