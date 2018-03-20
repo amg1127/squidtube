@@ -73,7 +73,8 @@ void JobWorker::processObjectFromUrl (int requestId, const QJSValue& appHelperOb
             CacheStatus cacheStatus = appHelperInfo->memoryCache->read (squidRequest.objectClassName, squidRequest.objectId, this->currentTimestamp, objectData, objectTimestamp);
             if (cacheStatus == CacheStatus::CacheHitPositive) {
                 qInfo() << QString("[%1] Information retrieved from the cache concerning 'className=%2, id=%3' is fresh. Now the matching test begins.").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
-                this->processCriteria (requestId, objectData);
+                bool matchResult = this->processCriteria (squidRequest, 0, objectData.object());
+                this->squidResponseOut (requestId, QString("Cached data from the object with 'className=%1, id=%2' %3 specified criteria.").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), false, matchResult);
             } else if (cacheStatus == CacheStatus::CacheHitNegative) {
                 qInfo() << QString("[%1] Information retrieved from the cache concerning 'className=%2, id=%3' is unusable.").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
                 this->squidResponseOut (requestId, "Another thread or process have already tried to fetch information concerning the object and failed to do so.", true, false);
@@ -90,7 +91,7 @@ void JobWorker::processObjectFromUrl (int requestId, const QJSValue& appHelperOb
                 this->runningRequests[requestId] = squidRequest;
                 // Note: remember the reminder saved into 'objectcache.cpp'...
                 QJsonDocument empty;
-                empty.setArray (QJsonArray ());
+                empty.setObject (QJsonObject ());
                 // Should a failure during a database write prevent me to request object information from a helper?
                 // In this moment, i guess it should not. So, errors from ObjectCache::write() are being ignored for now.
                 appHelperInfo->memoryCache->write (squidRequest.objectClassName, squidRequest.objectId, empty, this->currentTimestamp);
@@ -127,21 +128,24 @@ void JobWorker::processPropertiesFromObject (int requestId, const QJSValue& appH
             qWarning() << QString("[%1] Data returned by the helper either is not an object or has no properties: 'className=%2, id=%3, rawData=%4'!").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(QString::fromUtf8 (objectData.toJson(QJsonDocument::Compact)));
             objectData = QJsonDocument();
         }
-#error Normalize the JSON object!
         if (! appHelperInfo->memoryCache->write (squidRequest.objectClassName, squidRequest.objectId, objectData, this->currentTimestamp)) {
             qCritical() << QString("[%1] Failed to save object information! 'className=%2, id=%3, rawData=%4'!").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(QString::fromUtf8 (objectData.toJson (QJsonDocument::Compact)));
         }
-        this->processCriteria (requestId, objectData);
+        bool matchResult = this->processCriteria (squidRequest, 0, objectData.object());
+        this->squidResponseOut (requestId, QString("Retrieved data from the object with 'className=%1, id=%2' %3 specified criteria.").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), false, matchResult);
     } else {
         qWarning() << QString("Invalid returned data: requestId=%1 , data='%2'").arg(requestId).arg(JavascriptBridge::QJS2QString(appHelperPropertiesFromObject));
     }
 }
 
-void JobWorker::processCriteria (int requestId, const QJsonDocument& data) {
+bool JobWorker::processCriteria (const AppSquidRequest& squidRequest, int level, const QJsonObject& jsonObject) {
 #warning I believe that I will need to create a recursive function.
 #warning I do not believe the signature will be like this...
     this->squidResponseOut (requestId, "Answer is not ready yet!", true, false);
-    qCritical() << data.toJson (QJsonDocument::Indented);
+    QJsonDocument emptyDocument;
+    emptyDocument.setObject (jsonObject);
+    qCritical() << emptyDocument.toJson (QJsonDocument::Indented);
+    return (false);
 }
 
 JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :

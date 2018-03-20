@@ -5,8 +5,8 @@
 #include "javascriptbridge.h"
 #include "objectcache.h"
 
-#include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QJsonParseError>
 #include <QJSValue>
 #include <QLinkedList>
@@ -49,7 +49,7 @@ private:
     void processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls);
     void processObjectFromUrl (int requestId, const QJSValue& appHelperObjectFromUrl);
     void processPropertiesFromObject (int requestId, const QJSValue& appHelperPropertiesFromObject);
-    void processCriteria (int requestId, const QJsonDocument& data);
+    bool processCriteria (const AppSquidRequest& squidRequest, int level, const QJsonObject& jsonObject);
 public:
     JobWorker (const QString& requestChannel, QObject* parent = Q_NULLPTR);
     ~JobWorker();

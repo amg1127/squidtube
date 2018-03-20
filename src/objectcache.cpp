@@ -10,8 +10,8 @@ ObjectCache::ObjectCache (const QString& helperName, ObjectCache* lowerCache) :
  * A reminder:
  *
  * * An invalid JSON Document means a failure during object data retrieval (negativeTTL).
- * * A valid JSON Document that is not an array or has no items means another thread or process is retrieving data already.
- * * A valid JSON Document that is an array with at least one item means valid cached data (positiveTTL).
+ * * A valid JSON Document that is not an object or has no properties means another thread or process is retrieving data already.
+ * * A valid JSON Document that is an object with at least one property means valid cached data (positiveTTL).
  *
  */
 
@@ -36,7 +36,7 @@ CacheStatus ObjectCache::read (const QString& className, const QString& id, cons
         cacheHit = (returnValue != CacheStatus::CacheMiss);
     }
     if (cacheHit) {
-        if (returnValue == CacheStatus::CacheHitNegative || _data.array().count()) {
+        if (returnValue == CacheStatus::CacheHitNegative || _data.object().count()) {
             data = _data;
             timestampCreated = _timestampCreated;
         } else if ((_timestampCreated + AppConstants::AppHelperMaxWait) >= timestampNow) {
@@ -85,7 +85,7 @@ bool ObjectCache::write (const QString& className, const QString& id, const QJso
 }
 
 bool ObjectCache::jsonDocumentIsValid (const QJsonDocument& data) {
-    return (data.isArray() && (! data.isObject()) && (! data.isNull()) && (! data.isEmpty ()));
+    return (data.isObject() && (! data.isArray()) && (! data.isNull()) && (! data.isEmpty ()));
 }
 
 CacheStatus ObjectCache::jsonDocumentIsFresh (const QJsonDocument& data, const qint64 timestampCreated, const qint64 timestampNow) {

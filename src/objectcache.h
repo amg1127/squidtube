@@ -5,8 +5,8 @@
 #include "appruntime.h"
 #include "databasebridge.h"
 
-#include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QJsonParseError>
 #include <QMultiMap>
 #include <QMutex>
