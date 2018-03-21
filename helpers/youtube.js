@@ -55,7 +55,7 @@ function getObjectFromUrl (returnValue, url) {
         }
         setTimeout (function () {
             returnValue (answer);
-        }, 1000);
+        }, 1);
     } else {
         throw new URIError ("Invalid URL: '" + url + "'!");
     }
@@ -72,5 +72,5 @@ function getPropertiesFromObject (returnValue, className, id) {
             "foo": "bar",
             "id": 2345
         });
-    }, 1000);
+    }, 1);
 }

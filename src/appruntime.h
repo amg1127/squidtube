@@ -4,6 +4,7 @@
 #include <QDateTime>
 #include <QHash>
 #include <QJsonDocument>
+#include <QLinkedList>
 #include <QList>
 #include <QMutex>
 #include <QRegExp>
@@ -94,10 +95,35 @@ public:
 // QHash<QString,AppHelperObjectCache> helperMemoryCache
 // qDebug() << helperMemoryCache["youtube"]->className["video"]->id["dQw4w9WgXcQ"]->data;
 
+enum class PropertyMatchQuantity {
+    MatchNone = 0,
+    MatchAny = 1,
+    MatchAll = 2
+};
+
+class AppSquidPropertyMatch {
+public:
+    QString matchName;
+    int matchFrom;
+    int matchTo;
+    PropertyMatchQuantity matchQuantity;
+};
+
+enum class AppSquidMathMatchOperator {
+    String = 1,
+    LessThan = 1,
+    LessThanOrEquals = 2,
+    Equals = 3,
+    NotEquals = 4,
+    GreaterThanOrEquals = 5,
+    GreaterThan = 6
+};
+
 class AppSquidRequest {
 public:
     QUrl requestUrl;
-    QString requestProperty;
+    QLinkedList<AppSquidPropertyMatch> requestProperties;
+    AppSquidMathMatchOperator requestMathOperator;
     Qt::CaseSensitivity requestCaseSensivity;
     QRegExp::PatternSyntax requestPatternSyntax;
     QStringList requestCriteria;

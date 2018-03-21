@@ -181,7 +181,8 @@ AppHelperObjectCache::~AppHelperObjectCache () {
 AppSquidRequest AppSquidRequest::deepCopy () const {
     AppSquidRequest returnValue;
     returnValue.requestUrl = QUrl::fromEncoded (this->requestUrl.toEncoded(QUrl::FullyEncoded), QUrl::StrictMode);
-    returnValue.requestProperty = QString("%1").arg (this->requestProperty);
+    returnValue.requestProperties << this->requestProperties;
+    returnValue.requestMathOperator = this->requestMathOperator;
     returnValue.requestCaseSensivity = this->requestCaseSensivity;
     returnValue.requestPatternSyntax = this->requestPatternSyntax;
     returnValue.requestCriteria << this->requestCriteria;

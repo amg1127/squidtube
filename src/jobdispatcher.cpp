@@ -49,25 +49,108 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
         AppSquidRequest squidRequest;
         squidRequest.requestUrl = requestUrl;
         squidRequest.requestCriteria = requestData;
-        squidRequest.requestProperty = QUrl::fromPercentEncoding (squidRequest.requestCriteria.takeFirst().toUtf8());
+        squidRequest.requestMathOperator = AppSquidMathMatchOperator::String;
         squidRequest.requestCaseSensivity = Qt::CaseSensitive;
         squidRequest.requestPatternSyntax = QRegExp::RegExp;
+        // Evaluate and transform the property that the administrator wants to compare
+        QStringList propertyItems (QUrl::fromPercentEncoding(squidRequest.requestCriteria.takeFirst().toUtf8()).split(".", QString::KeepEmptyParts));
+        // Dear supporter of the website https://regexr.com/ : thank you for your site. It helped me a lot!
+        static QRegExp propertyItemMatch("(|\\[(none|any|all)(|:(-?\\d+)\\.\\.?(-?\\d+))\\])(|[a-zA-Z_]\\w*)(|\\[(none|any|all)(|:(-?\\d+)\\.\\.?(-?\\d+))\\])");
+#ifndef QT_NO_DEBUG
+        // A sanity check...
+        if (! propertyItemMatch.isValid()) {
+            qFatal(QString("'propertyItemMatch' regular expression did not compile: '%1'").arg(propertyItemMatch.errorString()).toLocal8Bit().constData());
+        }
+#endif
+        QStringList propertyCapturedItems;
+        int intervalSpecOffset;
+        for (QStringList::iterator token = propertyItems.begin(); token != propertyItems.end(); token++) {
+            if (propertyItemMatch.exactMatch (*token)) {
+                propertyCapturedItems = propertyItemMatch.capturedTexts ();
+#ifndef QT_NO_DEBUG
+                // Another sanity check...
+                if (propertyCapturedItems.count() != 12) {
+                    qFatal(QString("Unexpected number of captured groups: %1").arg(propertyCapturedItems.count()).toLocal8Bit().constData());
+                }
+#endif
+                if (! propertyCapturedItems[1].isEmpty ()) {
+                    intervalSpecOffset = 0;
+                    if (! propertyCapturedItems[7].isEmpty ()) {
+                        this->writeAnswerLine (requestChannel, "ACL property syntax is not valid.", true, false);
+                        return;
+                    }
+                } else {
+                    intervalSpecOffset = 6;
+                }
+                AppSquidPropertyMatch propertyMatch;
+                propertyMatch.matchName = propertyCapturedItems[6];
+                propertyMatch.matchFrom = 0;
+                propertyMatch.matchTo = -1;
+                propertyMatch.matchQuantity = PropertyMatchQuantity::MatchAll;
+                if (! propertyCapturedItems[intervalSpecOffset + 1].isEmpty()) {
+                    if (propertyCapturedItems[intervalSpecOffset + 2] == "none") {
+                        propertyMatch.matchQuantity = PropertyMatchQuantity::MatchNone;
+                    } else if (propertyCapturedItems[intervalSpecOffset + 2] == "any") {
+                        propertyMatch.matchQuantity = PropertyMatchQuantity::MatchAny;
+                    }
+                    if (! propertyCapturedItems[intervalSpecOffset + 3].isEmpty()) {
+                        propertyMatch.matchFrom = propertyCapturedItems[intervalSpecOffset + 4].toInt();
+                        propertyMatch.matchTo = propertyCapturedItems[intervalSpecOffset + 5].toInt();
+                    }
+                }
+                squidRequest.requestProperties.append (propertyMatch);
+            } else {
+                this->writeAnswerLine (requestChannel, "ACL has an invalid property syntax.", true, false);
+                return;
+            }
+        }
+        if (squidRequest.requestProperties.first().matchName.isEmpty()) {
+            this->writeAnswerLine (requestChannel, "The first property token does not have a valid variable name!", true, false);
+            return;
+        }
         // Decode the tokens
         for (QStringList::iterator token = squidRequest.requestCriteria.begin(); token != squidRequest.requestCriteria.end(); token++) {
             (*token) = QUrl::fromPercentEncoding (token->toUtf8());
         }
-        // Check the flags that may have specified by the administrator
+        // Check the flags that may have set by the administrator
+        bool stringMatch = false;
+        bool numericMatch = false;
         while (! squidRequest.requestCriteria.isEmpty ()) {
             QString requestFlag (squidRequest.requestCriteria.takeFirst());
             if (requestFlag.left(1) == "-") {
                 if (requestFlag == "-f" || requestFlag == "--fixed") {
                     squidRequest.requestPatternSyntax = QRegExp::FixedString;
+                    stringMatch = true;
                 } else if (requestFlag == "-w" || requestFlag == "--wildcard") {
                     squidRequest.requestPatternSyntax = QRegExp::WildcardUnix;
+                    stringMatch = true;
                 } else if (requestFlag == "-i" || requestFlag == "--ignorecase") {
                     squidRequest.requestCaseSensivity = Qt::CaseInsensitive;
+                    stringMatch = true;
+                } else if (requestFlag == "-<" || requestFlag == "-lt" || requestFlag == "--lessthan") {
+                    squidRequest.requestMathOperator = AppSquidMathMatchOperator::LessThan;
+                    numericMatch = true;
+                } else if (requestFlag == "-<=" || requestFlag == "-le" || requestFlag == "--lessthanorequals") {
+                    squidRequest.requestMathOperator = AppSquidMathMatchOperator::LessThanOrEquals;
+                    numericMatch = true;
+                } else if (requestFlag == "-=" || requestFlag == "-eq" || requestFlag == "--equals") {
+                    squidRequest.requestMathOperator = AppSquidMathMatchOperator::Equals;
+                    numericMatch = true;
+                } else if (requestFlag == "-<>" || requestFlag == "-!=" || requestFlag == "-ne" || requestFlag == "--notequals") {
+                    squidRequest.requestMathOperator = AppSquidMathMatchOperator::NotEquals;
+                    numericMatch = true;
+                } else if (requestFlag == "->" || requestFlag == "-gt" || requestFlag == "--greaterthan") {
+                    squidRequest.requestMathOperator = AppSquidMathMatchOperator::GreaterThan;
+                    numericMatch = true;
+                } else if (requestFlag == "->=" || requestFlag == "-ge" || requestFlag == "--greaterthanorequals") {
+                    squidRequest.requestMathOperator = AppSquidMathMatchOperator::GreaterThanOrEquals;
+                    numericMatch = true;
                 } else {
                     this->writeAnswerLine (requestChannel, QString("ACL specifies an invalid flag: ") + requestFlag, true, false);
+                    return;
+                }
+                if (stringMatch && numericMatch) {
+                    this->writeAnswerLine (requestChannel, "ACL specifies an invalid combination of number and string flags", true, false);
                     return;
                 }
             } else {

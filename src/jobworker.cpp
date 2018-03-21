@@ -141,10 +141,9 @@ void JobWorker::processPropertiesFromObject (int requestId, const QJSValue& appH
 bool JobWorker::processCriteria (const AppSquidRequest& squidRequest, int level, const QJsonObject& jsonObject) {
 #warning I believe that I will need to create a recursive function.
 #warning I do not believe the signature will be like this...
-    this->squidResponseOut (requestId, "Answer is not ready yet!", true, false);
     QJsonDocument emptyDocument;
     emptyDocument.setObject (jsonObject);
-    qCritical() << emptyDocument.toJson (QJsonDocument::Indented);
+    qCritical() << emptyDocument.toJson (QJsonDocument::Compact);
     return (false);
 }
 
