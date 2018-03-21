@@ -49,7 +49,7 @@ private:
     void processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls);
     void processObjectFromUrl (int requestId, const QJSValue& appHelperObjectFromUrl);
     void processPropertiesFromObject (int requestId, const QJSValue& appHelperPropertiesFromObject);
-    static bool processCriteria (const AppSquidRequest& squidRequest, int level, const QJsonObject& jsonObject);
+    static bool processCriteria (const QLinkedList<AppSquidPropertyMatch>& requestProperties, const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesItem, const AppSquidMathMatchOperator& requestMathOperator, const Qt::CaseSensitivity& requestCaseSensitivity, const QRegExp::PatternSyntax& requestPatternSyntax, const QStringList& requestCriteria, const QJsonObject& jsonObjectInformation);
 public:
     JobWorker (const QString& requestChannel, QObject* parent = Q_NULLPTR);
     ~JobWorker();

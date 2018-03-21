@@ -49,8 +49,8 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
         AppSquidRequest squidRequest;
         squidRequest.requestUrl = requestUrl;
         squidRequest.requestCriteria = requestData;
-        squidRequest.requestMathOperator = AppSquidMathMatchOperator::String;
-        squidRequest.requestCaseSensivity = Qt::CaseSensitive;
+        squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::String;
+        squidRequest.requestCaseSensitivity = Qt::CaseSensitive;
         squidRequest.requestPatternSyntax = QRegExp::RegExp;
         // Evaluate and transform the property that the administrator wants to compare
         QStringList propertyItems (QUrl::fromPercentEncoding(squidRequest.requestCriteria.takeFirst().toUtf8()).split(".", QString::KeepEmptyParts));
@@ -125,25 +125,25 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
                     squidRequest.requestPatternSyntax = QRegExp::WildcardUnix;
                     stringMatch = true;
                 } else if (requestFlag == "-i" || requestFlag == "--ignorecase") {
-                    squidRequest.requestCaseSensivity = Qt::CaseInsensitive;
+                    squidRequest.requestCaseSensitivity = Qt::CaseInsensitive;
                     stringMatch = true;
                 } else if (requestFlag == "-<" || requestFlag == "-lt" || requestFlag == "--lessthan") {
-                    squidRequest.requestMathOperator = AppSquidMathMatchOperator::LessThan;
+                    squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::LessThan;
                     numericMatch = true;
                 } else if (requestFlag == "-<=" || requestFlag == "-le" || requestFlag == "--lessthanorequals") {
-                    squidRequest.requestMathOperator = AppSquidMathMatchOperator::LessThanOrEquals;
+                    squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::LessThanOrEquals;
                     numericMatch = true;
                 } else if (requestFlag == "-=" || requestFlag == "-eq" || requestFlag == "--equals") {
-                    squidRequest.requestMathOperator = AppSquidMathMatchOperator::Equals;
+                    squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::Equals;
                     numericMatch = true;
                 } else if (requestFlag == "-<>" || requestFlag == "-!=" || requestFlag == "-ne" || requestFlag == "--notequals") {
-                    squidRequest.requestMathOperator = AppSquidMathMatchOperator::NotEquals;
+                    squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::NotEquals;
                     numericMatch = true;
                 } else if (requestFlag == "->" || requestFlag == "-gt" || requestFlag == "--greaterthan") {
-                    squidRequest.requestMathOperator = AppSquidMathMatchOperator::GreaterThan;
+                    squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::GreaterThan;
                     numericMatch = true;
                 } else if (requestFlag == "->=" || requestFlag == "-ge" || requestFlag == "--greaterthanorequals") {
-                    squidRequest.requestMathOperator = AppSquidMathMatchOperator::GreaterThanOrEquals;
+                    squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::GreaterThanOrEquals;
                     numericMatch = true;
                 } else {
                     this->writeAnswerLine (requestChannel, QString("ACL specifies an invalid flag: ") + requestFlag, true, false);

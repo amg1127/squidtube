@@ -73,7 +73,15 @@ void JobWorker::processObjectFromUrl (int requestId, const QJSValue& appHelperOb
             CacheStatus cacheStatus = appHelperInfo->memoryCache->read (squidRequest.objectClassName, squidRequest.objectId, this->currentTimestamp, objectData, objectTimestamp);
             if (cacheStatus == CacheStatus::CacheHitPositive) {
                 qInfo() << QString("[%1] Information retrieved from the cache concerning 'className=%2, id=%3' is fresh. Now the matching test begins.").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
-                bool matchResult = this->processCriteria (squidRequest, 0, objectData.object());
+                bool matchResult = this->processCriteria (
+                    squidRequest.requestProperties,
+                    squidRequest.requestProperties.constBegin(),
+                    squidRequest.requestMathMatchOperator,
+                    squidRequest.requestCaseSensitivity,
+                    squidRequest.requestPatternSyntax,
+                    squidRequest.requestCriteria,
+                    objectData.object()
+                );
                 this->squidResponseOut (requestId, QString("Cached data from the object with 'className=%1, id=%2' %3 specified criteria.").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), false, matchResult);
             } else if (cacheStatus == CacheStatus::CacheHitNegative) {
                 qInfo() << QString("[%1] Information retrieved from the cache concerning 'className=%2, id=%3' is unusable.").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
@@ -131,18 +139,25 @@ void JobWorker::processPropertiesFromObject (int requestId, const QJSValue& appH
         if (! appHelperInfo->memoryCache->write (squidRequest.objectClassName, squidRequest.objectId, objectData, this->currentTimestamp)) {
             qCritical() << QString("[%1] Failed to save object information! 'className=%2, id=%3, rawData=%4'!").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(QString::fromUtf8 (objectData.toJson (QJsonDocument::Compact)));
         }
-        bool matchResult = this->processCriteria (squidRequest, 0, objectData.object());
+        bool matchResult = this->processCriteria (
+            squidRequest.requestProperties,
+            squidRequest.requestProperties.constBegin(),
+            squidRequest.requestMathMatchOperator,
+            squidRequest.requestCaseSensitivity,
+            squidRequest.requestPatternSyntax,
+            squidRequest.requestCriteria,
+            objectData.object()
+        );
         this->squidResponseOut (requestId, QString("Retrieved data from the object with 'className=%1, id=%2' %3 specified criteria.").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), false, matchResult);
     } else {
         qWarning() << QString("Invalid returned data: requestId=%1 , data='%2'").arg(requestId).arg(JavascriptBridge::QJS2QString(appHelperPropertiesFromObject));
     }
 }
 
-bool JobWorker::processCriteria (const AppSquidRequest& squidRequest, int level, const QJsonObject& jsonObject) {
-#warning I believe that I will need to create a recursive function.
-#warning I do not believe the signature will be like this...
+bool JobWorker::processCriteria (const QLinkedList<AppSquidPropertyMatch>& requestProperties, const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesItem, const AppSquidMathMatchOperator& requestMathOperator, const Qt::CaseSensitivity& requestCaseSensitivity, const QRegExp::PatternSyntax& requestPatternSyntax, const QStringList& requestCriteria, const QJsonObject& jsonObjectInformation) {
+#warning Be happy! This is the last C++ function to code! Then, I will test the software, build documentation and publish the project on GitHub! <3
     QJsonDocument emptyDocument;
-    emptyDocument.setObject (jsonObject);
+    emptyDocument.setObject (jsonObjectInformation);
     qCritical() << emptyDocument.toJson (QJsonDocument::Compact);
     return (false);
 }

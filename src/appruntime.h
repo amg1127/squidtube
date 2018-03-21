@@ -123,8 +123,8 @@ class AppSquidRequest {
 public:
     QUrl requestUrl;
     QLinkedList<AppSquidPropertyMatch> requestProperties;
-    AppSquidMathMatchOperator requestMathOperator;
-    Qt::CaseSensitivity requestCaseSensivity;
+    AppSquidMathMatchOperator requestMathMatchOperator;
+    Qt::CaseSensitivity requestCaseSensitivity;
     QRegExp::PatternSyntax requestPatternSyntax;
     QStringList requestCriteria;
     QString requestHelperName;
