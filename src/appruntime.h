@@ -7,6 +7,7 @@
 #include <QLinkedList>
 #include <QList>
 #include <QMutex>
+#include <QPair>
 #include <QRegExp>
 #include <QSemaphore>
 #include <QString>
@@ -44,7 +45,7 @@ public:
     static QMutex commonSourcesMutex;
     static QHash<QString,QString> commonSources; // All functions in class QHash<Key,T> are reentrant
     // Database information
-    static int dbInstance;
+    static unsigned int dbInstance;
     static QStringList dbStartupQueries;
     static QMutex dbSettingsMutex;
     // Number versions of positiveTTL and negativeTTL
@@ -76,6 +77,8 @@ public:
     QJsonDocument data;
     qint64 timestampCreated;
     AppHelperClass* objectClass;
+    QLinkedList<AppHelperObject*>::iterator cachePosition;
+    QHash<QString,AppHelperObject*>::iterator classPosition;
 };
 
 class AppHelperClass {
@@ -89,11 +92,18 @@ class AppHelperObjectCache {
 public:
     QHash<QString,AppHelperClass*> classNames;
     QMutex mutex;
+    QLinkedList<AppHelperObject*> cachedIds;
+    int cacheSize;
     ~AppHelperObjectCache ();
 };
 
 // QHash<QString,AppHelperObjectCache> helperMemoryCache
 // qDebug() << helperMemoryCache["youtube"]->className["video"]->id["dQw4w9WgXcQ"]->data;
+
+enum class PropertyMatchType {
+    MatchObject = 1,
+    MatchArray = 2
+};
 
 enum class PropertyMatchQuantity {
     MatchNone = 0,
@@ -103,9 +113,9 @@ enum class PropertyMatchQuantity {
 
 class AppSquidPropertyMatch {
 public:
-    QString matchName;
-    int matchFrom;
-    int matchTo;
+    QString componentName;
+    PropertyMatchType matchType;
+    QList<QPair<int,int>> matchIntervals;
     PropertyMatchQuantity matchQuantity;
 };
 
@@ -127,6 +137,7 @@ public:
     Qt::CaseSensitivity requestCaseSensitivity;
     QRegExp::PatternSyntax requestPatternSyntax;
     QStringList requestCriteria;
+    bool requestInvertMatch;
     QString requestHelperName;
     int requestHelperId;
     QString objectClassName;

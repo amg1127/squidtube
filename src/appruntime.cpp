@@ -31,7 +31,7 @@ QStringList AppRuntime::helperNames;
 QMutex AppRuntime::commonSourcesMutex;
 QHash<QString,QString> AppRuntime::commonSources;
 
-int AppRuntime::dbInstance = 1;
+unsigned int AppRuntime::dbInstance = 1;
 QStringList AppRuntime::dbStartupQueries;
 QMutex AppRuntime::dbSettingsMutex;
 

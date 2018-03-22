@@ -53,8 +53,8 @@ public:
 
 class ObjectCacheMemory : public ObjectCache {
 private:
-    int cacheSize;
     AppHelperObjectCache* objectCache;
+    AppHelperObject* moveObjectIdAhead (const QHash<QString,AppHelperObject*>::iterator& idIterator);
     virtual bool lock ();
     virtual bool unlock ();
     virtual bool unlockedRead (const QString& className, const QString& id, QJsonDocument& data, qint64& timestampCreated);

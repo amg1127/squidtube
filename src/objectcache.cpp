@@ -197,9 +197,15 @@ bool ObjectCacheDatabase::unlockedWrite (const QString& className, const QString
 
 //////////////////////////////////////////////////////////////////
 
+AppHelperObject* ObjectCacheMemory::moveObjectIdAhead (const QHash<QString,AppHelperObject*>::iterator& idIterator) {
+    AppHelperObject* idObj = (*idIterator);
+    this->objectCache->cachedIds.erase (idObj->cachePosition);
+    idObj->cachePosition = this->objectCache->cachedIds.insert (this->objectCache->cachedIds.begin(), idObj);
+    return (idObj);
+}
+
 ObjectCacheMemory::ObjectCacheMemory (const QString& helperName, ObjectCacheDatabase& databaseCache) :
-    ObjectCache (helperName, &databaseCache),
-    cacheSize (0) {
+    ObjectCache (helperName, &databaseCache) {
     this->cacheType = "memory";
     AppRuntime::helperMemoryCacheMutex.lock ();
     int index = AppRuntime::helperNames.indexOf (helperName);
@@ -228,10 +234,12 @@ bool ObjectCacheMemory::unlock () {
 }
 
 bool ObjectCacheMemory::unlockedRead (const QString& className, const QString& id, QJsonDocument& data, qint64& timestampCreated) {
-    if (this->objectCache->classNames.contains (className)) {
-        AppHelperClass* classNameObj = this->objectCache->classNames.value (className);
-        if (classNameObj->ids.contains (id)) {
-            AppHelperObject* idObj = classNameObj->ids.value (id);
+    QHash<QString,AppHelperClass*>::const_iterator classNameIterator = this->objectCache->classNames.find (className);
+    if (classNameIterator != this->objectCache->classNames.constEnd()) {
+        AppHelperClass* classNameObj = (*classNameIterator);
+        QHash<QString,AppHelperObject*>::iterator idIterator = classNameObj->ids.find (id);
+        if (idIterator != classNameObj->ids.constEnd()) {
+            AppHelperObject* idObj = this->moveObjectIdAhead (idIterator);
             data = idObj->data;
             timestampCreated = idObj->timestampCreated;
             return (true);
@@ -241,41 +249,30 @@ bool ObjectCacheMemory::unlockedRead (const QString& className, const QString& i
 }
 
 bool ObjectCacheMemory::unlockedWrite (const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated) {
-    AppHelperClass* classNameObj;
-    AppHelperObject* idObj;
-    if (this->objectCache->classNames.contains (className)) {
-        classNameObj = this->objectCache->classNames.value (className);
-    } else {
-        this->objectCache->classNames[className] = classNameObj = new AppHelperClass ();
-        classNameObj->objectCache = this->objectCache;
+    QHash<QString,AppHelperClass*>::iterator classNameIterator = this->objectCache->classNames.find (className);
+    if (classNameIterator == this->objectCache->classNames.end()) {
+        classNameIterator = this->objectCache->classNames.insert (className, new AppHelperClass ());
+        (*classNameIterator)->objectCache = this->objectCache;
     }
-    if (classNameObj->ids.contains (id)) {
-        idObj = classNameObj->ids.value (id);
+    AppHelperClass* classNameObj = (*classNameIterator);
+    QHash<QString,AppHelperObject*>::iterator idIterator = classNameObj->ids.find (id);
+    AppHelperObject* idObj;
+    if (idIterator != classNameObj->ids.end()) {
+        idObj = this->moveObjectIdAhead (idIterator);
     } else {
-        if (this->cacheSize >= AppConstants::AppHelperCacheMaxSize) {
-            qDebug() << QString("[%1] Memory cache for 'className=%2' has reached the maximum size. Vacuuming...").arg(this->helperName).arg(className);
-            QMultiMap<qlonglong,AppHelperObject*> idsByAge;
-            AppHelperClass* otherClassNameObj;
-            AppHelperObject* otherIdObj;
-            for (QHash<QString,AppHelperClass*>::const_iterator otherClassNameIterator = this->objectCache->classNames.constBegin(); otherClassNameIterator != this->objectCache->classNames.constEnd(); otherClassNameIterator++) {
-                otherClassNameObj = otherClassNameIterator.value();
-                for (QHash<QString,AppHelperObject*>::const_iterator otherIdIterator = otherClassNameObj->ids.constBegin(); otherIdIterator != otherClassNameObj->ids.constEnd(); otherIdIterator++) {
-                    otherIdObj = otherIdIterator.value();
-                    idsByAge.insert (otherIdObj->timestampCreated, otherIdObj);
-                }
-            }
-            QMultiMap<qlonglong,AppHelperObject*>::iterator oldestId = idsByAge.begin();
-            for (int i = 0; i < AppConstants::AppHelperCacheVacuumSize && i < AppConstants::AppHelperCacheMaxSize; i++) {
-                otherIdObj = oldestId.value();
-                oldestId = idsByAge.erase (oldestId);
-                otherIdObj->objectClass->ids.remove (otherIdObj->objectClass->ids.key (otherIdObj));
-                delete (otherIdObj);
-                this->cacheSize--;
+        idObj = new AppHelperObject ();
+        idObj->objectClass = classNameObj;
+        idObj->cachePosition = this->objectCache->cachedIds.insert (this->objectCache->cachedIds.begin(), idObj);
+        idObj->classPosition = classNameObj->ids.insert (id, idObj);
+        this->objectCache->cacheSize++;
+        if (this->objectCache->cacheSize > AppConstants::AppHelperCacheMaxSize) {
+            AppHelperObject* removedIdObj;
+            for (int i = 0; i < AppConstants::AppHelperCacheVacuumSize && this->objectCache->cacheSize > 1; i++, this->objectCache->cacheSize--) {
+                removedIdObj = this->objectCache->cachedIds.takeLast ();
+                removedIdObj->objectClass->ids.erase (removedIdObj->classPosition);
+                delete (removedIdObj);
             }
         }
-        classNameObj->ids[id] = idObj = new AppHelperObject ();
-        idObj->objectClass = classNameObj;
-        this->cacheSize++;
     }
     idObj->data = data;
     idObj->timestampCreated = timestampCreated;

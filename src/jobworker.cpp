@@ -1,6 +1,6 @@
 #include "jobworker.h"
 
-void JobWorker::squidResponseOut (const int requestId, const QString& msg, bool isError, bool isMatch) {
+void JobWorker::squidResponseOut (const unsigned int requestId, const QString& msg, bool isError, bool isMatch) {
     AppSquidRequest squidRequest (this->runningRequests.take (requestId));
     if (squidRequest.requestHelperName.isEmpty ()) {
         emit writeAnswerLine (this->requestChannel, msg, isError, isMatch);
@@ -48,9 +48,10 @@ void JobWorker::processSupportedUrls (int helperInstance, const QJSValue& appHel
     }
 }
 
-void JobWorker::processObjectFromUrl (int requestId, const QJSValue& appHelperObjectFromUrl) {
-    if (this->runningRequests.contains (requestId)) {
-        AppSquidRequest squidRequest (this->runningRequests[requestId]);
+void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& appHelperObjectFromUrl) {
+    QMap<unsigned int,AppSquidRequest>::iterator requestIdIterator = this->runningRequests.find (requestId);
+    if (requestIdIterator != this->runningRequests.end()) {
+        AppSquidRequest squidRequest (*requestIdIterator);
         if (appHelperObjectFromUrl.isObject ()) {
             squidRequest.objectClassName = appHelperObjectFromUrl.property("className").toString ();
             squidRequest.objectId = appHelperObjectFromUrl.property("id").toString ();
@@ -118,9 +119,10 @@ void JobWorker::processObjectFromUrl (int requestId, const QJSValue& appHelperOb
     }
 }
 
-void JobWorker::processPropertiesFromObject (int requestId, const QJSValue& appHelperPropertiesFromObject) {
-    if (this->runningRequests.contains (requestId)) {
-        AppSquidRequest squidRequest (this->runningRequests[requestId]);
+void JobWorker::processPropertiesFromObject (unsigned int requestId, const QJSValue& appHelperPropertiesFromObject) {
+    QMap<unsigned int,AppSquidRequest>::iterator requestIdIterator = this->runningRequests.find (requestId);
+    if (requestIdIterator != this->runningRequests.end()) {
+        AppSquidRequest squidRequest (*requestIdIterator);
         AppHelperInfo* appHelperInfo (this->helperInstances[squidRequest.requestHelperId]);
         QJsonDocument objectData;
         if (appHelperPropertiesFromObject.isObject ()) {
@@ -159,6 +161,22 @@ bool JobWorker::processCriteria (const QLinkedList<AppSquidPropertyMatch>& reque
     QJsonDocument emptyDocument;
     emptyDocument.setObject (jsonObjectInformation);
     qCritical() << emptyDocument.toJson (QJsonDocument::Compact);
+    return (false);
+}
+
+bool JobWorker::processCriteria (const QLinkedList<AppSquidPropertyMatch>& requestProperties, const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesItem, const AppSquidMathMatchOperator& requestMathOperator, const Qt::CaseSensitivity& requestCaseSensitivity, const QRegExp::PatternSyntax& requestPatternSyntax, const QStringList& requestCriteria, const QJsonArray& jsonArrayInformation) {
+    QJsonDocument emptyDocument;
+    emptyDocument.setArray (jsonArrayInformation);
+    qCritical() << emptyDocument.toJson (QJsonDocument::Compact);
+    return (false);
+}
+
+bool JobWorker::processCriteria (const QLinkedList<AppSquidPropertyMatch>& requestProperties, const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesItem, const AppSquidMathMatchOperator& requestMathOperator, const Qt::CaseSensitivity& requestCaseSensitivity, const QRegExp::PatternSyntax& requestPatternSyntax, const QStringList& requestCriteria, const QJsonValue& jsonValueInformation) {
+    if (requestPropertiesItem == requestProperties.constEnd()) {
+        // This means that I have ended the walk through the JSON tree and I shall compare the value pointed by 'jsonValueInformation' against 'requestCriteria'.
+    } else {
+
+    }
     return (false);
 }
 
@@ -202,7 +220,7 @@ JobWorker::~JobWorker () {
     delete (this->runtimeEnvironment);
 }
 
-void JobWorker::valueReturnedFromJavascript (int context, const QString& method, const QJSValue& returnedValue) {
+void JobWorker::valueReturnedFromJavascript (unsigned int context, const QString& method, const QJSValue& returnedValue) {
     if (method == "getSupportedUrls") {
         this->processSupportedUrls (context, returnedValue);
     } else if (method == "getObjectFromUrl") {
@@ -243,7 +261,7 @@ void JobWorker::processIncomingRequest () {
     if (squidRequest.requestHelperName.isEmpty ()) {
         this->squidResponseOut (0, "Unable to find a helper that handles the requested URL.", false, false);
     } else {
-        int requestId (this->requestId);
+        unsigned int requestId (this->requestId);
         this->requestId += 2;
         this->runningRequests[requestId] = squidRequest;
         qDebug() << QString("[%1] Invoking 'getObjectFromUrl ();', RequestID #%2").arg(appHelperInfo->name).arg(requestId);

@@ -28,15 +28,15 @@ public:
 class JavascriptTimer : public QTimer {
     Q_OBJECT
 private:
-    int timerId;
+    unsigned int timerId;
     QJSEngine* jsEngine;
     QJSValue callback;
 public:
-    JavascriptTimer (QJSEngine& jsEngine, int timerId, bool repeat, int timeout, const QJSValue& callback);
+    JavascriptTimer (QJSEngine& jsEngine, unsigned int timerId, bool repeat, int timeout, const QJSValue& callback);
 private slots:
     void timerTimeout ();
 signals:
-    void timerFinished (int timerId);
+    void timerFinished (unsigned int timerId);
 };
 
 class JavascriptBridge : public QObject {
@@ -44,11 +44,11 @@ class JavascriptBridge : public QObject {
 private:
     QJSValue myself;
     QString requestChannel;
-    int transactionId;
-    QMap<int,int> pendingTransactions;
+    unsigned int transactionId;
+    QMap<unsigned int,unsigned int> pendingTransactions;
     QStringList loadedLibraries;
-    QMap<int,JavascriptTimer*> javascriptTimers;
-    int javascriptTimerId;
+    QMap<unsigned int,JavascriptTimer*> javascriptTimers;
+    unsigned int javascriptTimerId;
     static QJsonValue QJS2QJsonValue (const QJSValue& value);
     static QJSValue QJson2QJS (QJSEngine& jsEngine, const QJsonValue& value);
     QJSValue createTimer (const bool repeat, const QJSValue& callback, const int interval);
@@ -58,18 +58,18 @@ public:
     static QJSValue QJson2QJS (QJSEngine& jsEngine, const QJsonDocument& value);
     static QString QJS2QString (const QJSValue& value);
     static bool warnJsError (const QJSValue& jsValue, const QString& msg = QString());
-    bool invokeMethod (QJSValue& entryPoint, int context, int method, QJSValue args = QJSValue(QJSValue::UndefinedValue));
-    bool invokeMethod (QJSValue& entryPoint, int context, const QString& method, QJSValue args = QJSValue(QJSValue::UndefinedValue));
-    Q_INVOKABLE void receiveValue (int transactionId, const QString& method, const QJSValue& returnedValue);
+    bool invokeMethod (QJSValue& entryPoint, unsigned int context, int method, QJSValue args = QJSValue(QJSValue::UndefinedValue));
+    bool invokeMethod (QJSValue& entryPoint, unsigned int context, const QString& method, QJSValue args = QJSValue(QJSValue::UndefinedValue));
+    Q_INVOKABLE void receiveValue (unsigned int transactionId, const QString& method, const QJSValue& returnedValue);
     Q_INVOKABLE void require (const QJSValue& library);
     Q_INVOKABLE QJSValue setTimeout (const QJSValue& callback, const int interval);
     Q_INVOKABLE QJSValue setInterval (const QJSValue& callback, const int interval);
-    Q_INVOKABLE void clearTimeout (int timerId);
-    Q_INVOKABLE void clearInterval (int timerId);
+    Q_INVOKABLE void clearTimeout (unsigned int timerId);
+    Q_INVOKABLE void clearInterval (unsigned int timerId);
 private slots:
-    void timerFinished (int timerId);
+    void timerFinished (unsigned int timerId);
 signals:
-    void valueReturnedFromJavascript (int context, const QString& method, const QJSValue& returnedValue);
+    void valueReturnedFromJavascript (unsigned int context, const QString& method, const QJSValue& returnedValue);
 };
 
 #endif // JAVASCRIPTBRIDGE_H

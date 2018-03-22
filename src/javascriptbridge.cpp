@@ -12,7 +12,7 @@ const QStringList JavascriptMethod::requiredMethods (
 
 //////////////////////////////////////////////////////////////////
 
-JavascriptTimer::JavascriptTimer (QJSEngine& jsEngine, int timerId, bool repeat, int timeout, const QJSValue& callback) :
+JavascriptTimer::JavascriptTimer (QJSEngine& jsEngine, unsigned int timerId, bool repeat, int timeout, const QJSValue& callback) :
     QTimer (&jsEngine),
     timerId (timerId),
     jsEngine (&jsEngine),
@@ -108,7 +108,10 @@ QJSValue JavascriptBridge::createTimer (const bool repeat, const QJSValue& callb
     QJSEngine* jsEngine (qjsEngine (this));
     if (jsEngine != Q_NULLPTR) {
         int timerId (this->javascriptTimerId);
-        this->javascriptTimerId += 2;
+        this->javascriptTimerId += 4;
+        if (repeat) {
+            timerId += 2;
+        }
         JavascriptTimer* newTimer = new JavascriptTimer ((*jsEngine), timerId, repeat, ((interval > 1) ? interval : 1), callback);
         this->javascriptTimers.insert (timerId, newTimer);
         QObject::connect (newTimer, &JavascriptTimer::timerFinished, this, &JavascriptBridge::timerFinished);
@@ -217,13 +220,13 @@ bool JavascriptBridge::warnJsError (const QJSValue& jsValue, const QString& msg)
  *
  */
 
-bool JavascriptBridge::invokeMethod (QJSValue& entryPoint, int context, int method, QJSValue args) {
+bool JavascriptBridge::invokeMethod (QJSValue& entryPoint, unsigned int context, int method, QJSValue args) {
     return (this->invokeMethod (entryPoint, context, JavascriptMethod::requiredMethods.value (method), args));
 }
 
-bool JavascriptBridge::invokeMethod (QJSValue& entryPoint, int context, const QString& method, QJSValue args) {
+bool JavascriptBridge::invokeMethod (QJSValue& entryPoint, unsigned int context, const QString& method, QJSValue args) {
     if (entryPoint.isCallable ()) {
-        int transactionId (this->transactionId);
+        unsigned int transactionId (this->transactionId);
         this->transactionId += 2;
         this->pendingTransactions[transactionId] = context;
         QJSValue callReturn (entryPoint.call (QJSValueList() << this->myself.property("receiveValue") << transactionId << method << args));
@@ -241,9 +244,12 @@ bool JavascriptBridge::invokeMethod (QJSValue& entryPoint, int context, const QS
     return (false);
 }
 
-void JavascriptBridge::receiveValue (int transactionId, const QString& method, const QJSValue& returnedValue) {
-    if (this->pendingTransactions.contains (transactionId)) {
-        emit valueReturnedFromJavascript (this->pendingTransactions.take(transactionId), method, returnedValue);
+void JavascriptBridge::receiveValue (unsigned int transactionId, const QString& method, const QJSValue& returnedValue) {
+    QMap<unsigned int, unsigned int>::iterator transactionIdIterator = this->pendingTransactions.find (transactionId);
+    if (transactionIdIterator != this->pendingTransactions.end()) {
+        unsigned int context = (*transactionIdIterator);
+        this->pendingTransactions.erase (transactionIdIterator);
+        emit valueReturnedFromJavascript (context, method, returnedValue);
     } else {
         qWarning() << QString("Unexpected data '%1' received by a invocation of method '%2' on channel #%3! It will be discarded.").arg(JavascriptBridge::QJS2QString (returnedValue)).arg(method).arg(this->requestChannel);
     }
@@ -289,17 +295,25 @@ QJSValue JavascriptBridge::setInterval (const QJSValue& callback, const int inte
     return (this->createTimer (true, callback, interval));
 }
 
-void JavascriptBridge::clearTimeout (int timerId) {
-    this->timerFinished (timerId);
+void JavascriptBridge::clearTimeout (unsigned int timerId) {
+    // This prevent misuse of clearTimeout() and clearInterval() interchangeably
+    if (! (timerId & 3)) {
+        this->timerFinished (timerId);
+    }
 }
 
-void JavascriptBridge::clearInterval (int timerId) {
-    this->timerFinished (timerId);
+void JavascriptBridge::clearInterval (unsigned int timerId) {
+    // This prevent misuse of clearTimeout() and clearInterval() interchangeably
+    if (timerId & 3) {
+        this->timerFinished (timerId);
+    }
 }
 
-void JavascriptBridge::timerFinished (int timerId) {
-    if (this->javascriptTimers.contains (timerId)) {
-        JavascriptTimer* oldTimer = this->javascriptTimers.take (timerId);
+void JavascriptBridge::timerFinished (unsigned int timerId) {
+    QMap<unsigned int,JavascriptTimer*>::iterator timerIdIterator = this->javascriptTimers.find (timerId);
+    if (timerIdIterator != this->javascriptTimers.end()) {
+        JavascriptTimer* oldTimer = (*timerIdIterator);
+        this->javascriptTimers.erase (timerIdIterator);
         oldTimer->deleteLater ();
     }
 }
