@@ -70,21 +70,22 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
         QStringList propertyCapturedItems;
         for (QStringList::iterator token = propertyItems.begin(); token != propertyItems.end(); token++) {
             if (objectPropertyMatch.exactMatch (*token)) {
+                propertyCapturedItems = objectPropertyMatch.capturedTexts ();
                 AppSquidPropertyMatch propertyMatch;
                 propertyMatch.matchType = PropertyMatchType::MatchObject;
-                propertyCapturedItems = propertyItemMatch.capturedTexts ();
                 propertyMatch.componentName = propertyCapturedItems.value (2);
                 if (propertyMatch.componentName.isEmpty ()) {
                     propertyMatch.componentName = QUrl::fromPercentEncoding(propertyCapturedItems.value(3).toUtf8());
                 }
                 squidRequest.requestProperties.append (propertyMatch);
             } else if (arrayPropertyMatch.exactMatch (*token)) {
+                propertyCapturedItems = arrayPropertyMatch.capturedTexts ();
                 AppSquidPropertyMatch propertyMatch;
                 propertyMatch.matchType = PropertyMatchType::MatchArray;
-                propertyCapturedItems = arrayPropertyMatch.capturedTexts ();
-                if ((propertyCapturedItems.value(1) + propertyCapturedItems.value(7)) == "<>") {
+                propertyMatch.componentName = propertyCapturedItems.value(1) + propertyCapturedItems.value(7);
+                if (propertyMatch.componentName == "<>") {
                     propertyMatch.matchQuantity = PropertyMatchQuantity::MatchAll;
-                } else if ((propertyCapturedItems.value(1) + propertyCapturedItems.value(7)) == "[]") {
+                } else if (propertyMatch.componentName == "[]") {
                     propertyMatch.matchQuantity = PropertyMatchQuantity::MatchAny;
                 } else {
                     this->writeAnswerLine (requestChannel, "ACL interval evaluation specification is not valid", true, false);
@@ -169,6 +170,9 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
                         this->writeAnswerLine (requestChannel, "ACL specifies incompatible string matching flags!", true, false);
                         return;
                     }
+                } else if (requestFlag == "--") {
+                    // No more flags to look for
+                    break;
                 } else {
                     this->writeAnswerLine (requestChannel, QString("ACL specifies an invalid flag: ") + requestFlag, true, false);
                     return;
@@ -179,13 +183,9 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
                 break;
             }
             if (numericMatch > 1) {
-                this->writeAnswerLine (requestChannel, "More than one mathematic operator is not allowed", true, false);
+                this->writeAnswerLine (requestChannel, "More than one comparison operator is not allowed", true, false);
                 return;
             }
-        }
-        if (stringMatch && numericMatch) {
-            this->writeAnswerLine (requestChannel, "ACL specifies an invalid combination of number and string flags", true, false);
-            return;
         }
         // Now, send the request to a worker
         // Create if it does not exists yet

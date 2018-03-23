@@ -185,6 +185,7 @@ AppSquidRequest AppSquidRequest::deepCopy () const {
     returnValue.requestMathMatchOperator = this->requestMathMatchOperator;
     returnValue.requestCaseSensitivity = this->requestCaseSensitivity;
     returnValue.requestPatternSyntax = this->requestPatternSyntax;
+    returnValue.requestInvertMatch = this->requestInvertMatch;
     returnValue.requestCriteria << this->requestCriteria;
     returnValue.requestHelperName = QString("%1").arg (this->requestHelperName);
     returnValue.requestHelperId = this->requestHelperId;

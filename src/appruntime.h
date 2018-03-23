@@ -106,7 +106,6 @@ enum class PropertyMatchType {
 };
 
 enum class PropertyMatchQuantity {
-    MatchNone = 0,
     MatchAny = 1,
     MatchAll = 2
 };
@@ -136,8 +135,8 @@ public:
     AppSquidMathMatchOperator requestMathMatchOperator;
     Qt::CaseSensitivity requestCaseSensitivity;
     QRegExp::PatternSyntax requestPatternSyntax;
-    QStringList requestCriteria;
     bool requestInvertMatch;
+    QStringList requestCriteria;
     QString requestHelperName;
     int requestHelperId;
     QString objectClassName;

@@ -5,6 +5,7 @@
 #include "appruntime.h"
 #include "databasebridge.h"
 
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
@@ -35,6 +36,7 @@ public:
     virtual CacheStatus read (const QString& className, const QString& id, const qint64 timestampNow, QJsonDocument& data, qint64& timestampCreated);
     virtual bool write (const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated);
     static bool jsonDocumentIsValid (const QJsonDocument& data);
+    static bool jsonDocumentHasData (const QJsonDocument& data);
     static CacheStatus jsonDocumentIsFresh (const QJsonDocument& data, const qint64 timestampCreated, const qint64 timestampNow);
 };
 

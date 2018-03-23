@@ -40,8 +40,8 @@ int main(int argc, char *argv[]) {
     qDebug() << "Starting...";
 
     // Manually register some QtMetaTypes, so I can queue variables of those types under QObject::connect
-    qRegisterMetaType<Qt::CaseSensitivity>("Qt::CaseSensitivity");
-    qRegisterMetaType<QRegExp::PatternSyntax>("QRegExp::PatternSyntax");
+    // qRegisterMetaType<Qt::CaseSensitivity>("Qt::CaseSensitivity");
+    // qRegisterMetaType<QRegExp::PatternSyntax>("QRegExp::PatternSyntax");
     qRegisterMetaType<AppSquidRequest>("AppSquidRequest");
 
     // Make sure that default program settings are valid

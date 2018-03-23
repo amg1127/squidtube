@@ -75,13 +75,15 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
             if (cacheStatus == CacheStatus::CacheHitPositive) {
                 qInfo() << QString("[%1] Information retrieved from the cache concerning 'className=%2, id=%3' is fresh. Now the matching test begins.").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
                 bool matchResult = this->processCriteria (
-                    squidRequest.requestProperties,
+                    squidRequest.requestHelperName,
+                    squidRequest.requestProperties.count(),
                     squidRequest.requestProperties.constBegin(),
                     squidRequest.requestMathMatchOperator,
                     squidRequest.requestCaseSensitivity,
                     squidRequest.requestPatternSyntax,
+                    squidRequest.requestInvertMatch,
                     squidRequest.requestCriteria,
-                    objectData.object()
+                    objectData
                 );
                 this->squidResponseOut (requestId, QString("Cached data from the object with 'className=%1, id=%2' %3 specified criteria.").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), false, matchResult);
             } else if (cacheStatus == CacheStatus::CacheHitNegative) {
@@ -95,7 +97,7 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                 } else {
                     this->retryTimer->start (AppConstants::AppHelperTimerTimeout);
                 }
-            } else /* if (cacheStatus == CacheStatus::CacheMiss) */ {
+            } else if (cacheStatus == CacheStatus::CacheMiss) {
                 qInfo() << QString("[%1] Information concerning 'className=%2, id=%3' was not found in the cache. Invoking 'getPropertiesFromObject ();', RequestID #%4").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(requestId);
                 this->runningRequests[requestId] = squidRequest;
                 // Note: remember the reminder saved into 'objectcache.cpp'...
@@ -112,6 +114,8 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                     appHelperInfo->memoryCache->write (squidRequest.objectClassName, squidRequest.objectId, QJsonDocument(), this->currentTimestamp);
                     this->squidResponseOut (requestId, "'getPropertiesFromObject ();' function returned an error!", true, false);
                 }
+            } else {
+                qFatal ("Unexpected code flow!");
             }
         }
     } else {
@@ -142,13 +146,15 @@ void JobWorker::processPropertiesFromObject (unsigned int requestId, const QJSVa
             qCritical() << QString("[%1] Failed to save object information! 'className=%2, id=%3, rawData=%4'!").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(QString::fromUtf8 (objectData.toJson (QJsonDocument::Compact)));
         }
         bool matchResult = this->processCriteria (
-            squidRequest.requestProperties,
+            squidRequest.requestHelperName,
+            squidRequest.requestProperties.count(),
             squidRequest.requestProperties.constBegin(),
             squidRequest.requestMathMatchOperator,
             squidRequest.requestCaseSensitivity,
             squidRequest.requestPatternSyntax,
+            squidRequest.requestInvertMatch,
             squidRequest.requestCriteria,
-            objectData.object()
+            objectData
         );
         this->squidResponseOut (requestId, QString("Retrieved data from the object with 'className=%1, id=%2' %3 specified criteria.").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), false, matchResult);
     } else {
@@ -156,28 +162,282 @@ void JobWorker::processPropertiesFromObject (unsigned int requestId, const QJSVa
     }
 }
 
-bool JobWorker::processCriteria (const QLinkedList<AppSquidPropertyMatch>& requestProperties, const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesItem, const AppSquidMathMatchOperator& requestMathOperator, const Qt::CaseSensitivity& requestCaseSensitivity, const QRegExp::PatternSyntax& requestPatternSyntax, const QStringList& requestCriteria, const QJsonObject& jsonObjectInformation) {
-#warning Be happy! This is the last C++ function to code! Then, I will test the software, build documentation and publish the project on GitHub! <3
-    QJsonDocument emptyDocument;
-    emptyDocument.setObject (jsonObjectInformation);
-    qCritical() << emptyDocument.toJson (QJsonDocument::Compact);
-    return (false);
-}
-
-bool JobWorker::processCriteria (const QLinkedList<AppSquidPropertyMatch>& requestProperties, const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesItem, const AppSquidMathMatchOperator& requestMathOperator, const Qt::CaseSensitivity& requestCaseSensitivity, const QRegExp::PatternSyntax& requestPatternSyntax, const QStringList& requestCriteria, const QJsonArray& jsonArrayInformation) {
-    QJsonDocument emptyDocument;
-    emptyDocument.setArray (jsonArrayInformation);
-    qCritical() << emptyDocument.toJson (QJsonDocument::Compact);
-    return (false);
-}
-
-bool JobWorker::processCriteria (const QLinkedList<AppSquidPropertyMatch>& requestProperties, const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesItem, const AppSquidMathMatchOperator& requestMathOperator, const Qt::CaseSensitivity& requestCaseSensitivity, const QRegExp::PatternSyntax& requestPatternSyntax, const QStringList& requestCriteria, const QJsonValue& jsonValueInformation) {
-    if (requestPropertiesItem == requestProperties.constEnd()) {
-        // This means that I have ended the walk through the JSON tree and I shall compare the value pointed by 'jsonValueInformation' against 'requestCriteria'.
+QString JobWorker::jsonType (const QJsonValue& jsonValue) {
+    QJsonValue::Type jsonValueType = jsonValue.type();
+    if (jsonValueType == QJsonValue::Null) {
+        return ("QJsonValue::Null");
+    } else if (jsonValueType == QJsonValue::Bool) {
+        return ("QJsonValue::Bool");
+    } else if (jsonValueType == QJsonValue::Double) {
+        return ("QJsonValue::Double");
+    } else if (jsonValueType == QJsonValue::String) {
+        return ("QJsonValue::String");
+    } else if (jsonValueType == QJsonValue::Array) {
+        return ("QJsonValue::Array");
+    } else if (jsonValueType == QJsonValue::Object) {
+        return ("QJsonValue::Object");
+    } else if (jsonValueType == QJsonValue::Undefined) {
+        return ("QJsonValue::Undefined");
     } else {
+        return ("(unknown)");
+    }
+}
 
+bool JobWorker::processCriteria (
+    const QString& requestHelperName,
+    const int level,
+    const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesIterator,
+    const AppSquidMathMatchOperator& requestMathMatchOperator,
+    const Qt::CaseSensitivity& requestCaseSensitivity,
+    const QRegExp::PatternSyntax& requestPatternSyntax,
+    bool requestInvertMatch,
+    const QStringList& requestCriteria,
+    const QJsonDocument& jsonDocumentInformation) {
+    if (jsonDocumentInformation.isObject ()) {
+        return (JobWorker::processCriteria (
+            requestHelperName,
+            level,
+            requestPropertiesIterator,
+            requestMathMatchOperator,
+            requestCaseSensitivity,
+            requestPatternSyntax,
+            requestInvertMatch,
+            requestCriteria,
+            jsonDocumentInformation.object()
+        ));
+    } else if (jsonDocumentInformation.isArray ()) {
+        return (JobWorker::processCriteria (
+            requestHelperName,
+            level,
+            requestPropertiesIterator,
+            requestMathMatchOperator,
+            requestCaseSensitivity,
+            requestPatternSyntax,
+            requestInvertMatch,
+            requestCriteria,
+            jsonDocumentInformation.array()
+        ));
+    } else {
+        qInfo() << QString("[%1] Unexpected JSON format while parsing '%2'.").arg(requestHelperName).arg(requestPropertiesIterator->componentName);
     }
     return (false);
+}
+
+bool JobWorker::processCriteria (
+    const QString& requestHelperName,
+    const int level,
+    const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesIterator,
+    const AppSquidMathMatchOperator& requestMathMatchOperator,
+    const Qt::CaseSensitivity& requestCaseSensitivity,
+    const QRegExp::PatternSyntax& requestPatternSyntax,
+    bool requestInvertMatch,
+    const QStringList& requestCriteria,
+    const QJsonValue& jsonValueInformation) {
+    if (level > 0) {
+        AppSquidPropertyMatch requestPropertiesItem = (*requestPropertiesIterator);
+        if (requestPropertiesItem.matchType == PropertyMatchType::MatchObject) {
+            if (jsonValueInformation.isObject ()) {
+                return (JobWorker::processCriteria (
+                    requestHelperName,
+                    level - 1,
+                    requestPropertiesIterator + 1,
+                    requestMathMatchOperator,
+                    requestCaseSensitivity,
+                    requestPatternSyntax,
+                    requestInvertMatch,
+                    requestCriteria,
+                    jsonValueInformation.toObject().value(requestPropertiesItem.componentName)
+                ));
+            } else {
+                qInfo() << QString("[%1] Unexpected JSON type '%2' while parsing '%3'. A '%4' was expected.").arg(requestHelperName).arg(JobWorker::jsonType(jsonValueInformation)).arg(requestPropertiesItem.componentName).arg(JobWorker::jsonType(QJsonValue::Object));
+            }
+        } else if (requestPropertiesItem.matchType == PropertyMatchType::MatchArray) {
+            if (jsonValueInformation.isArray ()) {
+                QJsonArray jsonArray (jsonValueInformation.toArray ());
+                int arraySize = jsonArray.count ();
+                int intervalStart, intervalEnd, intervalItem;
+                for (QList<QPair<int,int>>::const_iterator intervalIterator = requestPropertiesItem.matchIntervals.constBegin(); intervalIterator != requestPropertiesItem.matchIntervals.constEnd(); intervalIterator++) {
+                    intervalStart = intervalIterator->first;
+                    if (intervalStart < 0) {
+                        intervalStart = arraySize + intervalStart;
+                    }
+                    if (intervalStart < 0) {
+                        intervalStart = 0;
+                    }
+                    if (intervalStart >= arraySize) {
+                        intervalStart = arraySize - 1;
+                    }
+                    intervalEnd = intervalIterator->second;
+                    if (intervalEnd < 0) {
+                        intervalEnd = arraySize + intervalEnd;
+                    }
+                    if (intervalEnd < 0) {
+                        intervalEnd = 0;
+                    }
+                    if (intervalEnd >= arraySize) {
+                        intervalEnd = arraySize - 1;
+                    }
+                    for (intervalItem = intervalStart; intervalItem <= intervalEnd; intervalItem++) {
+                        if (JobWorker::processCriteria (
+                            requestHelperName,
+                            level - 1,
+                            requestPropertiesIterator + 1,
+                            requestMathMatchOperator,
+                            requestCaseSensitivity,
+                            requestPatternSyntax,
+                            requestInvertMatch,
+                            requestCriteria,
+                            jsonArray.at (intervalItem))) {
+                            if (requestPropertiesItem.matchQuantity == PropertyMatchQuantity::MatchAny) {
+                                return (true);
+                            }
+                        } else {
+                            if (requestPropertiesItem.matchQuantity == PropertyMatchQuantity::MatchAll) {
+                                return (false);
+                            }
+                        }
+                    }
+                }
+                if (requestPropertiesItem.matchQuantity == PropertyMatchQuantity::MatchAll) {
+                    return (true);
+                } else if (requestPropertiesItem.matchQuantity == PropertyMatchQuantity::MatchAny) {
+                    return (false);
+                } else {
+                    qFatal ("Unexpected code flow!");
+                }
+            } else {
+                qInfo() << QString("[%1] Unexpected JSON type '%2' while parsing '%3'. A '%4' was expected.").arg(requestHelperName).arg(JobWorker::jsonType(jsonValueInformation)).arg(requestPropertiesItem.componentName).arg(JobWorker::jsonType(QJsonValue::Array));
+            }
+        } else {
+            qFatal ("Unexpected code flow!");
+        }
+    } else {
+        // Match the leaf as Bool, Double or String
+        if (jsonValueInformation.isBool ()) {
+            static QList<QStringList> booleanOptions (
+                QList<QStringList> ()
+                    << ( QStringList()
+                        << "n"
+                        << "no"
+                        << "0"
+                        << "false"
+                        << "$false"
+                        << "off"
+                    ) << ( QStringList()
+                        << "y"
+                        << "yes"
+                        << "1"
+                        << "true"
+                        << "$true"
+                        << "on"
+                    )
+            );
+            int booleanOptionsPos = ((jsonValueInformation.toBool ()) ? 1 : 0);
+            if (requestMathMatchOperator == AppSquidMathMatchOperator::String ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::Equals ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::NotEquals) {
+                bool matched = (requestMathMatchOperator == AppSquidMathMatchOperator::NotEquals);
+                for (QStringList::const_iterator requestCriteriaIterator = requestCriteria.constBegin(); requestCriteriaIterator != requestCriteria.constEnd(); requestCriteriaIterator++) {
+                    if (booleanOptions[booleanOptionsPos].contains ((*requestCriteriaIterator), Qt::CaseInsensitive)) {
+                        matched = (! matched);
+                        break;
+                    } else if (! booleanOptions[1 - booleanOptionsPos].contains ((*requestCriteriaIterator), Qt::CaseInsensitive)) {
+                        qInfo() << QString("[%1] Unable to evaluate '%2' as a boolean value").arg(requestHelperName).arg(*requestCriteriaIterator);
+                        return (false);
+                    }
+                }
+                if (requestInvertMatch) {
+                    return (! matched);
+                } else {
+                    return (matched);
+                }
+            } else {
+                qInfo() << QString("[%1] Unable to apply selected comparison operator on a boolean value!").arg(requestHelperName);
+            }
+        } else if (jsonValueInformation.isDouble ()) {
+            if (requestMathMatchOperator == AppSquidMathMatchOperator::LessThan ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::LessThanOrEquals ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::Equals ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::NotEquals ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThanOrEquals ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThan) {
+                double doubleValue = jsonValueInformation.toDouble ();
+                double doubleComparison;
+                bool conversionOk;
+                for (QStringList::const_iterator requestCriteriaIterator = requestCriteria.constBegin(); requestCriteriaIterator != requestCriteria.constEnd(); requestCriteriaIterator++) {
+                    doubleComparison = requestCriteriaIterator->toDouble (&conversionOk);
+                    if (conversionOk) {
+                        if ((requestMathMatchOperator == AppSquidMathMatchOperator::LessThan && doubleValue < doubleComparison) ||
+                            (requestMathMatchOperator == AppSquidMathMatchOperator::LessThanOrEquals && doubleValue <= doubleComparison) ||
+                            (requestMathMatchOperator == AppSquidMathMatchOperator::Equals && doubleValue == doubleComparison) ||
+                            (requestMathMatchOperator == AppSquidMathMatchOperator::NotEquals && doubleValue != doubleComparison) ||
+                            (requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThanOrEquals && doubleValue >= doubleComparison) ||
+                            (requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThan && doubleValue > doubleComparison)) {
+                            return (! requestInvertMatch);
+                        }
+                    } else {
+                        qInfo() << QString("[%1] Unable to evaluate '%2' as a numeric value").arg(requestHelperName).arg(*requestCriteriaIterator);
+                        return (false);
+                    }
+                }
+                return (requestInvertMatch);
+            } else {
+                qInfo() << QString("[%1] Unable to apply selected comparison operator on a numeric value!").arg(requestHelperName);
+            }
+        } else if (jsonValueInformation.isString ()) {
+            if (requestMathMatchOperator == AppSquidMathMatchOperator::String ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::LessThan ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::LessThanOrEquals ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::Equals ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::NotEquals ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThanOrEquals ||
+                requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThan) {
+                QString stringValue (jsonValueInformation.toString ());
+                int compareResult;
+                for (QStringList::const_iterator requestCriteriaIterator = requestCriteria.constBegin(); requestCriteriaIterator != requestCriteria.constEnd(); requestCriteriaIterator++) {
+                    if (requestMathMatchOperator == AppSquidMathMatchOperator::String) {
+                        QRegExp regexComparison ((*requestCriteriaIterator), requestCaseSensitivity, requestPatternSyntax);
+                        if (regexComparison.isValid()) {
+                            if (JobWorker::regexMatches (regexComparison, stringValue)) {
+                                return (! requestInvertMatch);
+                            }
+                        } else {
+                            qInfo() << QString("[%1] Expression specification '%2' could not be parsed: '%3'").arg(requestHelperName).arg(*requestCriteriaIterator).arg(regexComparison.errorString());
+                            return (false);
+                        }
+                    } else {
+                        compareResult = stringValue.compare ((*requestCriteriaIterator), requestCaseSensitivity);
+                        if ((requestMathMatchOperator == AppSquidMathMatchOperator::LessThan && compareResult < 0) ||
+                            (requestMathMatchOperator == AppSquidMathMatchOperator::LessThanOrEquals && compareResult <= 0) ||
+                            (requestMathMatchOperator == AppSquidMathMatchOperator::Equals && compareResult == 0) ||
+                            (requestMathMatchOperator == AppSquidMathMatchOperator::NotEquals && compareResult != 0) ||
+                            (requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThanOrEquals && compareResult >= 0) ||
+                            (requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThan && compareResult > 0)) {
+                            return (! requestInvertMatch);
+                        }
+                    }
+                }
+                return (requestInvertMatch);
+            } else {
+                qInfo() << QString("[%1] Unable to apply selected comparison operator on a string value!").arg(requestHelperName);
+            }
+        } else {
+            qInfo() << QString("[%1] Unexpected JSON type '%2'").arg(requestHelperName).arg(JobWorker::jsonType(jsonValueInformation));
+        }
+    }
+    return (false);
+}
+
+bool JobWorker::regexMatches (const QRegExp& regularExpression, const QString& testString) {
+    QRegExp::PatternSyntax patternSyntax = regularExpression.patternSyntax();
+    switch (patternSyntax) {
+        case QRegExp::RegExp:
+            /* FALLTHROUGH */
+        case QRegExp::RegExp2:
+            return (regularExpression.indexIn (testString) >= 0);
+        default:
+            return (regularExpression.exactMatch (testString));
+    }
 }
 
 JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
@@ -246,7 +506,7 @@ void JobWorker::processIncomingRequest () {
             if (appHelperInfo->entryPoint.isCallable ()) {
                 int numSupportedUrls = appHelperInfo->supportedURLs.count ();
                 for (int supportedUrlPos = 0; supportedUrlPos < numSupportedUrls; supportedUrlPos++) {
-                    if (urlString.indexOf (appHelperInfo->supportedURLs[supportedUrlPos]) >= 0) {
+                    if (JobWorker::regexMatches (appHelperInfo->supportedURLs[supportedUrlPos], urlString)) {
                         squidRequest.requestHelperName = appHelperInfo->name;
                         squidRequest.requestHelperId = helperPos;
                         supportedUrlPos = numSupportedUrls;

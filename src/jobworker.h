@@ -51,9 +51,28 @@ private:
     void processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls);
     void processObjectFromUrl (unsigned int requestId, const QJSValue& appHelperObjectFromUrl);
     void processPropertiesFromObject (unsigned int requestId, const QJSValue& appHelperPropertiesFromObject);
-    static bool processCriteria (const QLinkedList<AppSquidPropertyMatch>& requestProperties, const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesItem, const AppSquidMathMatchOperator& requestMathOperator, const Qt::CaseSensitivity& requestCaseSensitivity, const QRegExp::PatternSyntax& requestPatternSyntax, const QStringList& requestCriteria, const QJsonObject& jsonObjectInformation);
-    static bool processCriteria (const QLinkedList<AppSquidPropertyMatch>& requestProperties, const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesItem, const AppSquidMathMatchOperator& requestMathOperator, const Qt::CaseSensitivity& requestCaseSensitivity, const QRegExp::PatternSyntax& requestPatternSyntax, const QStringList& requestCriteria, const QJsonArray& jsonArrayInformation);
-    static bool processCriteria (const QLinkedList<AppSquidPropertyMatch>& requestProperties, const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesItem, const AppSquidMathMatchOperator& requestMathOperator, const Qt::CaseSensitivity& requestCaseSensitivity, const QRegExp::PatternSyntax& requestPatternSyntax, const QStringList& requestCriteria, const QJsonValue& jsonValueInformation);
+    static QString jsonType (const QJsonValue& jsonValue);
+    static bool processCriteria (
+        const QString& requestHelperName,
+        const int level,
+        const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesIterator,
+        const AppSquidMathMatchOperator& requestMathMatchOperator,
+        const Qt::CaseSensitivity& requestCaseSensitivity,
+        const QRegExp::PatternSyntax& requestPatternSyntax,
+        bool requestInvertMatch,
+        const QStringList& requestCriteria,
+        const QJsonDocument& jsonDocumentInformation);
+    static bool processCriteria (
+        const QString& requestHelperName,
+        const int level,
+        const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesIterator,
+        const AppSquidMathMatchOperator& requestMathMatchOperator,
+        const Qt::CaseSensitivity& requestCaseSensitivity,
+        const QRegExp::PatternSyntax& requestPatternSyntax,
+        bool requestInvertMatch,
+        const QStringList& requestCriteria,
+        const QJsonValue& jsonValueInformation);
+    static bool regexMatches (const QRegExp& regularExpression, const QString& testString);
 public:
     JobWorker (const QString& requestChannel, QObject* parent = Q_NULLPTR);
     ~JobWorker();

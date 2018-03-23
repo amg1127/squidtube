@@ -63,11 +63,7 @@ function getObjectFromUrl (returnValue, url) {
 
 function getPropertiesFromObject (returnValue, className, id) {
     // throw new TypeError ("'getPropertiesFromObject (returnValue, className, id);' is not implemented yet!");
-    // This function drops repeated calls.
-    // I must reimplement setTimeout(), setInterval(), clearTimeout() and clearInterval()
-    console.warn ("late call requested.");
     setTimeout (function () {
-        console.warn ("late call done.");
         returnValue ({
             "foo": "bar",
             "id": 2345
