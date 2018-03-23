@@ -39,6 +39,7 @@ unix {
 }
 
 # Turn all warnings on
+CONFIG += warn_on
 QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion -DQT_DEPRECATED_WARNINGS
 
 ###########################

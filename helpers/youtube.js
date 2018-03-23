@@ -1,7 +1,19 @@
+// This helper requires an implementation of the URL object: https://developer.mozilla.org/en-US/docs/Web/API/URL
+require ("URL");
+
+// This helper requires a global variable named 'v3ApiKey', which stores the
 if (! v3ApiKey) {
     throw new ReferenceError ("Global variable 'v3ApiKey' must be set in configuration!");
 }
 
+// This helper accepts a global variable named 'part', which will be forwarded directly to YouTube API endpoint
+// If unset, it defaults to 'snippet'.
+// Check YouTube v3 API documentation for details: https://developers.google.com/youtube/v3/docs/standard_parameters
+if (! part) {
+    var part = "snippet";
+}
+
+// This variable is used internally
 let helperRegExp = /^https?:\/\/(([^\/]+\.)?youtube\.com(\.\w\w)?|youtu\.be)(:[0-9]+)?\//i;
 
 function getSupportedUrls (returnValue) {
@@ -11,8 +23,6 @@ function getSupportedUrls (returnValue) {
 function getObjectFromUrl (returnValue, url) {
     if (helperRegExp.test (url)) {
         let answer, dir, subdir, pos, answerClassName, answerId;
-        // This function requires an implementation of the URL object: https://developer.mozilla.org/en-US/docs/Web/API/URL
-        require ("URL");
         let urlObj = new URL (url);
         if (urlObj.pathname.startsWith ("/")) {
             pos = urlObj.pathname.indexOf ("/", 1);
@@ -62,11 +72,46 @@ function getObjectFromUrl (returnValue, url) {
 }
 
 function getPropertiesFromObject (returnValue, className, id) {
-    // throw new TypeError ("'getPropertiesFromObject (returnValue, className, id);' is not implemented yet!");
-    setTimeout (function () {
-        returnValue ({
-            "foo": "bar",
-            "id": 2345
-        });
-    }, 1);
+    let path = className + "s";
+    let param = "id";
+    if (className == "user") {
+        path = "channels";
+        param = "forUsername";
+    }
+    let xhr = new XMLHttpRequest ();
+    let youtubeURL = "https://www.googleapis.com/youtube/v3/" + path + "?" + param + "=" + escape(id) + "&part=" + escape(part) + "&key=" + escape (v3ApiKey);
+    xhr.open ("GET", youtubeURL, true);
+    let timer = setTimeout (function () {
+        console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' timed out. Aborting...");
+        xhr.abort ();
+    }, 5000);
+    xhr.onload = function () {
+        clearTimeout (timer);
+        if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+                let jsonResponse = JSON.parse (xhr.responseText);
+                console.log ("Data about className='" + className + "' and ID='" + id + "' was retrieved successfully.");
+                returnValue (jsonResponse.items.slice(0, 1));
+            } catch (e) {
+                console.warn ("An exception was thrown while handling YouTube API response: " + e.message);
+                returnValue (null);
+            }
+        } else {
+            console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' returned HTTP status code " + xhr.status + ": '" + xhr.statusText + "'!");
+            returnValue (null);
+        }
+    };
+    xhr.onerror = function () {
+        console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' failed!");
+        returnValue (null);
+    };
+    xhr.onabort = function () {
+        console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' was aborted!");
+        returnValue (null);
+    };
+    xhr.onreadystatechange = function () {
+        console.log ("XMLHttpRequest.readyState is now #" + xhr.readyState + "...");
+    }
+    xhr.send ();
+    console.log ("Querying YouTube v3 API for data about className='" + className + "' and ID='" + id + "'...");
 }
