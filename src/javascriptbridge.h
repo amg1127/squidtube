@@ -25,6 +25,10 @@ public:
     static const QStringList requiredMethods;
 };
 
+#warning Definir XMLHttpRequest no Javascript
+#warning Definir o metodo XMLHttpRequest.send() dentro do C++, passando todo o XMLHttpRequest como um QJSValue
+#warning Chamar os event handlers usando QJSValue.call()
+
 class JavascriptTimer : public QTimer {
     Q_OBJECT
 private:
@@ -48,6 +52,7 @@ private:
     QMap<unsigned int,unsigned int> pendingTransactions;
     QStringList loadedLibraries;
     QMap<unsigned int,JavascriptTimer*> javascriptTimers;
+    QMap<unsigned int,QJSValue> JavascriptXMLHttpRequests;
     unsigned int javascriptTimerId;
     static QJsonValue QJS2QJsonValue (const QJSValue& value);
     static QJSValue QJson2QJS (QJSEngine& jsEngine, const QJsonValue& value);
@@ -66,6 +71,11 @@ public:
     Q_INVOKABLE QJSValue setInterval (const QJSValue& callback, const int interval);
     Q_INVOKABLE void clearTimeout (unsigned int timerId);
     Q_INVOKABLE void clearInterval (unsigned int timerId);
+    Q_INVOKABLE void xmlHttpRequest_send (QJSValue& object, QJSValue& requestBody, QJSValue& getPrivateData, QJSValue& setPrivateData);
+    Q_INVOKABLE void console_log (const QJSValue& msg);
+    Q_INVOKABLE void console_info (const QJSValue& msg);
+    Q_INVOKABLE void console_warn (const QJSValue& msg);
+    Q_INVOKABLE void console_error (const QJSValue& msg);
 private slots:
     void timerFinished (unsigned int timerId);
 signals:

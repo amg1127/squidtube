@@ -2,6 +2,7 @@
 #define APPRUNTIME_H
 
 #include <QDateTime>
+#include <QFile>
 #include <QHash>
 #include <QJsonDocument>
 #include <QLinkedList>
@@ -11,6 +12,7 @@
 #include <QRegExp>
 #include <QSemaphore>
 #include <QString>
+#include <QTextStream>
 #include <QUrl>
 
 class AppHelperObject;
@@ -53,9 +55,9 @@ public:
     static qint64 negativeTTLint;
     // A static method for datetime retrieval, because the native class is reentrant
     static QDateTime currentDateTime();
-    // JSON retrieved from the database must pass this test
-    // inline static bool validateJsonData (const QJsonDocument& data) { return ((! data.isNull()) && (! data.isEmpty()) && (! data.isObject()) && data.isArray ()); }
-    // A static method to check whether a JSON document is considered fresh
+    // Static methods for file reading. I use them several times along the program
+    QString readFileContents (const QString& fileName);
+    QString readFileContents (QFile& fileObj);
 };
 
 class AppConstants {
@@ -68,8 +70,6 @@ public:
     static const QString AppCommonSubDir;
     static const QString AppHelperSubDir;
     static const QString AppHelperExtension;
-    static const QString AppHelperCodeHeader;
-    static const QString AppHelperCodeFooter;
 };
 
 class AppHelperObject {

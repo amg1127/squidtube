@@ -6,6 +6,28 @@ try {
     }
 } catch (e) {
 
+    // Added in Qt 5.8
+    if (! String.prototype.startsWith) {
+        String.prototype.startsWith = function (substr, position) {
+            let _start = 0;
+            if (position) {
+                _start = position;
+            }
+            return (this.substring (_start, _start + substr.length) == substr);
+        }
+    }
+
+    // Added in Qt 5.8
+    if (! String.prototype.endsWith) {
+        String.prototype.endsWith = function (substr, position) {
+            let _end = this.length;
+            if (position) {
+                _end = position;
+            }
+            return (this.substring (_end - substr.length, _end) == substr);
+        }
+    }
+
     var URL = function (urlString, baseString) {
         "use strict";
 

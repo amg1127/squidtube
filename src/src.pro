@@ -61,3 +61,10 @@ target.path = $${install_bin_dir}
 configfiles.path = $${install_etc_dir}
 configfiles.files = $$sprintf("../%1.conf", $${project_name})
 INSTALLS += configfiles
+
+DISTFILES += \
+    xmlhttprequest.js \
+    helperjail.js
+
+RESOURCES += \
+    javascriptsources.qrc

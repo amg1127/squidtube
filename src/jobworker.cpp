@@ -445,7 +445,7 @@ JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
     finishRequested (false),
     rngdInitialized (false),
     requestChannel (requestChannel),
-    runtimeEnvironment (new QQmlEngine (this)),
+    runtimeEnvironment (new QJSEngine (this)),
     javascriptBridge (new JavascriptBridge ((*runtimeEnvironment), requestChannel)),
     requestId (1),
     retryTimer (new QTimer (this)),

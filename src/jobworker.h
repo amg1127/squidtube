@@ -5,6 +5,7 @@
 #include "javascriptbridge.h"
 #include "objectcache.h"
 
+#include <QJSEngine>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -15,8 +16,6 @@
 #include <QList>
 #include <QMap>
 #include <QNetworkAccessManager>
-#include <QQmlEngine>
-#include <QQmlNetworkAccessManagerFactory>
 #include <QRegExp>
 #include <QString>
 #include <QStringList>
@@ -40,7 +39,7 @@ private:
     bool rngdInitialized;
     QString requestChannel;
     QList<AppHelperInfo*> helperInstances;
-    QQmlEngine* runtimeEnvironment;
+    QJSEngine* runtimeEnvironment;
     JavascriptBridge* javascriptBridge;
     unsigned int requestId;
     QMap<unsigned int,AppSquidRequest> runningRequests;

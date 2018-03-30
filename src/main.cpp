@@ -369,25 +369,12 @@ bool loadRuntimeVariables () {
     }
     // Now load library contents
     for (QHash<QString,QString>::const_iterator library = libraryCandidates.constBegin(); librariesLoaded && library != libraryCandidates.constEnd(); library++) {
-        QFile libraryFile (library.value ());
-        if (libraryFile.open (QIODevice::ReadOnly | QIODevice::Text)) {
-            {
-                QTextStream libraryFileStream (&libraryFile);
-                AppRuntime::commonSources.insert (library.key(), libraryFileStream.readAll());
-                qDebug() << QString("Loaded library '%1' from script file '%2'.").arg(library.key()).arg(library.value());
-            }
-            if (libraryFile.error() != QFileDevice::NoError) {
-                qCritical() << QString("Error reading contents of file '%1': '%2'!").arg(library.value()).arg(libraryFile.errorString());
-                librariesLoaded = false;
-            }
-            if (! libraryFile.atEnd ()) {
-                qWarning() << QString("The file '%1' was not read completely!").arg(library.value());
-                librariesLoaded = false;
-            }
-            libraryFile.close ();
-        } else {
-            qCritical() << QString("Unable to open file '%1' for reading: '%2'!").arg(library.value()).arg(libraryFile.errorString());
+        QString libraryFileContents (AppRuntime::readFileContents (library.value()));
+        if (libraryFileContents.isNull ()) {
+            qCritical() << QString("Unable to read library file '%1'!").arg(library.value());
             librariesLoaded = false;
+        } else {
+            AppRuntime::commonSources.insert (library.key(), libraryFileContents);
         }
     }
     if (! librariesLoaded) {
@@ -396,35 +383,47 @@ bool loadRuntimeVariables () {
 
     // Load helpers into the memory
     qDebug() << "Loading helper contents into memory...";
-    bool helpersLoaded = true;
-    for (QStringList::iterator helper = AppRuntime::helperNames.begin(); helpersLoaded && helper != AppRuntime::helperNames.end(); helper++) {
-        QFile helperFile (configurationDir + "/" + AppConstants::AppHelperSubDir + "/" + (*helper) + AppConstants::AppHelperExtension);
-        if (! helperFile.exists ()) {
-            helperFile.setFileName (QString(APP_install_share_dir) + "/" + AppConstants::AppHelperSubDir + "/" + (*helper) + AppConstants::AppHelperExtension);
+    QString helperJailTemplate (AppRuntime::readFileContents (":/helperjail.js"));
+    if (helperJailTemplate.isNull ()) {
+        qFatal("Unable to read resource file ':/helperjail.js'!");
+    } else {
+        QString helperContents;
+        QRegExp helperJailPlaceHolder ("/\\*\\s*Helper\\s+code\\s+goes\\s+here\\W", Qt::CaseInsensitive);
+        if (! helperJailPlaceHolder.isValid ()) {
+            qFatal(QString("'helperJailPlaceHolder' regular expression did not build: '%1'!").arg(helperJailPlaceHolder.errorString()).toLocal8Bit().constData());
         }
-        if (helperFile.open (QIODevice::ReadOnly | QIODevice::Text)) {
-            {
-                QTextStream helperFileStream (&helperFile);
-                AppRuntime::helperSourcesByName[(*helper)] = AppConstants::AppHelperCodeHeader + AppRuntime::helperSourcesByName[(*helper)] + "\n" + helperFileStream.readAll() + AppConstants::AppHelperCodeFooter;
-                AppRuntime::helperMemoryCache.append (new AppHelperObjectCache());
-                qDebug() << QString("Loaded helper '%1' from script file '%2'.").arg(*helper).arg(helperFile.fileName());
+        int helperPlaceHolderBegin = helperJailTemplate.indexOf (helperJailPlaceHolder);
+        if (helperPlaceHolderBegin >= 0) {
+            QString helperJailTemplateBegin (helperJailTemplate.left (helperPlaceHolderBegin));
+            helperJailTemplate.remove (0, helperPlaceHolderBegin);
+            int helperPlaceHolderEnd = helperJailTemplate.indexOf ("*/");
+            if (helperPlaceHolderEnd >= 0) {
+                helperJailTemplate.remove (0, helperPlaceHolderEnd + 2);
+                bool helpersLoaded = true;
+                for (QStringList::iterator helper = AppRuntime::helperNames.begin(); helpersLoaded && helper != AppRuntime::helperNames.end(); helper++) {
+                    QFile helperFile (configurationDir + "/" + AppConstants::AppHelperSubDir + "/" + (*helper) + AppConstants::AppHelperExtension);
+                    if (! helperFile.exists ()) {
+                        helperFile.setFileName (QString(APP_install_share_dir) + "/" + AppConstants::AppHelperSubDir + "/" + (*helper) + AppConstants::AppHelperExtension);
+                    }
+                    helperContents = AppRuntime::readFileContents (helperFile);
+                    if (helperContents.isNull ()) {
+                        qCritical() << QString("Unable to read helper file '%1'!").arg(helperFile.fileName());
+                        helpersLoaded = false;
+                    } else {
+                        AppRuntime::helperSourcesByName[(*helper)] = helperJailTemplateBegin + AppRuntime::helperSourcesByName[(*helper)] + "\n" + helperContents + helperJailTemplate;
+                        AppRuntime::helperMemoryCache.append (new AppHelperObjectCache());
+                        qDebug() << QString("Loaded helper '%1' from script file '%2'.").arg(*helper).arg(helperFile.fileName());
+                    }
+                }
+                if (! helpersLoaded) {
+                    return (false);
+                }
+            } else {
+                qFatal("'helperPlaceHolderEnd' search did not succeed!");
             }
-            if (helperFile.error() != QFileDevice::NoError) {
-                qCritical() << QString("Error reading contents of file '%1': '%2'!").arg(helperFile.fileName()).arg(helperFile.errorString());
-                helpersLoaded = false;
-            }
-            if (! helperFile.atEnd ()) {
-                qWarning() << QString("The file '%1' was not read completely!").arg(helperFile.fileName());
-                helpersLoaded = false;
-            }
-            helperFile.close ();
         } else {
-            qCritical() << QString("Unable to open file '%1' for reading: '%2'!").arg(helperFile.fileName()).arg(helperFile.errorString());
-            helpersLoaded = false;
+            qFatal("'helperPlaceHolderBegin' search did not succeed!");
         }
-    }
-    if (! helpersLoaded) {
-        return (false);
     }
 
     return (true);

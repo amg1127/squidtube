@@ -91,7 +91,7 @@ function getPropertiesFromObject (returnValue, className, id) {
             try {
                 let jsonResponse = JSON.parse (xhr.responseText);
                 console.log ("Data about className='" + className + "' and ID='" + id + "' was retrieved successfully.");
-                returnValue (jsonResponse.items.slice(0, 1));
+                returnValue (jsonResponse.items[0]);
             } catch (e) {
                 console.warn ("An exception was thrown while handling YouTube API response: " + e.message);
                 returnValue (null);

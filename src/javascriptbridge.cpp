@@ -136,6 +136,32 @@ JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestC
     jsEngine.globalObject().setProperty ("setInterval", this->myself.property ("setInterval"));
     jsEngine.globalObject().setProperty ("clearTimeout", this->myself.property ("clearTimeout"));
     jsEngine.globalObject().setProperty ("clearInterval", this->myself.property ("clearInterval"));
+    // Console object implementation
+    QJSValue consoleObj = jsEngine.newObject ();
+    consoleObj.setProperty ("debug", this->myself.property ("console_log"));
+    consoleObj.setProperty ("log", this->myself.property ("console_log"));
+    consoleObj.setProperty ("error", this->myself.property ("console_error"));
+    consoleObj.setProperty ("exception", this->myself.property ("console_error"));
+    consoleObj.setProperty ("info", this->myself.property ("console_info"));
+    consoleObj.setProperty ("warn", this->myself.property ("console_warn"));
+    jsEngine.globalObject().setProperty ("console", consoleObj);
+    // XMLHttpRequest implementation
+    QString xmlHttpCode = AppRuntime::readFileContents (":/xmlhttprequest.js");
+    if (xmlHttpCode.isNull ()) {
+        qFatal("Unable to read resource file ':/xmlhttprequest.js'!");
+    } else {
+        QJSValue xmlHttpRequestFunction = jsEngine.evaluate (xmlHttpCode, ":/xmlhttprequest.js");
+        if (! JavascriptBridge::warnJsError (xmlHttpRequestFunction, "Unable to initialize XMLHttpRequest object within the QJSEngine!")) {
+            if (xmlHttpRequestFunction.isCallable ()) {
+                QJSValue xmlHttpRequest = xmlHttpRequestFunction.call (QJSValueList() << this->myself.property ("xmlHttpRequest_send"));
+                if (! JavascriptBridge::warnJsError (xmlHttpRequest, "Unable to retrieve the XMLHttpRequest constructor from the code!")) {
+                    jsEngine.globalObject().setProperty ("XMLHttpRequest", xmlHttpRequest);
+                }
+            } else {
+                qCritical() << "XMLHttpRequest initialization procedure did not return a callable object!";
+            }
+        }
+    }
 }
 
 QJSValue JavascriptBridge::QJson2QJS (QJSEngine& jsEngine, const QJsonDocument& value) {
@@ -214,7 +240,7 @@ bool JavascriptBridge::warnJsError (const QJSValue& jsValue, const QString& msg)
 /*
  * A reminder: Javascript::invokeMethod must be the last call of every calling function.
  * C++ methods will run out of the expected order if Javascript method returns values immediately, because
- * QQmlEngine will call back the C++ method before the code flow returns to the event loop.
+ * QJSEngine will call back the C++ method before the code flow returns to the event loop.
  *
  * Following a call to Javascript::invokeMethod, there should be error handling statements only.
  *
@@ -307,6 +333,26 @@ void JavascriptBridge::clearInterval (unsigned int timerId) {
     if (timerId & 3) {
         this->timerFinished (timerId);
     }
+}
+
+void JavascriptBridge::xmlHttpRequest_send (QJSValue& object, QJSValue& requestBody, QJSValue& getPrivateData, QJSValue& setPrivateData) {
+    qFatal("Not done yet!");
+}
+
+void JavascriptBridge::console_log (const QJSValue& msg) {
+    qDebug() << QString("QJS: ") + msg.toString();
+}
+
+void JavascriptBridge::console_info (const QJSValue& msg) {
+    qInfo() << QString("QJS: ") + msg.toString();
+}
+
+void JavascriptBridge::console_warn (const QJSValue& msg) {
+    qWarning() << QString("QJS: ") + msg.toString();
+}
+
+void JavascriptBridge::console_error (const QJSValue& msg) {
+    qCritical() << QString("QJS: ") + msg.toString();
 }
 
 void JavascriptBridge::timerFinished (unsigned int timerId) {
