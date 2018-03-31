@@ -12,6 +12,7 @@
 #include <QRegExp>
 #include <QSemaphore>
 #include <QString>
+#include <QtDebug>
 #include <QTextStream>
 #include <QUrl>
 
@@ -53,11 +54,15 @@ public:
     // Number versions of positiveTTL and negativeTTL
     static qint64 positiveTTLint;
     static qint64 negativeTTLint;
+    // Mutex to handle reentrancy of the QTextCodec class
+    static QMutex textCoDecMutex;
     // A static method for datetime retrieval, because the native class is reentrant
     static QDateTime currentDateTime();
     // Static methods for file reading. I use them several times along the program
-    QString readFileContents (const QString& fileName);
-    QString readFileContents (QFile& fileObj);
+    static QString readFileContents (const QString& fileName);
+    static QString readFileContents (QFile& fileObj);
+    // Static method that forces a deep copy of a list
+    template<class T> static void deepCopyList (T& destination, const T& source);
 };
 
 class AppConstants {

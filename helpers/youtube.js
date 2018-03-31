@@ -84,18 +84,15 @@ function getPropertiesFromObject (returnValue, className, id) {
     let timer = setTimeout (function () {
         console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' timed out. Aborting...");
         xhr.abort ();
-    }, 5000);
+    }, 30000);
+    xhr.timeout = 5000;
+    xhr.responseType = "json";
     xhr.onload = function () {
         clearTimeout (timer);
         if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-                let jsonResponse = JSON.parse (xhr.responseText);
-                console.log ("Data about className='" + className + "' and ID='" + id + "' was retrieved successfully.");
-                returnValue (jsonResponse.items[0]);
-            } catch (e) {
-                console.warn ("An exception was thrown while handling YouTube API response: " + e.message);
-                returnValue (null);
-            }
+            let jsonResponse = xhr.response;
+            console.log ("Data about className='" + className + "' and ID='" + id + "' was retrieved successfully.");
+            returnValue (jsonResponse.items[0]);
         } else {
             console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' returned HTTP status code " + xhr.status + ": '" + xhr.statusText + "'!");
             returnValue (null);

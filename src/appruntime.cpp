@@ -38,6 +38,8 @@ QMutex AppRuntime::dbSettingsMutex;
 qint64 AppRuntime::positiveTTLint = 0;
 qint64 AppRuntime::negativeTTLint = 0;
 
+QMutex AppRuntime::textCoDecMutex;
+
 QDateTime AppRuntime::currentDateTime () {
     static QMutex m (QMutex::Recursive);
     QMutexLocker m_lck (&m);
@@ -76,6 +78,19 @@ QString AppRuntime::readFileContents (QFile& fileObj) {
         qWarning() << QString("Unable to open file '%1' for reading: '%2'!").arg(fileObj.fileName()).arg(fileObj.errorString());
     }
     return (QString());
+}
+
+template<class T> void AppRuntime::deepCopyList (T& destination, const T& source) {
+    if (source.isEmpty ()) {
+        destination.clear ();
+    } else {
+        int size = destination.count() + 1;
+        destination << source.first();
+        destination << source;
+        while (size-- > 0) {
+            destination.removeFirst ();
+        }
+    }
 }
 
 //////////////////////////////////////////////////////////////////
@@ -133,12 +148,12 @@ AppHelperObjectCache::~AppHelperObjectCache () {
 AppSquidRequest AppSquidRequest::deepCopy () const {
     AppSquidRequest returnValue;
     returnValue.requestUrl = QUrl::fromEncoded (this->requestUrl.toEncoded(QUrl::FullyEncoded), QUrl::StrictMode);
-    returnValue.requestProperties << this->requestProperties;
+    AppRuntime::deepCopyList (returnValue.requestProperties, this->requestProperties);
     returnValue.requestMathMatchOperator = this->requestMathMatchOperator;
     returnValue.requestCaseSensitivity = this->requestCaseSensitivity;
     returnValue.requestPatternSyntax = this->requestPatternSyntax;
     returnValue.requestInvertMatch = this->requestInvertMatch;
-    returnValue.requestCriteria << this->requestCriteria;
+    AppRuntime::deepCopyList (returnValue.requestCriteria, this->requestCriteria);
     returnValue.requestHelperName = QString("%1").arg (this->requestHelperName);
     returnValue.requestHelperId = this->requestHelperId;
     returnValue.objectClassName = QString("%1").arg (this->objectClassName);

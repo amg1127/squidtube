@@ -15,6 +15,9 @@
 #include <QMutexLocker>
 #include <QObject>
 #include <QtDebug>
+#include <QTextCodec>
+#include <QTextEncoder>
+#include <QTextDecoder>
 #include <QTimer>
 
 class JavascriptMethod {
@@ -71,7 +74,10 @@ public:
     Q_INVOKABLE QJSValue setInterval (const QJSValue& callback, const int interval);
     Q_INVOKABLE void clearTimeout (unsigned int timerId);
     Q_INVOKABLE void clearInterval (unsigned int timerId);
+    Q_INVOKABLE void xmlHttpRequest_abort (QJSValue& object, QJSValue& getPrivateData, QJSValue& setPrivateData);
     Q_INVOKABLE void xmlHttpRequest_send (QJSValue& object, QJSValue& requestBody, QJSValue& getPrivateData, QJSValue& setPrivateData);
+    Q_INVOKABLE QJSValue TextDecode (const QJSValue& bytes, const QJSValue& fallbackCharset);
+    Q_INVOKABLE QJSValue TextEncode (const QJSValue& string, const QJSValue& charset);
     Q_INVOKABLE void console_log (const QJSValue& msg);
     Q_INVOKABLE void console_info (const QJSValue& msg);
     Q_INVOKABLE void console_warn (const QJSValue& msg);

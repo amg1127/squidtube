@@ -145,6 +145,10 @@ JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestC
     consoleObj.setProperty ("info", this->myself.property ("console_info"));
     consoleObj.setProperty ("warn", this->myself.property ("console_warn"));
     jsEngine.globalObject().setProperty ("console", consoleObj);
+    // Interface for data conversion to and from Unicode
+    // My XMLHttpRequest implementation need it
+    jsEngine.globalObject().setProperty ("TextDecode", this->myself.property ("TextDecode"));
+    jsEngine.globalObject().setProperty ("TextEncode", this->myself.property ("TextEncode"));
     // XMLHttpRequest implementation
     QString xmlHttpCode = AppRuntime::readFileContents (":/xmlhttprequest.js");
     if (xmlHttpCode.isNull ()) {
@@ -153,7 +157,10 @@ JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestC
         QJSValue xmlHttpRequestFunction = jsEngine.evaluate (xmlHttpCode, ":/xmlhttprequest.js");
         if (! JavascriptBridge::warnJsError (xmlHttpRequestFunction, "Unable to initialize XMLHttpRequest object within the QJSEngine!")) {
             if (xmlHttpRequestFunction.isCallable ()) {
-                QJSValue xmlHttpRequest = xmlHttpRequestFunction.call (QJSValueList() << this->myself.property ("xmlHttpRequest_send"));
+                QJSValue xmlHttpRequest = xmlHttpRequestFunction.call (QJSValueList()
+                    << this->myself.property ("xmlHttpRequest_send")
+                    << this->myself.property ("xmlHttpRequest_abort")
+                );
                 if (! JavascriptBridge::warnJsError (xmlHttpRequest, "Unable to retrieve the XMLHttpRequest constructor from the code!")) {
                     jsEngine.globalObject().setProperty ("XMLHttpRequest", xmlHttpRequest);
                 }
@@ -335,8 +342,55 @@ void JavascriptBridge::clearInterval (unsigned int timerId) {
     }
 }
 
+void JavascriptBridge::xmlHttpRequest_abort (QJSValue& object, QJSValue& getPrivateData, QJSValue& setPrivateData) {
+    qFatal("Not done yet!");
+}
+
 void JavascriptBridge::xmlHttpRequest_send (QJSValue& object, QJSValue& requestBody, QJSValue& getPrivateData, QJSValue& setPrivateData) {
     qFatal("Not done yet!");
+}
+
+QJSValue JavascriptBridge::TextDecode (const QJSValue& bytes, const QJSValue& fallbackCharset) {
+    QJSValue answer ("");
+    QByteArray inputBuffer;
+    if (bytes.isArray ()) {
+        uint length = bytes.property("length").toUInt();
+        for (uint i = 0; i < length; i++) {
+            inputBuffer.append ((char) bytes.property(i).toUInt());
+        }
+        QMutexLocker m_lck (&AppRuntime::textCoDecMutex);
+        QTextCodec* textCodec = QTextCodec::codecForUtfText (inputBuffer, QTextCodec::codecForName (fallbackCharset.toString().toUtf8()));
+        if (textCodec != Q_NULLPTR) {
+            QTextDecoder textDecoder (textCodec, QTextCodec::ConvertInvalidToNull);
+            answer = textDecoder.toUnicode (inputBuffer);
+        }
+    }
+    return (answer);
+}
+
+QJSValue JavascriptBridge::TextEncode (const QJSValue& string, const QJSValue& charset) {
+    QJSEngine* jsEngine (qjsEngine (this));
+    if (jsEngine != Q_NULLPTR) {
+        QJSValue answer (jsEngine->newArray ());
+        QByteArray outputBuffer;
+        {
+            QMutexLocker m_lck (&AppRuntime::textCoDecMutex);
+            QTextCodec* textCodec = QTextCodec::codecForName (charset.toString().toUtf8());
+            if (textCodec != Q_NULLPTR) {
+                QTextEncoder textEncoder (textCodec, QTextCodec::ConvertInvalidToNull);
+                outputBuffer = textEncoder.fromUnicode (string.toString());
+            }
+        }
+        uint len = outputBuffer.size ();
+        answer = jsEngine->newArray (len);
+        for (uint i = 0; i < len; i++) {
+            answer.setProperty (i, (uint) outputBuffer[i]);
+        }
+        return (answer);
+    } else {
+        qFatal("JavascriptBridge object must be bound to a QJSEngine! Invoke 'QJSEngine::newQObject();'!");
+        return (QJSValue());
+    }
 }
 
 void JavascriptBridge::console_log (const QJSValue& msg) {
