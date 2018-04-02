@@ -14,7 +14,7 @@ if (! part) {
 }
 
 // This variable is used internally
-let helperRegExp = /^https?:\/\/(([^\/]+\.)?youtube\.com(\.\w\w)?|youtu\.be)(:[0-9]+)?\//i;
+var helperRegExp = /^https?:\/\/(([^\/]+\.)?youtube\.com(\.\w\w)?|youtu\.be)(:[0-9]+)?\//i;
 
 function getSupportedUrls (returnValue) {
     returnValue ([helperRegExp]);
@@ -22,8 +22,8 @@ function getSupportedUrls (returnValue) {
 
 function getObjectFromUrl (returnValue, url) {
     if (helperRegExp.test (url)) {
-        let answer, dir, subdir, pos, answerClassName, answerId;
-        let urlObj = new URL (url);
+        var answer, dir, subdir, pos, answerClassName, answerId;
+        var urlObj = new URL (url);
         if (urlObj.pathname.startsWith ("/")) {
             pos = urlObj.pathname.indexOf ("/", 1);
             if (pos >= 0) {
@@ -72,16 +72,16 @@ function getObjectFromUrl (returnValue, url) {
 }
 
 function getPropertiesFromObject (returnValue, className, id) {
-    let path = className + "s";
-    let param = "id";
+    var path = className + "s";
+    var param = "id";
     if (className == "user") {
         path = "channels";
         param = "forUsername";
     }
-    let xhr = new XMLHttpRequest ();
-    let youtubeURL = "https://www.googleapis.com/youtube/v3/" + path + "?" + param + "=" + escape(id) + "&part=" + escape(part) + "&key=" + escape (v3ApiKey);
+    var xhr = new XMLHttpRequest ();
+    var youtubeURL = "https://www.googleapis.com/youtube/v3/" + path + "?" + param + "=" + escape(id) + "&part=" + escape(part) + "&key=" + escape (v3ApiKey);
     xhr.open ("GET", youtubeURL, true);
-    let timer = setTimeout (function () {
+    var timer = setTimeout (function () {
         console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' timed out. Aborting...");
         xhr.abort ();
     }, 30000);
@@ -90,7 +90,7 @@ function getPropertiesFromObject (returnValue, className, id) {
     xhr.onload = function () {
         clearTimeout (timer);
         if (xhr.status >= 200 && xhr.status < 300) {
-            let jsonResponse = xhr.response;
+            var jsonResponse = xhr.response;
             console.log ("Data about className='" + className + "' and ID='" + id + "' was retrieved successfully.");
             returnValue (jsonResponse.items[0]);
         } else {

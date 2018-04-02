@@ -28,8 +28,8 @@
 
 (function () {
     "use strict";
-    /* let global_variable_a = unescape ('foo'); */
-    /* let global_variable_b = unescape ('bar'); */
+    /* var global_variable_a = unescape ('foo'); */
+    /* var global_variable_b = unescape ('bar'); */
 
     /* Helper code goes here - this placeholder must not be removed! */
 

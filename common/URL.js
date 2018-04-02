@@ -9,7 +9,7 @@ try {
     // Added in Qt 5.8
     if (! String.prototype.startsWith) {
         String.prototype.startsWith = function (substr, position) {
-            let _start = 0;
+            var _start = 0;
             if (position) {
                 _start = position;
             }
@@ -20,7 +20,7 @@ try {
     // Added in Qt 5.8
     if (! String.prototype.endsWith) {
         String.prototype.endsWith = function (substr, position) {
-            let _end = this.length;
+            var _end = this.length;
             if (position) {
                 _end = position;
             }
@@ -36,11 +36,11 @@ try {
                 if (path.endsWith ("/.") || path.endsWith ("/..")) {
                     path += "/";
                 }
-                let pathComponents = path.split("/");
-                let pathLength = pathComponents.length;
-                let resolvedPath = [];
-                let i;
-                let pathComponent;
+                var pathComponents = path.split("/");
+                var pathLength = pathComponents.length;
+                var resolvedPath = [];
+                var i;
+                var pathComponent;
                 for (i = 0; i < pathLength; i++) {
                     pathComponent = pathComponents[i];
                     if (pathComponent == "..") {
@@ -56,12 +56,12 @@ try {
         }
 
         function URLSearchParams (searchComponents) {
-            let length = searchComponents.length;
+            var length = searchComponents.length;
 
             Object.defineProperties (this, {
                 "get"     : { "value": (function (param) {
-                    let escapedParam = escape (param) + "=";
-                    let i;
+                    var escapedParam = escape (param) + "=";
+                    var i;
                     for (i = 0; i < length; i++) {
                         if (searchComponents[i].startsWith (escapedParam)) {
                             return (unescape (searchComponents[i].substring (escapedParam.length)));
@@ -70,9 +70,9 @@ try {
                     return (null);
                 })},
                 "getAll"  : { "value": (function (param) {
-                    let returnValue = [];
-                    let escapedParam = escape (param) + "=";
-                    let i;
+                    var returnValue = [];
+                    var escapedParam = escape (param) + "=";
+                    var i;
                     for (i = 0; i < length; i++) {
                         if (searchComponents[i].startsWith (escapedParam)) {
                             returnValue.push (unescape (searchComponents[i].substring (escapedParam.length)));
@@ -98,7 +98,7 @@ try {
             });
         }
 
-        let regexpAbsoluteUrl = (/^(|[^:\s]+:)((|\/\/)(|([^:@\/\s]+)(|:([^@\/\s]*))@)((([\w-_]+\.)*[\w-_]+\.?)(|:(\d+))))(|\/[^?#\s]*)(|\?[^#\s]*)(|#.*)$/).exec (urlString);
+        var regexpAbsoluteUrl = (/^(|[^:\s]+:)((|\/\/)(|([^:@\/\s]+)(|:([^@\/\s]*))@)((([\w-_]+\.)*[\w-_]+\.?)(|:(\d+))))(|\/[^?#\s]*)(|\?[^#\s]*)(|#.*)$/).exec (urlString);
         if (regexpAbsoluteUrl) {
             Object.defineProperties (this, {
                 "protocol"    : { "value": regexpAbsoluteUrl[1] },
@@ -118,9 +118,9 @@ try {
             });
             Object.defineProperty (this, "toString", { "value": (function () { return (this.href); }) });
         } else {
-            let regexpRelativeUrl = (/^(|\.?\.?\/[^?#\s]*)(|\?[^#\s]*)(|#.*)$/).exec (urlString);
+            var regexpRelativeUrl = (/^(|\.?\.?\/[^?#\s]*)(|\?[^#\s]*)(|#.*)$/).exec (urlString);
             if (baseString && regexpRelativeUrl) {
-                let baseUrlObject = new URL (baseString);
+                var baseUrlObject = new URL (baseString);
                 Object.defineProperties (this, {
                     "protocol"    : { "value": baseUrlObject.protocol },
                     "username"    : { "value": baseUrlObject.username },
@@ -132,7 +132,7 @@ try {
                     "hash"        : { "value": ((regexpRelativeUrl[3]) ? regexpRelativeUrl[3] : baseUrlObject.hash) },
                     "origin"      : { "value": baseUrlObject.origin }
                 });
-                let pathname;
+                var pathname;
                 if (regexpRelativeUrl[1].startsWith ("/")) {
                     pathname = path_resolution (regexpRelativeUrl[1]);
                 } else if (baseUrlObject.pathname.endsWith ("/")) {

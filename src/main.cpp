@@ -300,7 +300,7 @@ bool loadRuntimeVariables () {
         QHash<QString,QString>::iterator helperCode (AppRuntime::helperSourcesByName.insert ((*helper), ""));
         for (QHash<QString,QString>::const_iterator variable = globalVariables.constBegin(); variable != globalVariables.constEnd(); variable++) {
             if (variable.key().startsWith ((*helper) + ".")) {
-                helperCode.value() += "let " + variable.key().mid(helper->length() + 1) + " = unescape ('" + QString::fromUtf8(QUrl::toPercentEncoding (variable.value())) + "');\n";
+                helperCode.value() += "var " + variable.key().mid(helper->length() + 1) + " = unescape ('" + QString::fromUtf8(QUrl::toPercentEncoding (variable.value())) + "');\n";
             }
         }
     }

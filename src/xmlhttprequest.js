@@ -10,7 +10,7 @@
             "message": { "value": message },
             "code": { "get": (function () {
                 // https://heycam.github.io/webidl/#idl-DOMException-error-names
-                let dictionary = {
+                var dictionary = {
                     "IndexSizeError": 1,
                     "DOMStringSizeError": 2,
                     "HierarchyRequestError": 3,
@@ -49,15 +49,15 @@
     DOMException.prototype.constructor = DOMException;
 
     // This is so crazy: https://stackoverflow.com/a/249937
-    let contentTypeParser = /\s*,\s*([\w-]+\/[\w-]+)((\s*;\s*[\w-]+\s*=\s*([\w-]+|"([^"\\]|\\.)*"))*)\s*/g;
-    let parametersParser = /\s*;\s*([\w-]+)\s*=\s*(([\w-]+)|"(([^"\\]|\\.)*)")\s*/g;
+    var contentTypeParser = /\s*,\s*([\w-]+\/[\w-]+)((\s*;\s*[\w-]+\s*=\s*([\w-]+|"([^"\\]|\\.)*"))*)\s*/g;
+    var parametersParser = /\s*;\s*([\w-]+)\s*=\s*(([\w-]+)|"(([^"\\]|\\.)*)")\s*/g;
     function parseContentType (contentTypeString) {
-        let returnValue = {};
+        var returnValue = {};
         contentTypeParser.lastIndex = 0;
-        let contentTypeCaptures = null;
-        let parametersCaptures = null;
-        let contentTypeStringWithComma = "," + contentTypeString;
-        let lastMatchedIndex = 0;
+        var contentTypeCaptures = null;
+        var parametersCaptures = null;
+        var contentTypeStringWithComma = "," + contentTypeString;
+        var lastMatchedIndex = 0;
         while (contentTypeCaptures = contentTypeParser.exec (contentTypeStringWithComma)) {
             lastMatchedIndex = contentTypeParser.lastIndex;
             returnValue["mimeType"] = contentTypeCaptures[1];
@@ -84,7 +84,7 @@
         }
     }
 
-    let writableValue = { "writable": true };
+    var writableValue = { "writable": true };
 
     function XMLHttpRequestEventTarget () {
         Object.defineProperties (this, {
@@ -108,13 +108,13 @@
             return (new XMLHttpRequest());
         }
 
-        let status_UNSENT = 0;
-        let status_OPENED = 1;
-        let status_HEADERS_RECEIVED = 2;
-        let status_LOADING = 3;
-        let status_DONE = 4;
+        var status_UNSENT = 0;
+        var status_OPENED = 1;
+        var status_HEADERS_RECEIVED = 2;
+        var status_LOADING = 3;
+        var status_DONE = 4;
 
-        let XMLHttpRequestPrivate = {
+        var XMLHttpRequestPrivate = {
             "state"              : status_UNSENT,
             "requestMethod"      : "",
             "requestUrl"         : "",
@@ -137,36 +137,36 @@
             "withCredentialsFlag": false
         };
 
-        let getArrayBufferResponse = function () {
+        var getArrayBufferResponse = function () {
             if (XMLHttpRequestPrivate["responseArrayBuffer"]) {
                 if (XMLHttpRequestPrivate["responseArrayBuffer"].byteLength == XMLHttpRequestPrivate["responseBuffer"].length) {
                     return (XMLHttpRequestPrivate["responseArrayBuffer"]);
                 }
             }
-            let data = new ArrayBuffer (XMLHttpRequestPrivate["responseBuffer"].length);
-            {
-                let view = new Uint8Array (data);
-                XMLHttpRequestPrivate["responseArrayBuffer"].map (function (currentValue, index) {
-                    view[index] = currentValue;
-                });
-            }
+            var data = new ArrayBuffer (XMLHttpRequestPrivate["responseBuffer"].length);
+            var view = new Uint8Array (data);
+            XMLHttpRequestPrivate["responseArrayBuffer"].map (function (currentValue, index) {
+                view[index] = currentValue;
+            });
+            view = null;
             XMLHttpRequestPrivate["responseArrayBuffer"] = data;
             XMLHttpRequestPrivate["responseObject"]["type"] = "arraybuffer";
             XMLHttpRequestPrivate["responseObject"]["value"] = data;
             return (data);
         };
 
-        let getFinalMimeType = function () {
-            let finalMimeType = "text/xml";
-            let finalCharset = null;
-            let finalQuotedCharset = null;
+        var getFinalMimeType = function () {
+            var finalMimeType = "text/xml";
+            var finalCharset = null;
+            var finalQuotedCharset = null;
             if (XMLHttpRequestPrivate["responseHeaders"]) {
                 if (XMLHttpRequestPrivate["responseHeaders"]["content-type"]) {
-                    let mimeTypeCandidates = XMLHttpRequestPrivate["responseHeaders"]["content-type"];
-                    let mimeTypeCandidatesLength = mimeTypeCandidates.length;
-                    let mimeTypeCandidatesPos = 0;
+                    var mimeTypeCandidates = XMLHttpRequestPrivate["responseHeaders"]["content-type"];
+                    var mimeTypeCandidatesLength = mimeTypeCandidates.length;
+                    var mimeTypeCandidatesPos = 0;
+                    var mimeParsed;
                     while (mimeTypeCandidatesPos < mimeTypeCandidatesLength) {
-                        let mimeParsed = parseContentType (mimeTypeCandidates[mimeTypeCandidatesPos]);
+                        mimeParsed = parseContentType (mimeTypeCandidates[mimeTypeCandidatesPos]);
                         if (mimeParsed) {
                             if (mimeParsed["mimeType"]) {
                                 finalMimeType = mimeParsed["mimeType"];
@@ -201,7 +201,7 @@
             });
         }
 
-        let isXMLMimeType = function (mimeType) {
+        var isXMLMimeType = function (mimeType) {
             if (mimeType == "text/xml" || mimeType == "application/xml") {
                 return (true);
             } else if (mimeType.substring (mimeType.length - 4, mimeType.length) == "+xml") {
@@ -211,11 +211,11 @@
             }
         }
 
-        let getBlobResponse = function () {
-            let finalMimeType = getFinalMimeType ();
+        var getBlobResponse = function () {
+            var finalMimeType = getFinalMimeType ();
             if (XMLHttpRequestPrivate["responseBlob"]) {
                 if (XMLHttpRequestPrivate["responseBlob"].size == XMLHttpRequestPrivate["responseBuffer"].length) {
-                    let currentMimeType = parseContentType (XMLHttpRequestPrivate["responseBlob"].type);
+                    var currentMimeType = parseContentType (XMLHttpRequestPrivate["responseBlob"].type);
                     if (currentMimeType) {
                         if (currentMimeType["mimeType"] == finalMimeType["mimeType"] && currentMimeType["charset"] == finalMimeType["charset"]) {
                             return (XMLHttpRequestPrivate["responseBlob"]);
@@ -223,19 +223,19 @@
                     }
                 }
             }
-            let data = new Blob ([getArrayBufferResponse()], { "type": (finalMimeType["mimeType"] + ((finalMimeType["quotedCharset"]) ? (" ; charset=\"" + finalMimeType["quotedCharset"] + "\"") : "")) });
+            var data = new Blob ([getArrayBufferResponse()], { "type": (finalMimeType["mimeType"] + ((finalMimeType["quotedCharset"]) ? (" ; charset=\"" + finalMimeType["quotedCharset"] + "\"") : "")) });
             XMLHttpRequestPrivate["responseBlob"] = data;
             XMLHttpRequestPrivate["responseObject"]["type"] = "blob";
             XMLHttpRequestPrivate["responseObject"]["value"] = data;
             return (data);
         }
 
-        let getDocumentResponse = function () {
+        var getDocumentResponse = function () {
             throw new DOMException ("This XMLHttpRequest implementation can not return a document response!", "NotFoundError");
         }
 
         // https://en.wikipedia.org/wiki/Byte_order_mark#Byte_order_marks_by_encoding
-        let bomMasks = {
+        var bomMasks = {
             "utf-32": [
                 [ 0x00, 0x00, 0xFE, 0xFF ],
                 [ 0xFF, 0xFE, 0x00, 0x00 ]
@@ -263,35 +263,35 @@
                 [ 0x84, 0x31, 0x95, 0x33 ]
             ]
         };
-        let bomMasksKeys = Object.keys (bomMasks);
-        let bomMasksKeysLength = bomMasksKeys.length;
-        let xmlHeaderParser = /^<\?xml(|.*(\s+encoding=['"]?([^'"\?\s>]+)['"]?(|\s+.*)))\?>/m;
-        let getTextResponse = function () {
+        var bomMasksKeys = Object.keys (bomMasks);
+        var bomMasksKeysLength = bomMasksKeys.length;
+        var xmlHeaderParser = /^<\?xml(|.*(\s+encoding=['"]?([^'"\?\s>]+)['"]?(|\s+.*)))\?>/m;
+        var getTextResponse = function () {
             if (XMLHttpRequestPrivate["responseText"] && XMLHttpRequestPrivate["responseTextLength"]) {
                 if (XMLHttpRequestPrivate["responseTextLength"] == XMLHttpRequestPrivate["responseBuffer"].length) {
                     return (XMLHttpRequestPrivate["responseText"]);
                 }
             }
-            let data = "";
+            var data = "";
             if (XMLHttpRequestPrivate["responseBuffer"].length) {
-                let finalMimeType = getFinalMimeType ();
-                let charset = finalMimeType["charset"];
+                var finalMimeType = getFinalMimeType ();
+                var charset = finalMimeType["charset"];
                 if ((! XMLHttpRequestPrivate["responseType"]) && (! charset) && isXMLMimeType (finalMimeType["mimeType"])) {
                     // ... then use the rules set forth in the XML specifications to determine the encoding
                     // http://xmlwriter.net/xml_guide/xml_declaration.shtml
-                    let buffer = XMLHttpRequestPrivate["responseBuffer"];
-                    let bufferLen = buffer.length;
-                    let xmlBufferStart = 0;
+                    var buffer = XMLHttpRequestPrivate["responseBuffer"];
+                    var bufferLen = buffer.length;
+                    var xmlBufferStart = 0;
                     // https://en.wikipedia.org/wiki/Byte_order_mark#Byte_order_marks_by_encoding
-                    let bomMasksKeysPos;
+                    var bomMasksKeysPos;
+                    var bomMaskPatterns, bomMaskPatternsLength, bomMaskPatternsPos;
+                    var bomMaskPattern, bomMaskPatternLength, bomMaskPatternPos;
                     for (bomMasksKeysPos = 0; bomMasksKeysPos < bomMasksKeysLength; bomMasksKeysPos++) {
-                        let bomMaskPatterns = bomMasks[bomMasksKeys[bomMasksKeysPos]];
-                        let bomMaskPatternsLength = bomMaskPatterns.length;
-                        let bomMaskPatternsPos;
+                        bomMaskPatterns = bomMasks[bomMasksKeys[bomMasksKeysPos]];
+                        bomMaskPatternsLength = bomMaskPatterns.length;
                         for (bomMaskPatternsPos = 0; bomMaskPatternsPos < bomMaskPatternsLength; bomMaskPatternsPos++) {
-                            let bomMaskPattern = bomMaskPatterns[bomMaskPatternsPos];
-                            let bomMaskPatternLength = bomMaskPattern.length;
-                            let bomMaskPatternPos;
+                            bomMaskPattern = bomMaskPatterns[bomMaskPatternsPos];
+                            bomMaskPatternLength = bomMaskPattern.length;
                             for (bomMaskPatternPos = 0; bomMaskPatternPos < bomMaskPatternLength && bomMaskPatternPos < bufferLen; bomMaskPatternPos++) {
                                 if (bomMaskPattern[bomMaskPatternPos] != buffer[bomMaskPatternPos]) {
                                     break;
@@ -307,11 +307,11 @@
                             break;
                         }
                     }
-                    let xmlHeader = "";
+                    var xmlHeader = "";
                     for (; xmlBufferStart < bufferLen && xmlBufferStart < 128; xmlBufferStart++) {
                         xmlHeader += String.fromCharCode (buffer[xmlBufferStart]);
                     }
-                    let xmlHeaderCaptures = xmlHeaderParser.exec (xmlHeader);
+                    var xmlHeaderCaptures = xmlHeaderParser.exec (xmlHeader);
                     if (xmlHeaderCaptures) {
                         if (xmlHeaderCaptures[3]) {
                             charset = xmlHeaderCaptures[3];
@@ -324,7 +324,7 @@
                 if (charset.toLowerCase() == 'utf7-empty') {
                     data = "";
                 } else {
-                    data = TextDecode (XMLHttpRequestPrivate["responseBuffer"], charset);
+                    data = textDecode (XMLHttpRequestPrivate["responseBuffer"], charset);
                 }
             }
             XMLHttpRequestPrivate["responseTextLength"] = XMLHttpRequestPrivate["responseBuffer"].length;
@@ -334,15 +334,15 @@
             return (data);
         }
 
-        let getJsonResponse = function () {
+        var getJsonResponse = function () {
             if (XMLHttpRequestPrivate["responseJson"] && XMLHttpRequestPrivate["responseJsonLength"]) {
                 if (XMLHttpRequestPrivate["responseJsonLength"] == XMLHttpRequestPrivate["responseBuffer"].length) {
                     return (XMLHttpRequestPrivate["responseJson"]);
                 }
             }
             XMLHttpRequestPrivate["responseJsonLength"] = XMLHttpRequestPrivate["responseBuffer"].length;
-            let strData = TextDecode (XMLHttpRequestPrivate["responseBuffer"], "utf-8");
-            let jsonData;
+            var strData = textDecode (XMLHttpRequestPrivate["responseBuffer"], "utf-8");
+            var jsonData;
             try {
                 jsonData = JSON.parse (strData);
             } catch (e) {
@@ -355,7 +355,7 @@
             return (jsonData);
         };
 
-        let abortMethod = function () {
+        var abortMethod = function () {
             abortCallback (this, function (name) {
                 return (XMLHttpRequestPrivate[name]);
             }, function (name, value) {
@@ -363,7 +363,7 @@
             });
         };
 
-        let forbiddenHeaderNames = [
+        var forbiddenHeaderNames = [
             'Accept-Charset',
             'Accept-Encoding',
             'Access-Control-Request-Headers',
@@ -385,12 +385,12 @@
             'Upgrade',
             'Via'
         ];
-        let forbiddenHeaderNamesLength = forbiddenHeaderNames.length;
-        let forbiddenHeaderPrefixes = [
+        var forbiddenHeaderNamesLength = forbiddenHeaderNames.length;
+        var forbiddenHeaderPrefixes = [
             'Proxy-',
             'Sec-'
         ];
-        let forbiddenHeaderPrefixesLength = forbiddenHeaderPrefixes.length;
+        var forbiddenHeaderPrefixesLength = forbiddenHeaderPrefixes.length;
 
         Object.defineProperties (this, {
             // event handlers
@@ -408,7 +408,7 @@
                 if (! (/^\w+$/.test (method))) {
                     throw new DOMException ("Invalid XMLHttpRequest method '" + method + "'!", "SyntaxError");
                 }
-                let methodUpper = method.toUpperCase();
+                var methodUpper = method.toUpperCase();
                 if (methodUpper == 'CONNECT' || methodUpper == 'TRACE' || methodUpper == 'TRACK') {
                     throw new DOMException ("Forbidden XMLHttpRequest method '" + method + "'!", "SecurityError");
                 }
@@ -455,12 +455,12 @@
                 if (XMLHttpRequestPrivate["sendFlag"]) {
                     throw new DOMException ("XMLHttpRequest sendFlag is set", "InvalidStateError");
                 }
-                let valueNormalized = value.trim ();
+                var valueNormalized = value.trim ();
                 if (! ((/^[\w-]+$/.test (name)) && (/^[^\x00\x0a\x0d]*$/.test (valueNormalized)))) {
                     throw new DOMException ("Either header name or value is invalid", "SyntaxError");
                 }
-                let nameLower = name.toLowerCase ();
-                let headerPos;
+                var nameLower = name.toLowerCase ();
+                var headerPos;
                 for (headerPos = 0; headerPos < forbiddenHeaderNamesLength; headerPos++) {
                     if (forbiddenHeaderNames[headerPos].toLowerCase() == nameLower) {
                         return;
@@ -509,16 +509,16 @@
                 }
                 if (body) {
                     XMLHttpRequestPrivate["requestBuffer"] = [];
-                    let encoding = null;
-                    let mimeType = null;
+                    var encoding = null;
+                    var mimeType = null;
                     if (body instanceof String) {
                         encoding = 'UTF-8';
-                        XMLHttpRequestPrivate["requestBuffer"] = TextEncode (body, encoding);
+                        XMLHttpRequestPrivate["requestBuffer"] = textEncode (body, encoding);
 
                     } else if (body instanceof Blob) {
                         throw new DOMException ("This XMLHttpRequest implementation can not receive a BLOB request body", "NotFoundError");
                     } else if (body instanceof ArrayBuffer) {
-                        let bodyData = new Uint8Array (body);
+                        var bodyData = new Uint8Array (body);
                         bodyData.map (function (currentValue) {
                             XMLHttpRequestPrivate["requestBuffer"].push (currentValue);
                         });
@@ -526,7 +526,7 @@
                     } else if (body instanceof Object) {
                         // I believe the caller intends to send JSON data...
                         encoding = 'UTF-8';
-                        XMLHttpRequestPrivate["requestBuffer"] = TextEncode (JSON.stringify (body), encoding);
+                        XMLHttpRequestPrivate["requestBuffer"] = textEncode (JSON.stringify (body), encoding);
                     }
                     if (mimeType) {
                         if (! XMLHttpRequestPrivate["requestHeaders"]["content-type"]) {
@@ -534,11 +534,11 @@
                         }
                     }
                     if (encoding) {
-                        let contentTypeLen = XMLHttpRequestPrivate["requestHeaders"]["content-type"].length;
-                        let contentTypePos;
+                        var contentTypeLen = XMLHttpRequestPrivate["requestHeaders"]["content-type"].length;
+                        var contentTypePos, contentTypeValue, specifiedMimeType;
                         for (contentTypePos = 0; contentTypePos < contentTypeLen; contentTypePos++) {
-                            let contentTypeValue = XMLHttpRequestPrivate["requestHeaders"]["content-type"][contentTypePos];
-                            let specifiedMimeType = parseContentType (contentTypeValue);
+                            contentTypeValue = XMLHttpRequestPrivate["requestHeaders"]["content-type"][contentTypePos];
+                            specifiedMimeType = parseContentType (contentTypeValue);
                             if (specifiedMimeType) {
                                 if (specifiedMimeType["mimeType"] && specifiedMimeType["charset"] != encoding) {
                                     XMLHttpRequestPrivate["requestHeaders"]["content-type"][contentTypePos] = contentTypeValue.replace (/\s*;\s*charset\s*=\s*([\w-]+|"([^"\\]|\\.)*")\s*/gi, '; charset="' + encoding.replace(/["\\]/g, '\\$1').replace(/\$/g, '$$') + "'");
@@ -576,7 +576,7 @@
                 return (XMLHttpRequestPrivate["statusText"]);
             })},
             "getResponseHeader": { "value": (function (name) {
-                let lcName = name.toLowerCase();
+                var lcName = name.toLowerCase();
                 if (XMLHttpRequestPrivate["responseHeaders"]) {
                     if (XMLHttpRequestPrivate["responseHeaders"][lcName]) {
                         return (XMLHttpRequestPrivate["responseHeaders"][lcName].join("\x2C\x20"));
@@ -585,16 +585,17 @@
                 return (null);
             })},
             "getAllResponseHeaders": { "value": (function () {
-                let output = "";
+                var output = "";
                 if (XMLHttpRequestPrivate["responseHeaders"]) {
-                    let headers = Object.keys (XMLHttpRequestPrivate["responseHeaders"]);
+                    var headers = Object.keys (XMLHttpRequestPrivate["responseHeaders"]);
                     headers.sort ();
-                    let headersLength = headers.length;
-                    let headersPos = 0;
+                    var headersLength = headers.length;
+                    var headersPos = 0;
+                    var headerItem, headerItemLength, headerItemPos;
                     while (headersPos < headersLength) {
-                        let headerItem = XMLHttpRequestPrivate["responseHeaders"][headers[headersPos]];
-                        let headerItemLength = headerItem.length;
-                        let headerItemPos = 0;
+                        headerItem = XMLHttpRequestPrivate["responseHeaders"][headers[headersPos]];
+                        headerItemLength = headerItem.length;
+                        headerItemPos = 0;
                         while (headerItemPos < headerItemLength) {
                             output += headers[headersPos] + "\x3A\x20" + headerItem[headerItemPos]  + "\x0D\x0A";
                             headerItemPos++;
@@ -609,7 +610,7 @@
                     throw new DOMException ("XMLHttpRequest state is " + XMLHttpRequestPrivate["state"], "InvalidStateError");
                 } else {
                     XMLHttpRequestPrivate["overrideMimeType"] = "application/octet-stream";
-                    let mimeParsed = parseContentType (mime);
+                    var mimeParsed = parseContentType (mime);
                     if (mimeParsed) {
                         if (mimeParsed["mimeType"]) {
                             XMLHttpRequestPrivate["overrideMimeType"] = mimeParsed["mimeType"];
@@ -631,7 +632,7 @@
                 } else if (XMLHttpRequestPrivate["state"] == status_LOADING || XMLHttpRequestPrivate["state"] == status_DONE) {
                     throw new DOMException ("XMLHttpRequest state is " + XMLHttpRequestPrivate["state"], "InvalidStateError");
                 } else {
-                    let allowedValues = [
+                    var allowedValues = [
                         "",
                         "arraybuffer",
                         "blob",

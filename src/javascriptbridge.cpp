@@ -48,7 +48,12 @@ QJsonValue JavascriptBridge::QJS2QJsonValue (const QJSValue& value) {
     if (value.isBool ()) {
         return (QJsonValue (value.toBool ()));
     } else if (value.isDate ()) {
+        // https://bugreports.qt.io/browse/QTBUG-59235
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 8, 0))
         return (QJsonValue (value.toDateTime().toString(Qt::ISODateWithMs)));
+#else
+        return (QJsonValue (value.toDateTime().toString(Qt::ISODate)));
+#endif
     } else if (value.isNull ()) {
         return (QJsonValue (QJsonValue::Null));
     } else if (value.isNumber ()) {
@@ -137,6 +142,9 @@ JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestC
     jsEngine.globalObject().setProperty ("clearTimeout", this->myself.property ("clearTimeout"));
     jsEngine.globalObject().setProperty ("clearInterval", this->myself.property ("clearInterval"));
     // Console object implementation
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 6, 0))
+    jsEngine.installExtensions (QJSEngine::ConsoleExtension);
+#else
     QJSValue consoleObj = jsEngine.newObject ();
     consoleObj.setProperty ("debug", this->myself.property ("console_log"));
     consoleObj.setProperty ("log", this->myself.property ("console_log"));
@@ -145,10 +153,11 @@ JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestC
     consoleObj.setProperty ("info", this->myself.property ("console_info"));
     consoleObj.setProperty ("warn", this->myself.property ("console_warn"));
     jsEngine.globalObject().setProperty ("console", consoleObj);
+ #endif
     // Interface for data conversion to and from Unicode
     // My XMLHttpRequest implementation need it
-    jsEngine.globalObject().setProperty ("TextDecode", this->myself.property ("TextDecode"));
-    jsEngine.globalObject().setProperty ("TextEncode", this->myself.property ("TextEncode"));
+    jsEngine.globalObject().setProperty ("textDecode", this->myself.property ("textDecode"));
+    jsEngine.globalObject().setProperty ("textEncode", this->myself.property ("textEncode"));
     // XMLHttpRequest implementation
     QString xmlHttpCode = AppRuntime::readFileContents (":/xmlhttprequest.js");
     if (xmlHttpCode.isNull ()) {
@@ -205,7 +214,12 @@ QString JavascriptBridge::QJS2QString (const QJSValue& value) {
     } else if (value.isCallable ()) {
         return ("function () { /* Native code */ }");
     } else if (value.isDate ()) {
+        // https://bugreports.qt.io/browse/QTBUG-59235
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 8, 0))
         return (value.toDateTime().toString(Qt::ISODateWithMs));
+#else
+        return (value.toDateTime().toString(Qt::ISODate));
+#endif
     } else if (value.isNull ()) {
         return ("null");
     } else if (value.isNumber ()) {
@@ -350,7 +364,7 @@ void JavascriptBridge::xmlHttpRequest_send (QJSValue& object, QJSValue& requestB
     qFatal("Not done yet!");
 }
 
-QJSValue JavascriptBridge::TextDecode (const QJSValue& bytes, const QJSValue& fallbackCharset) {
+QJSValue JavascriptBridge::textDecode (const QJSValue& bytes, const QJSValue& fallbackCharset) {
     QJSValue answer ("");
     QByteArray inputBuffer;
     if (bytes.isArray ()) {
@@ -368,10 +382,9 @@ QJSValue JavascriptBridge::TextDecode (const QJSValue& bytes, const QJSValue& fa
     return (answer);
 }
 
-QJSValue JavascriptBridge::TextEncode (const QJSValue& string, const QJSValue& charset) {
+QJSValue JavascriptBridge::textEncode (const QJSValue& string, const QJSValue& charset) {
     QJSEngine* jsEngine (qjsEngine (this));
     if (jsEngine != Q_NULLPTR) {
-        QJSValue answer (jsEngine->newArray ());
         QByteArray outputBuffer;
         {
             QMutexLocker m_lck (&AppRuntime::textCoDecMutex);
@@ -382,17 +395,36 @@ QJSValue JavascriptBridge::TextEncode (const QJSValue& string, const QJSValue& c
             }
         }
         uint len = outputBuffer.size ();
-        answer = jsEngine->newArray (len);
-        for (uint i = 0; i < len; i++) {
-            answer.setProperty (i, (uint) outputBuffer[i]);
+        bool hasArrayBuffer = false;
+        QJSValue answer (jsEngine->globalObject().property("ArrayBuffer").callAsConstructor (QJSValueList() << len));
+        QJSValue answerView (jsEngine->newArray (len));
+        if (! JavascriptBridge::warnJsError (answer, "Unable to create an 'ArrayBuffer' object! Falling back to a classical 'Array' object; this may consume excessive memory...")) {
+            if (answer.isObject ()) {
+                QJSValue uInt8Array = jsEngine->globalObject().property("Uint8Array").callAsConstructor (QJSValueList() << answer);
+                if (! JavascriptBridge::warnJsError (uInt8Array, "Unable to create an 'Uint8Array' object! Falling back to classical 'Array' object; this may consume excessive memory...")) {
+                    if (uInt8Array.isObject ()) {
+                        hasArrayBuffer = true;
+                        answerView = uInt8Array;
+                    }
+                }
+            }
         }
-        return (answer);
+        for (uint i = 0; i < len; i++) {
+            answerView.setProperty (i, (uint) outputBuffer[i]);
+        }
+        if (hasArrayBuffer) {
+            answerView = QJSValue();
+            return (answer);
+        } else {
+            return (answerView);
+        }
     } else {
         qFatal("JavascriptBridge object must be bound to a QJSEngine! Invoke 'QJSEngine::newQObject();'!");
         return (QJSValue());
     }
 }
 
+#if (QT_VERSION < QT_VERSION_CHECK(5, 6, 0))
 void JavascriptBridge::console_log (const QJSValue& msg) {
     qDebug() << QString("QJS: ") + msg.toString();
 }
@@ -408,6 +440,7 @@ void JavascriptBridge::console_warn (const QJSValue& msg) {
 void JavascriptBridge::console_error (const QJSValue& msg) {
     qCritical() << QString("QJS: ") + msg.toString();
 }
+#endif
 
 void JavascriptBridge::timerFinished (unsigned int timerId) {
     QMap<unsigned int,JavascriptTimer*>::iterator timerIdIterator = this->javascriptTimers.find (timerId);

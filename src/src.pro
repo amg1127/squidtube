@@ -40,7 +40,8 @@ unix {
 
 # Turn all warnings on
 CONFIG += warn_on
-QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion -DQT_DEPRECATED_WARNINGS
+QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion
+DEFINES += QT_DEPRECATED_WARNINGS
 
 ###########################
 # Make project variables available inside the C++ code
