@@ -127,8 +127,8 @@
                 "type": "null",
                 "value": null
             },
-            "requestBuffer"      : [],
-            "responseBuffer"     : [],
+            "requestBuffer"      : null,
+            "responseBuffer"     : null,
             "synchronousFlag"    : false,
             "uploadCompleteFlag" : false,
             "uploadListenerFlag" : false,
@@ -138,21 +138,7 @@
         };
 
         var getArrayBufferResponse = function () {
-            if (XMLHttpRequestPrivate["responseArrayBuffer"]) {
-                if (XMLHttpRequestPrivate["responseArrayBuffer"].byteLength == XMLHttpRequestPrivate["responseBuffer"].length) {
-                    return (XMLHttpRequestPrivate["responseArrayBuffer"]);
-                }
-            }
-            var data = new ArrayBuffer (XMLHttpRequestPrivate["responseBuffer"].length);
-            var view = new Uint8Array (data);
-            XMLHttpRequestPrivate["responseArrayBuffer"].map (function (currentValue, index) {
-                view[index] = currentValue;
-            });
-            view = null;
-            XMLHttpRequestPrivate["responseArrayBuffer"] = data;
-            XMLHttpRequestPrivate["responseObject"]["type"] = "arraybuffer";
-            XMLHttpRequestPrivate["responseObject"]["value"] = data;
-            return (data);
+            return (XMLHttpRequestPrivate["responseBuffer"].slice(0));
         };
 
         var getFinalMimeType = function () {
@@ -214,7 +200,7 @@
         var getBlobResponse = function () {
             var finalMimeType = getFinalMimeType ();
             if (XMLHttpRequestPrivate["responseBlob"]) {
-                if (XMLHttpRequestPrivate["responseBlob"].size == XMLHttpRequestPrivate["responseBuffer"].length) {
+                if (XMLHttpRequestPrivate["responseBlob"].size == XMLHttpRequestPrivate["responseBuffer"].byteLength) {
                     var currentMimeType = parseContentType (XMLHttpRequestPrivate["responseBlob"].type);
                     if (currentMimeType) {
                         if (currentMimeType["mimeType"] == finalMimeType["mimeType"] && currentMimeType["charset"] == finalMimeType["charset"]) {
@@ -223,7 +209,7 @@
                     }
                 }
             }
-            var data = new Blob ([getArrayBufferResponse()], { "type": (finalMimeType["mimeType"] + ((finalMimeType["quotedCharset"]) ? (" ; charset=\"" + finalMimeType["quotedCharset"] + "\"") : "")) });
+            var data = new Blob ([XMLHttpRequestPrivate["responseBuffer"]], { "type": (finalMimeType["mimeType"] + ((finalMimeType["quotedCharset"]) ? (" ; charset=\"" + finalMimeType["quotedCharset"] + "\"") : "")) });
             XMLHttpRequestPrivate["responseBlob"] = data;
             XMLHttpRequestPrivate["responseObject"]["type"] = "blob";
             XMLHttpRequestPrivate["responseObject"]["value"] = data;
@@ -268,19 +254,19 @@
         var xmlHeaderParser = /^<\?xml(|.*(\s+encoding=['"]?([^'"\?\s>]+)['"]?(|\s+.*)))\?>/m;
         var getTextResponse = function () {
             if (XMLHttpRequestPrivate["responseText"] && XMLHttpRequestPrivate["responseTextLength"]) {
-                if (XMLHttpRequestPrivate["responseTextLength"] == XMLHttpRequestPrivate["responseBuffer"].length) {
+                if (XMLHttpRequestPrivate["responseTextLength"] == XMLHttpRequestPrivate["responseBuffer"].byteLength) {
                     return (XMLHttpRequestPrivate["responseText"]);
                 }
             }
             var data = "";
-            if (XMLHttpRequestPrivate["responseBuffer"].length) {
+            if (XMLHttpRequestPrivate["responseBuffer"].byteLength) {
+                var buffer = new Uint8Array (XMLHttpRequestPrivate["responseBuffer"]);
+                var bufferLen = buffer.length;
                 var finalMimeType = getFinalMimeType ();
                 var charset = finalMimeType["charset"];
                 if ((! XMLHttpRequestPrivate["responseType"]) && (! charset) && isXMLMimeType (finalMimeType["mimeType"])) {
                     // ... then use the rules set forth in the XML specifications to determine the encoding
                     // http://xmlwriter.net/xml_guide/xml_declaration.shtml
-                    var buffer = XMLHttpRequestPrivate["responseBuffer"];
-                    var bufferLen = buffer.length;
                     var xmlBufferStart = 0;
                     // https://en.wikipedia.org/wiki/Byte_order_mark#Byte_order_marks_by_encoding
                     var bomMasksKeysPos;
@@ -324,10 +310,10 @@
                 if (charset.toLowerCase() == 'utf7-empty') {
                     data = "";
                 } else {
-                    data = textDecode (XMLHttpRequestPrivate["responseBuffer"], charset);
+                    data = textDecode (buffer, charset);
                 }
             }
-            XMLHttpRequestPrivate["responseTextLength"] = XMLHttpRequestPrivate["responseBuffer"].length;
+            XMLHttpRequestPrivate["responseTextLength"] = XMLHttpRequestPrivate["responseBuffer"].byteLength;
             XMLHttpRequestPrivate["responseText"] = data;
             XMLHttpRequestPrivate["responseObject"]["type"] = "text";
             XMLHttpRequestPrivate["responseObject"]["value"] = data;
@@ -336,11 +322,11 @@
 
         var getJsonResponse = function () {
             if (XMLHttpRequestPrivate["responseJson"] && XMLHttpRequestPrivate["responseJsonLength"]) {
-                if (XMLHttpRequestPrivate["responseJsonLength"] == XMLHttpRequestPrivate["responseBuffer"].length) {
+                if (XMLHttpRequestPrivate["responseJsonLength"] == XMLHttpRequestPrivate["responseBuffer"].byteLength) {
                     return (XMLHttpRequestPrivate["responseJson"]);
                 }
             }
-            XMLHttpRequestPrivate["responseJsonLength"] = XMLHttpRequestPrivate["responseBuffer"].length;
+            XMLHttpRequestPrivate["responseJsonLength"] = XMLHttpRequestPrivate["responseBuffer"].byteLength;
             var strData = textDecode (XMLHttpRequestPrivate["responseBuffer"], "utf-8");
             var jsonData;
             try {
@@ -434,10 +420,8 @@
                 XMLHttpRequestPrivate["requestHeaders"] = [];
                 XMLHttpRequestPrivate["responseObject"]["type"] = "failure";
                 XMLHttpRequestPrivate["responseObject"]["value"] = "network error";
-                XMLHttpRequestPrivate["requestBuffer"] = [];
-                XMLHttpRequestPrivate["responseBuffer"] = [];
-                XMLHttpRequestPrivate["responseArrayBuffer"] = null;
-                XMLHttpRequestPrivate["responseArrayBuffer"] = null;
+                XMLHttpRequestPrivate["requestBuffer"] = null;
+                XMLHttpRequestPrivate["responseBuffer"] = null;
                 XMLHttpRequestPrivate["responseBlob"] = null;
                 XMLHttpRequestPrivate["responseText"] = null;
                 XMLHttpRequestPrivate["responseJson"] = null;
@@ -508,25 +492,22 @@
                     body = null;
                 }
                 if (body) {
-                    XMLHttpRequestPrivate["requestBuffer"] = [];
                     var encoding = null;
                     var mimeType = null;
                     if (body instanceof String) {
                         encoding = 'UTF-8';
                         XMLHttpRequestPrivate["requestBuffer"] = textEncode (body, encoding);
-
                     } else if (body instanceof Blob) {
                         throw new DOMException ("This XMLHttpRequest implementation can not receive a BLOB request body", "NotFoundError");
                     } else if (body instanceof ArrayBuffer) {
-                        var bodyData = new Uint8Array (body);
-                        bodyData.map (function (currentValue) {
-                            XMLHttpRequestPrivate["requestBuffer"].push (currentValue);
-                        });
+                        XMLHttpRequestPrivate["requestBuffer"] = body.slice (0);
                         mimeType = 'application/octet-stream';
                     } else if (body instanceof Object) {
                         // I believe the caller intends to send JSON data...
                         encoding = 'UTF-8';
                         XMLHttpRequestPrivate["requestBuffer"] = textEncode (JSON.stringify (body), encoding);
+                    } else {
+                        throw new DOMException ("Unmanageable request body type: '" + (typeof body) + "'!", "SyntaxError");
                     }
                     if (mimeType) {
                         if (! XMLHttpRequestPrivate["requestHeaders"]["content-type"]) {

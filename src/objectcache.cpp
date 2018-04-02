@@ -17,7 +17,7 @@ ObjectCache::ObjectCache (const QString& helperName, ObjectCache* lowerCache) :
 
 CacheStatus ObjectCache::read (const QString& className, const QString& id, const qint64 timestampNow, QJsonDocument& data, qint64& timestampCreated) {
     bool cacheHit = false;
-    CacheStatus returnValue = CacheStatus::CacheMiss;
+    CacheStatus returnValue = CacheMiss;
     QJsonDocument _data;
     qint64 _timestampCreated;
     qDebug() << QString("[%1] Trying to search %2 cache for information concerning 'className=%3, id=%4'...").arg(this->helperName).arg(this->cacheType).arg(className).arg(id);
@@ -29,18 +29,18 @@ CacheStatus ObjectCache::read (const QString& className, const QString& id, cons
     }
     if ((! cacheHit) && this->lowerCache != Q_NULLPTR) {
         returnValue = this->lowerCache->read (className, id, timestampNow, _data, _timestampCreated);
-        cacheHit = (returnValue != CacheStatus::CacheMiss);
+        cacheHit = (returnValue != CacheMiss);
     }
-    if (cacheHit && returnValue == CacheStatus::CacheMiss) {
+    if (cacheHit && returnValue == CacheMiss) {
         returnValue = ObjectCache::jsonDocumentIsFresh (_data, _timestampCreated, timestampNow);
-        cacheHit = (returnValue != CacheStatus::CacheMiss);
+        cacheHit = (returnValue != CacheMiss);
     }
     if (cacheHit) {
-        if (returnValue == CacheStatus::CacheHitNegative || ObjectCache::jsonDocumentHasData (_data)) {
+        if (returnValue == CacheHitNegative || ObjectCache::jsonDocumentHasData (_data)) {
             data = _data;
             timestampCreated = _timestampCreated;
         } else if ((_timestampCreated + AppConstants::AppHelperMaxWait) >= timestampNow) {
-            returnValue = CacheStatus::CacheOnProgress;
+            returnValue = CacheOnProgress;
         } else {
             /*
              * If multiple threads or processes are waiting for an answer and the worker which took that job times out,
@@ -52,7 +52,7 @@ CacheStatus ObjectCache::read (const QString& className, const QString& id, cons
              * codes to the program and the race ends.
              *
              */
-            returnValue = CacheStatus::CacheMiss;
+            returnValue = CacheMiss;
         }
     }
     if (lockStatus) {
@@ -102,14 +102,14 @@ bool ObjectCache::jsonDocumentHasData (const QJsonDocument& data) {
 CacheStatus ObjectCache::jsonDocumentIsFresh (const QJsonDocument& data, const qint64 timestampCreated, const qint64 timestampNow) {
     if (jsonDocumentIsValid (data)) {
         if ((timestampCreated + AppRuntime::positiveTTLint) >= timestampNow) {
-            return (CacheStatus::CacheHitPositive);
+            return (CacheHitPositive);
         }
     } else {
         if ((timestampCreated + AppRuntime::negativeTTLint) >= timestampNow) {
-            return (CacheStatus::CacheHitNegative);
+            return (CacheHitNegative);
         }
     }
-    return (CacheStatus::CacheMiss);
+    return (CacheMiss);
 }
 
 //////////////////////////////////////////////////////////////////

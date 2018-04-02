@@ -14,7 +14,7 @@
 #include <QString>
 #include <QtDebug>
 
-enum class CacheStatus {
+enum CacheStatus {
     CacheMiss = 1,
     CacheOnProgress = 2,
     CacheHitNegative = 3,

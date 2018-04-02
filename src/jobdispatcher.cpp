@@ -49,7 +49,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
         AppSquidRequest squidRequest;
         squidRequest.requestUrl = requestUrl;
         squidRequest.requestCriteria = requestData;
-        squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::String;
+        squidRequest.requestMathMatchOperator = OperatorString;
         squidRequest.requestCaseSensitivity = Qt::CaseSensitive;
         squidRequest.requestPatternSyntax = QRegExp::RegExp;
         squidRequest.requestInvertMatch = false;
@@ -72,7 +72,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
             if (objectPropertyMatch.exactMatch (*token)) {
                 propertyCapturedItems = objectPropertyMatch.capturedTexts ();
                 AppSquidPropertyMatch propertyMatch;
-                propertyMatch.matchType = PropertyMatchType::MatchObject;
+                propertyMatch.matchType = MatchObject;
                 propertyMatch.componentName = propertyCapturedItems.value (2);
                 if (propertyMatch.componentName.isEmpty ()) {
                     propertyMatch.componentName = QUrl::fromPercentEncoding(propertyCapturedItems.value(3).toUtf8());
@@ -81,12 +81,12 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
             } else if (arrayPropertyMatch.exactMatch (*token)) {
                 propertyCapturedItems = arrayPropertyMatch.capturedTexts ();
                 AppSquidPropertyMatch propertyMatch;
-                propertyMatch.matchType = PropertyMatchType::MatchArray;
+                propertyMatch.matchType = MatchArray;
                 propertyMatch.componentName = propertyCapturedItems.value(1) + propertyCapturedItems.value(7);
                 if (propertyMatch.componentName == "<>") {
-                    propertyMatch.matchQuantity = PropertyMatchQuantity::MatchAll;
+                    propertyMatch.matchQuantity = MatchAll;
                 } else if (propertyMatch.componentName == "[]") {
-                    propertyMatch.matchQuantity = PropertyMatchQuantity::MatchAny;
+                    propertyMatch.matchQuantity = MatchAny;
                 } else {
                     this->writeAnswerLine (requestChannel, "ACL interval evaluation specification is not valid", true, false);
                     return;
@@ -128,22 +128,22 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
         while (! squidRequest.requestCriteria.isEmpty ()) {
             QString requestFlag (squidRequest.requestCriteria.takeFirst());
             if (requestFlag == "<" || requestFlag == "-lt") {
-                squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::LessThan;
+                squidRequest.requestMathMatchOperator = OperatorLessThan;
                 numericMatch++;
             } else if (requestFlag == "<=" || requestFlag == "-le") {
-                squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::LessThanOrEquals;
+                squidRequest.requestMathMatchOperator = OperatorLessThanOrEquals;
                 numericMatch++;
             } else if (requestFlag == "=" || requestFlag == "==" || requestFlag == "-eq") {
-                squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::Equals;
+                squidRequest.requestMathMatchOperator = OperatorEquals;
                 numericMatch++;
             } else if (requestFlag == "<>" || requestFlag == "!=" || requestFlag == "-ne") {
-                squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::NotEquals;
+                squidRequest.requestMathMatchOperator = OperatorNotEquals;
                 numericMatch++;
             } else if (requestFlag == ">" || requestFlag == "-gt") {
-                squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::GreaterThan;
+                squidRequest.requestMathMatchOperator = OperatorGreaterThan;
                 numericMatch++;
             } else if (requestFlag == ">=" || requestFlag == "-ge") {
-                squidRequest.requestMathMatchOperator = AppSquidMathMatchOperator::GreaterThanOrEquals;
+                squidRequest.requestMathMatchOperator = OperatorGreaterThanOrEquals;
                 numericMatch++;
             } else if (requestFlag.left(1) == "-") {
                 if (requestFlag == "-f" || requestFlag == "--fixed") {

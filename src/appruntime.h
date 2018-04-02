@@ -105,12 +105,12 @@ public:
 // QHash<QString,AppHelperObjectCache> helperMemoryCache
 // qDebug() << helperMemoryCache["youtube"]->className["video"]->id["dQw4w9WgXcQ"]->data;
 
-enum class PropertyMatchType {
+enum PropertyMatchType {
     MatchObject = 1,
     MatchArray = 2
 };
 
-enum class PropertyMatchQuantity {
+enum PropertyMatchQuantity {
     MatchAny = 1,
     MatchAll = 2
 };
@@ -119,18 +119,18 @@ class AppSquidPropertyMatch {
 public:
     QString componentName;
     PropertyMatchType matchType;
-    QList<QPair<int,int>> matchIntervals;
+    QList< QPair<int,int> > matchIntervals;
     PropertyMatchQuantity matchQuantity;
 };
 
-enum class AppSquidMathMatchOperator {
-    String = 1,
-    LessThan = 1,
-    LessThanOrEquals = 2,
-    Equals = 3,
-    NotEquals = 4,
-    GreaterThanOrEquals = 5,
-    GreaterThan = 6
+enum AppSquidMathMatchOperator {
+    OperatorString = 1,
+    OperatorLessThan = 1,
+    OperatorLessThanOrEquals = 2,
+    OperatorEquals = 3,
+    OperatorNotEquals = 4,
+    OperatorGreaterThanOrEquals = 5,
+    OperatorGreaterThan = 6
 };
 
 class AppSquidRequest {

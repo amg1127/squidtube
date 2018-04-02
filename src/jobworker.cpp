@@ -72,7 +72,7 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
             QJsonDocument objectData;
             qint64 objectTimestamp;
             CacheStatus cacheStatus = appHelperInfo->memoryCache->read (squidRequest.objectClassName, squidRequest.objectId, this->currentTimestamp, objectData, objectTimestamp);
-            if (cacheStatus == CacheStatus::CacheHitPositive) {
+            if (cacheStatus == CacheHitPositive) {
                 qInfo() << QString("[%1] Information retrieved from the cache concerning 'className=%2, id=%3' is fresh. Now the matching test begins.").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
                 bool matchResult = this->processCriteria (
                     squidRequest.requestHelperName,
@@ -86,10 +86,10 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                     objectData
                 );
                 this->squidResponseOut (requestId, QString("Cached data from the object with 'className=%1, id=%2' %3 specified criteria.").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), false, matchResult);
-            } else if (cacheStatus == CacheStatus::CacheHitNegative) {
+            } else if (cacheStatus == CacheHitNegative) {
                 qInfo() << QString("[%1] Information retrieved from the cache concerning 'className=%2, id=%3' is unusable.").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
                 this->squidResponseOut (requestId, "Another thread or process have already tried to fetch information concerning the object and failed to do so.", true, false);
-            } else if (cacheStatus == CacheStatus::CacheOnProgress) {
+            } else if (cacheStatus == CacheOnProgress) {
                 qDebug() << QString("[%1] Another thread or process is currently fetching information concerning 'className=%2, id=%3'. I will try to wait for it...").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
                 this->incomingRequests.prepend (this->runningRequests.take (requestId));
                 if (this->rngdInitialized) {
@@ -97,7 +97,7 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                 } else {
                     this->retryTimer->start (AppConstants::AppHelperTimerTimeout);
                 }
-            } else if (cacheStatus == CacheStatus::CacheMiss) {
+            } else if (cacheStatus == CacheMiss) {
                 qInfo() << QString("[%1] Information concerning 'className=%2, id=%3' was not found in the cache. Invoking 'getPropertiesFromObject ();', RequestID #%4").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(requestId);
                 this->runningRequests[requestId] = squidRequest;
                 // Note: remember the reminder saved into 'objectcache.cpp'...
@@ -235,7 +235,7 @@ bool JobWorker::processCriteria (
     const QJsonValue& jsonValueInformation) {
     if (level > 0) {
         AppSquidPropertyMatch requestPropertiesItem = (*requestPropertiesIterator);
-        if (requestPropertiesItem.matchType == PropertyMatchType::MatchObject) {
+        if (requestPropertiesItem.matchType == MatchObject) {
             if (jsonValueInformation.isObject ()) {
                 return (JobWorker::processCriteria (
                     requestHelperName,
@@ -251,12 +251,12 @@ bool JobWorker::processCriteria (
             } else {
                 qInfo() << QString("[%1] Unexpected JSON type '%2' while parsing '%3'. A '%4' was expected.").arg(requestHelperName).arg(JobWorker::jsonType(jsonValueInformation)).arg(requestPropertiesItem.componentName).arg(JobWorker::jsonType(QJsonValue::Object));
             }
-        } else if (requestPropertiesItem.matchType == PropertyMatchType::MatchArray) {
+        } else if (requestPropertiesItem.matchType == MatchArray) {
             if (jsonValueInformation.isArray ()) {
                 QJsonArray jsonArray (jsonValueInformation.toArray ());
                 int arraySize = jsonArray.count ();
                 int intervalStart, intervalEnd, intervalItem;
-                for (QList<QPair<int,int>>::const_iterator intervalIterator = requestPropertiesItem.matchIntervals.constBegin(); intervalIterator != requestPropertiesItem.matchIntervals.constEnd(); intervalIterator++) {
+                for (QList< QPair<int,int> >::const_iterator intervalIterator = requestPropertiesItem.matchIntervals.constBegin(); intervalIterator != requestPropertiesItem.matchIntervals.constEnd(); intervalIterator++) {
                     intervalStart = intervalIterator->first;
                     if (intervalStart < 0) {
                         intervalStart = arraySize + intervalStart;
@@ -288,19 +288,19 @@ bool JobWorker::processCriteria (
                             requestInvertMatch,
                             requestCriteria,
                             jsonArray.at (intervalItem))) {
-                            if (requestPropertiesItem.matchQuantity == PropertyMatchQuantity::MatchAny) {
+                            if (requestPropertiesItem.matchQuantity == MatchAny) {
                                 return (true);
                             }
                         } else {
-                            if (requestPropertiesItem.matchQuantity == PropertyMatchQuantity::MatchAll) {
+                            if (requestPropertiesItem.matchQuantity == MatchAll) {
                                 return (false);
                             }
                         }
                     }
                 }
-                if (requestPropertiesItem.matchQuantity == PropertyMatchQuantity::MatchAll) {
+                if (requestPropertiesItem.matchQuantity == MatchAll) {
                     return (true);
-                } else if (requestPropertiesItem.matchQuantity == PropertyMatchQuantity::MatchAny) {
+                } else if (requestPropertiesItem.matchQuantity == MatchAny) {
                     return (false);
                 } else {
                     qFatal ("Unexpected code flow!");
@@ -333,10 +333,10 @@ bool JobWorker::processCriteria (
                     )
             );
             int booleanOptionsPos = ((jsonValueInformation.toBool ()) ? 1 : 0);
-            if (requestMathMatchOperator == AppSquidMathMatchOperator::String ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::Equals ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::NotEquals) {
-                bool matched = (requestMathMatchOperator == AppSquidMathMatchOperator::NotEquals);
+            if (requestMathMatchOperator == OperatorString ||
+                requestMathMatchOperator == OperatorEquals ||
+                requestMathMatchOperator == OperatorNotEquals) {
+                bool matched = (requestMathMatchOperator == OperatorNotEquals);
                 for (QStringList::const_iterator requestCriteriaIterator = requestCriteria.constBegin(); requestCriteriaIterator != requestCriteria.constEnd(); requestCriteriaIterator++) {
                     if (booleanOptions[booleanOptionsPos].contains ((*requestCriteriaIterator), Qt::CaseInsensitive)) {
                         matched = (! matched);
@@ -355,24 +355,24 @@ bool JobWorker::processCriteria (
                 qInfo() << QString("[%1] Unable to apply selected comparison operator on a boolean value!").arg(requestHelperName);
             }
         } else if (jsonValueInformation.isDouble ()) {
-            if (requestMathMatchOperator == AppSquidMathMatchOperator::LessThan ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::LessThanOrEquals ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::Equals ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::NotEquals ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThanOrEquals ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThan) {
+            if (requestMathMatchOperator == OperatorLessThan ||
+                requestMathMatchOperator == OperatorLessThanOrEquals ||
+                requestMathMatchOperator == OperatorEquals ||
+                requestMathMatchOperator == OperatorNotEquals ||
+                requestMathMatchOperator == OperatorGreaterThanOrEquals ||
+                requestMathMatchOperator == OperatorGreaterThan) {
                 double doubleValue = jsonValueInformation.toDouble ();
                 double doubleComparison;
                 bool conversionOk;
                 for (QStringList::const_iterator requestCriteriaIterator = requestCriteria.constBegin(); requestCriteriaIterator != requestCriteria.constEnd(); requestCriteriaIterator++) {
                     doubleComparison = requestCriteriaIterator->toDouble (&conversionOk);
                     if (conversionOk) {
-                        if ((requestMathMatchOperator == AppSquidMathMatchOperator::LessThan && doubleValue < doubleComparison) ||
-                            (requestMathMatchOperator == AppSquidMathMatchOperator::LessThanOrEquals && doubleValue <= doubleComparison) ||
-                            (requestMathMatchOperator == AppSquidMathMatchOperator::Equals && doubleValue == doubleComparison) ||
-                            (requestMathMatchOperator == AppSquidMathMatchOperator::NotEquals && doubleValue != doubleComparison) ||
-                            (requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThanOrEquals && doubleValue >= doubleComparison) ||
-                            (requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThan && doubleValue > doubleComparison)) {
+                        if ((requestMathMatchOperator == OperatorLessThan && doubleValue < doubleComparison) ||
+                            (requestMathMatchOperator == OperatorLessThanOrEquals && doubleValue <= doubleComparison) ||
+                            (requestMathMatchOperator == OperatorEquals && doubleValue == doubleComparison) ||
+                            (requestMathMatchOperator == OperatorNotEquals && doubleValue != doubleComparison) ||
+                            (requestMathMatchOperator == OperatorGreaterThanOrEquals && doubleValue >= doubleComparison) ||
+                            (requestMathMatchOperator == OperatorGreaterThan && doubleValue > doubleComparison)) {
                             return (! requestInvertMatch);
                         }
                     } else {
@@ -385,17 +385,17 @@ bool JobWorker::processCriteria (
                 qInfo() << QString("[%1] Unable to apply selected comparison operator on a numeric value!").arg(requestHelperName);
             }
         } else if (jsonValueInformation.isString ()) {
-            if (requestMathMatchOperator == AppSquidMathMatchOperator::String ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::LessThan ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::LessThanOrEquals ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::Equals ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::NotEquals ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThanOrEquals ||
-                requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThan) {
+            if (requestMathMatchOperator == OperatorString ||
+                requestMathMatchOperator == OperatorLessThan ||
+                requestMathMatchOperator == OperatorLessThanOrEquals ||
+                requestMathMatchOperator == OperatorEquals ||
+                requestMathMatchOperator == OperatorNotEquals ||
+                requestMathMatchOperator == OperatorGreaterThanOrEquals ||
+                requestMathMatchOperator == OperatorGreaterThan) {
                 QString stringValue (jsonValueInformation.toString ());
                 int compareResult;
                 for (QStringList::const_iterator requestCriteriaIterator = requestCriteria.constBegin(); requestCriteriaIterator != requestCriteria.constEnd(); requestCriteriaIterator++) {
-                    if (requestMathMatchOperator == AppSquidMathMatchOperator::String) {
+                    if (requestMathMatchOperator == OperatorString) {
                         QRegExp regexComparison ((*requestCriteriaIterator), requestCaseSensitivity, requestPatternSyntax);
                         if (regexComparison.isValid()) {
                             if (JobWorker::regexMatches (regexComparison, stringValue)) {
@@ -407,12 +407,12 @@ bool JobWorker::processCriteria (
                         }
                     } else {
                         compareResult = stringValue.compare ((*requestCriteriaIterator), requestCaseSensitivity);
-                        if ((requestMathMatchOperator == AppSquidMathMatchOperator::LessThan && compareResult < 0) ||
-                            (requestMathMatchOperator == AppSquidMathMatchOperator::LessThanOrEquals && compareResult <= 0) ||
-                            (requestMathMatchOperator == AppSquidMathMatchOperator::Equals && compareResult == 0) ||
-                            (requestMathMatchOperator == AppSquidMathMatchOperator::NotEquals && compareResult != 0) ||
-                            (requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThanOrEquals && compareResult >= 0) ||
-                            (requestMathMatchOperator == AppSquidMathMatchOperator::GreaterThan && compareResult > 0)) {
+                        if ((requestMathMatchOperator == OperatorLessThan && compareResult < 0) ||
+                            (requestMathMatchOperator == OperatorLessThanOrEquals && compareResult <= 0) ||
+                            (requestMathMatchOperator == OperatorEquals && compareResult == 0) ||
+                            (requestMathMatchOperator == OperatorNotEquals && compareResult != 0) ||
+                            (requestMathMatchOperator == OperatorGreaterThanOrEquals && compareResult >= 0) ||
+                            (requestMathMatchOperator == OperatorGreaterThan && compareResult > 0)) {
                             return (! requestInvertMatch);
                         }
                     }
