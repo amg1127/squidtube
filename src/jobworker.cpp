@@ -588,7 +588,7 @@ JobCarrier::~JobCarrier () {
 
 void JobCarrier::start (QThread::Priority priority) {
     if (this->started) {
-        qFatal ("Invalid procedure call! This method must be called only once!");
+        qFatal ("Invalid procedure call: this method must be called only once!");
     } else {
         this->threadObj->start (priority);
         this->started = true;

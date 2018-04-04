@@ -2,7 +2,7 @@
 // https://xhr.spec.whatwg.org/
 // http://tobyho.com/2010/11/22/javascript-constructors-and/
 
-(function (sendCallback, abortCallback) {
+(function (sendCallback, abortCallback, setTimeoutCallback, validStatusCodes) {
 
     function DOMException (message, name) {
         Object.defineProperties (this, {
@@ -108,33 +108,34 @@
             return (new XMLHttpRequest());
         }
 
-        var status_UNSENT = 0;
-        var status_OPENED = 1;
-        var status_HEADERS_RECEIVED = 2;
-        var status_LOADING = 3;
-        var status_DONE = 4;
+        var status_UNSENT = validStatusCodes["UNSENT"];
+        var status_OPENED = validStatusCodes["OPENED"];
+        var status_HEADERS_RECEIVED = validStatusCodes["HEADERS_RECEIVED"];
+        var status_LOADING = validStatusCodes["LOADING"];
+        var status_DONE = validStatusCodes["DONE"];
 
         var XMLHttpRequestPrivate = {
-            "state"              : status_UNSENT,
-            "requestMethod"      : "",
-            "requestUrl"         : "",
-            "requestHeaders"     : [],
-            "requestTimeout"     : 0,
-            "requestUsername"    : null,
-            "requestPassword"    : null,
-            "responseType"       : "",
-            "responseObject"     : {
+            "state"                 : status_UNSENT,
+            "requestId"             : null,
+            "requestMethod"         : "",
+            "requestUrl"            : "",
+            "requestHeaders"        : [],
+            "requestTimeout"        : 0,
+            "requestTimeoutCallback": 0,
+            "requestUsername"       : null,
+            "requestPassword"       : null,
+            "responseType"          : "",
+            "responseObject"        : {
                 "type": "null",
                 "value": null
             },
-            "requestBuffer"      : null,
-            "responseBuffer"     : null,
-            "synchronousFlag"    : false,
-            "uploadCompleteFlag" : false,
-            "uploadListenerFlag" : false,
-            "timedOutFlag"       : false,
-            "sendFlag"           : false,
-            "withCredentialsFlag": false
+            "requestBuffer"         : null,
+            "responseBuffer"        : null,
+            "synchronousFlag"       : false,
+            "uploadCompleteFlag"    : false,
+            "timedOutFlag"          : false,
+            "sendFlag"              : false,
+            "withCredentialsFlag"   : false
         };
 
         var getArrayBufferResponse = function () {
@@ -342,11 +343,9 @@
         };
 
         var abortMethod = function () {
-            abortCallback (this, function (name) {
-                return (XMLHttpRequestPrivate[name]);
-            }, function (name, value) {
-                    XMLHttpRequestPrivate[name] = value;
-            });
+            if (XMLHttpRequestPrivate["requestId"]) {
+                abortCallback (XMLHttpRequestPrivate["requestId"]);
+            }
         };
 
         var forbiddenHeaderNames = [
@@ -383,14 +382,14 @@
             "onreadystatechange": writableValue,
 
             // states
-            "UNSENT"           : { "value": status_UNSENT },
-            "OPENED"           : { "value": status_OPENED },
-            "HEADERS_RECEIVED" : { "value": status_HEADERS_RECEIVED },
-            "LOADING"          : { "value": status_LOADING },
-            "DONE"             : { "value": status_DONE },
+            "UNSENT"               : { "value": status_UNSENT },
+            "OPENED"               : { "value": status_OPENED },
+            "HEADERS_RECEIVED"     : { "value": status_HEADERS_RECEIVED },
+            "LOADING"              : { "value": status_LOADING },
+            "DONE"                 : { "value": status_DONE },
 
             // request
-            "open"             : { "value": (function (method, url, async, username, password) {
+            "open"                 : { "value": (function (method, url, async, username, password) {
                 if (! (/^\w+$/.test (method))) {
                     throw new DOMException ("Invalid XMLHttpRequest method '" + method + "'!", "SyntaxError");
                 }
@@ -409,7 +408,6 @@
                 }
                 abortMethod ();
                 XMLHttpRequestPrivate["sendFlag"] = false;
-                XMLHttpRequestPrivate["uploadListenerFlag"] = false;
                 XMLHttpRequestPrivate["requestMethod"] = method;
                 XMLHttpRequestPrivate["requestUrl"] = url;
                 if (! async) {
@@ -418,6 +416,8 @@
                     XMLHttpRequestPrivate["synchronousFlag"] = false;
                 }
                 XMLHttpRequestPrivate["requestHeaders"] = [];
+                XMLHttpRequestPrivate["requestUsername"] = username;
+                XMLHttpRequestPrivate["requestPassword"] = password;
                 XMLHttpRequestPrivate["responseObject"]["type"] = "failure";
                 XMLHttpRequestPrivate["responseObject"]["value"] = "network error";
                 XMLHttpRequestPrivate["requestBuffer"] = null;
@@ -432,7 +432,7 @@
                     }
                 }
             })},
-            "setRequestReader" : { "value": (function (name, value) {
+            "setRequestReader"     : { "value": (function (name, value) {
                 if (XMLHttpRequestPrivate["state"] != status_OPENED) {
                     throw new DOMException ("XMLHttpRequest state is " + XMLHttpRequestPrivate["state"], "InvalidStateError");
                 }
@@ -461,15 +461,18 @@
                     XMLHttpRequestPrivate["requestHeaders"][nameLower] = [valueNormalized];
                 }
             })},
-            "timeout"          : { "get": (function () {
+            "timeout"              : { "get": (function () {
                 return (XMLHttpRequestPrivate["requestTimeout"]);
             }), "set": (function (value) {
                 XMLHttpRequestPrivate["requestTimeout"] = value;
                 if (XMLHttpRequestPrivate["requestTimeout"] <= 0) {
                     XMLHttpRequestPrivate["requestTimeout"] = 0;
                 }
+                if (XMLHttpRequestPrivate["requestId"]) {
+                    setTimeoutCallback (XMLHttpRequestPrivate["requestId"], XMLHttpRequestPrivate["requestTimeout"]);
+                }
             })},
-            "withCredentials"  : { "get": (function () {
+            "withCredentials"      : { "get": (function () {
                 return (XMLHttpRequestPrivate["withCredentialsFlag"]);
             }), "set": (function (value) {
                 if (XMLHttpRequestPrivate["state"] != status_UNSENT && XMLHttpRequestPrivate["state"] != status_OPENED) {
@@ -480,8 +483,8 @@
                 }
                 XMLHttpRequestPrivate["withCredentialsFlag"] = value;
             })},
-            "upload"           : { "value": (new XMLHttpRequestUpload ()) },
-            "send"             : { "value": (function (body) {
+            "upload"               : { "value": (new XMLHttpRequestUpload ()) },
+            "send"                 : { "value": (function (body) {
                 if (XMLHttpRequestPrivate["state"] != status_OPENED) {
                     throw new DOMException ("XMLHttpRequest state is " + XMLHttpRequestPrivate["state"], "InvalidStateError");
                 }
@@ -538,25 +541,25 @@
                 XMLHttpRequestPrivate["sendFlag"] = true;
                 // From step 11 onwards, let the C++ stack assume the control
                 // sendCallback (object, requestBody, setPrivateData)
-                sendCallback (this, body, function (name) {
+                sendCallback (this, function (name) {
                     return (XMLHttpRequestPrivate[name]);
                 }, function (name, value) {
-                        XMLHttpRequestPrivate[name] = value;
+                    XMLHttpRequestPrivate[name] = value;
                 });
             })},
-            "abort"            : { "value": abortMethod },
+            "abort"                : { "value": abortMethod },
 
             // response
-            "responseURL": { "get": (function () {
+            "responseURL"          : { "get": (function () {
                 return (XMLHttpRequestPrivate["responseURL"]);
             })},
-            "status": { "get": (function () {
+            "status"               : { "get": (function () {
                 return (XMLHttpRequestPrivate["status"]);
             })},
-            "statusText": { "get": (function () {
+            "statusText"           : { "get": (function () {
                 return (XMLHttpRequestPrivate["statusText"]);
             })},
-            "getResponseHeader": { "value": (function (name) {
+            "getResponseHeader"    : { "value": (function (name) {
                 var lcName = name.toLowerCase();
                 if (XMLHttpRequestPrivate["responseHeaders"]) {
                     if (XMLHttpRequestPrivate["responseHeaders"][lcName]) {
@@ -586,7 +589,7 @@
                 }
                 return (output);
             })},
-            "overrideMimeType": { "value": (function (mime) {
+            "overrideMimeType"     : { "value": (function (mime) {
                 if (XMLHttpRequestPrivate["state"] == status_LOADING || XMLHttpRequestPrivate["state"] == status_DONE) {
                     throw new DOMException ("XMLHttpRequest state is " + XMLHttpRequestPrivate["state"], "InvalidStateError");
                 } else {
@@ -605,7 +608,7 @@
                     }
                 }
             })},
-            "responseType": { "get": (function () {
+            "responseType"         : { "get": (function () {
                 return (XMLHttpRequestPrivate["responseType"]);
             }), "set": (function (value) {
                 if (value == "document") {
@@ -627,7 +630,7 @@
                     }
                 }
             })},
-            "response": { "get": (function () {
+            "response"             : { "get": (function () {
                 if (XMLHttpRequestPrivate["responseType"] == "" || XMLHttpRequestPrivate["responseType"] == "text") {
                     if (XMLHttpRequestPrivate["state"] != status_LOADING && XMLHttpRequestPrivate["state"] != status_DONE) {
                         return ("");
@@ -654,7 +657,7 @@
                     }
                 }
             })},
-            "responseText": { "get": (function () {
+            "responseText"         : { "get": (function () {
                 if (XMLHttpRequestPrivate["responseType"] != "" && XMLHttpRequestPrivate["responseType"] != "text") {
                     throw new DOMException ("XMLHttpRequest responseType is " + XMLHttpRequestPrivate["responseType"], "InvalidStateError");
                 } else if (XMLHttpRequestPrivate["state"] != status_LOADING && XMLHttpRequestPrivate["state"] != status_DONE) {
@@ -663,7 +666,7 @@
                     return (getTextResponse ());
                 }
             })},
-            "responseXML": { "get": (function () {
+            "responseXML"          : { "get": (function () {
                 if (XMLHttpRequestPrivate["responseType"] != "" && XMLHttpRequestPrivate["responseType"] != "document") {
                     throw new DOMException ("XMLHttpRequest responseType is " + XMLHttpRequestPrivate["responseType"], "InvalidStateError");
                 } else if (XMLHttpRequestPrivate["state"] != status_DONE) {

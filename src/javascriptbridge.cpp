@@ -44,6 +44,256 @@ void JavascriptTimer::timerTimeout () {
 
 //////////////////////////////////////////////////////////////////
 
+const short int JavascriptNetworkRequest::status_UNSENT = 0;
+const short int JavascriptNetworkRequest::status_OPENED = 1;
+const short int JavascriptNetworkRequest::status_HEADERS_RECEIVED = 2;
+const short int JavascriptNetworkRequest::status_LOADING = 3;
+const short int JavascriptNetworkRequest::status_DONE = 4;
+
+bool JavascriptNetworkRequest::getPrivateData (QString key, QJSValue& value) {
+    if (this->getPrivateDataCallback.isCallable ()) {
+        return (! JavascriptBridge::warnJsError (value = this->getPrivateDataCallback.call (QJSValueList() << key), QString("[XHR#%1] Internal error while getting XMLHttpRequestPrivate.%2!").arg(this->networkRequestId).arg(key)));
+    } else {
+        return (false);
+    }
+}
+
+bool JavascriptNetworkRequest::setPrivateData (QString key, const QJSValue& value) {
+    if (this->setPrivateDataCallback.isCallable ()) {
+        return (! JavascriptBridge::warnJsError (this->setPrivateDataCallback.call (QJSValueList() << key << value), QString("[XHR#%1] Internal error while setting XMLHttpRequestPrivate.%2!").arg(this->networkRequestId).arg(key)));
+    } else {
+        return (false);
+    }
+}
+
+void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkManager) {
+    if (this->networkReply != Q_NULLPTR) {
+        this->networkReply->disconnect ();
+        if (this->networkReply->isRunning()) {
+            this->networkReply->abort ();
+        }
+        this->networkReply->deleteLater ();
+        this->networkReply = Q_NULLPTR;
+    }
+    QJSValue requestMethod;
+    QJSValue requestUrl;
+    QJSValue requestHeaders;
+    QJSValue requestTimeout;
+    QJSValue requestUsername;
+    QJSValue requestPassword;
+    QJSValue uploadCompleteFlag;
+    QJSValue synchronousFlag;
+    QJSValue requestBuffer;
+    if (this->getPrivateData ("requestMethod", requestMethod) &&
+        this->getPrivateData ("requestUrl", requestUrl) &&
+        this->getPrivateData ("requestHeaders", requestHeaders) &&
+        this->getPrivateData ("requestTimeout", requestTimeout) &&
+        this->getPrivateData ("requestUsername", requestUsername) &&
+        this->getPrivateData ("requestPassword", requestPassword) &&
+        this->getPrivateData ("uploadCompleteFlag", uploadCompleteFlag) &&
+        this->getPrivateData ("synchronousFlag", synchronousFlag) &&
+        this->getPrivateData ("requestBuffer", requestBuffer)) {
+        QUrl url (requestUrl.toString());
+        QString username (requestUsername.toString());
+        if (! username.isEmpty ()) {
+            url.setUserName (username);
+        }
+        QString password (requestPassword.toString());
+        if (! password.isEmpty ()) {
+            url.setPassword (password);
+        }
+        QNetworkRequest networkRequest (url);
+        QJSValueIterator requestHeader (requestHeaders);
+        while (requestHeader.hasNext ()) {
+            requestHeader.next ();
+            QString requestHeaderName (requestHeader.name());
+            QJSValue requestHeaderValue (requestHeader.value().property("join").call(QJSValueList() << ","));
+            if (JavascriptBridge::warnJsError (requestHeaderValue, QString("[XHR#%1] Internal error while fetching request header '%2'!").arg(this->networkRequestId).arg(requestHeaderName))) {
+                break;
+            } else {
+                networkRequest.setRawHeader (requestHeaderName.toLocal8Bit(), requestHeaderValue.toString().toLocal8Bit());
+            }
+        }
+        if (! requestHeader.hasNext ()) {
+            // Override the User Agent
+            networkRequest.setRawHeader ("user-agent", QString("%1.%2/%3").arg(APP_owner_name).arg(APP_project_name).arg(APP_project_version).toLocal8Bit());
+            if (this->requestBodyStream != Q_NULLPTR) {
+                delete (this->requestBodyStream);
+                this->requestBodyStream = Q_NULLPTR;
+            }
+            bool uploadCompleteFlagBool = uploadCompleteFlag.toBool();
+            int requestBodySize = this->requestBody.count();
+            if (! uploadCompleteFlagBool) {
+                this->requestBody = requestBuffer.toVariant().toByteArray();
+                networkRequest.setRawHeader ("content-length", QString::number(requestBodySize).toLocal8Bit());
+                this->requestBodyStream = new QDataStream (this->requestBody);
+            }
+            bool synchronousFlagBool = synchronousFlag.toBool();
+            if (! synchronousFlagBool) {
+                this->fireProgressEvent (false, "onloadstart", 0, 0);
+                if (! uploadCompleteFlagBool) {
+                    this->fireProgressEvent (true, "onloadstart", 0, requestBodySize);
+#warning I believe this statement should be moved to a function
+                    QJSValue state, sendFlag;
+                    bool fetchedState = (this->getPrivateData ("state", state) && this->getPrivateData ("sendFlag", sendFlag));
+                    if ((! fetchedState) || state.toInt() != JavascriptNetworkRequest::status_OPENED || (! sendFlag.toBool())) {
+                        emit networkRequestFinished (networkRequestId);
+                        return;
+                    }
+                }
+            }
+            QString strRequestMethod (requestMethod.toString());
+            int msec = requestTimeout.toInt ();
+            qDebug() << QString("[XHR#%1] Performing a HTTP %2 request against '%3'...").arg(this->networkRequestId).arg(strRequestMethod).str(url.toString(QUrl::RemoveUserInfo | QUrl::RemoveQuery));
+            this->downloadStarted = false;
+            this->networkReply = networkManager.sendCustomRequest (networkRequest, strRequestMethod.toLocal8Bit(), this->requestBodyStream);
+            QObject::connect (&(this->timeoutTimer), &QTimer::timeout, this->networkReply, &QNetworkReply::abort);
+            this->setTimerInterval (msec);
+            if (synchronousFlagBool) {
+                QEventLoop eventLoop;
+                QObject::connect (this->networkReply, &QNetworkReply::finished, &eventLoop, &QEventLoop::exit);
+                QObject::connect (this->networkReply, &QNetworkReply::finished, this, &JavascriptNetworkRequest::networkReplyFinished, Qt::DirectConnection);
+                eventLoop.exec ();
+            } else {
+                QObject::connect (this->networkReply, &QNetworkReply::finished, this, &JavascriptNetworkRequest::networkReplyFinished);
+                QObject::connect (this->networkReply, &QNetworkReply::downloadProgress, this, &JavascriptNetworkRequest::networkReplyDownloadProgress);
+                if (! uploadCompleteFlagBool) {
+                    QObject::connect (this->networkReply, &QNetworkReply::uploadProgress, this, &JavascriptNetworkRequest::networkReplyUploadProgress);
+                }
+            }
+            return;
+        }
+    }
+    emit networkRequestFinished (networkRequestId);
+}
+
+void JavascriptNetworkRequest::fireProgressEvent (bool isUpload, const QString& callback, const QJSValue& transmitted, const QJSValue& length) {
+    if (callback.startsWith ("on")) {
+        QJSValue jsCallback;
+        if (isUpload) {
+            jsCallback = this->xmlHttpRequestObject.property("upload").property(callback);
+        } else {
+            jsCallback = this->xmlHttpRequestObject.property(callback);
+        }
+        this->fireProgressEvent (jsCallback, transmitted, length);
+    } else {
+        qFatal ("Invalid procedure call: 'callback' must start with 'on'!");
+    }
+}
+
+void JavascriptNetworkRequest::fireProgressEvent (const QJSValue& callback, const QJSValue& transmitted, const QJSValue& length) {
+    if (callback.isCallable ()) {
+        QJSValue progressEvent = this->jsEngine->newObject ();
+        progressEvent.setProperty ("loaded", transmitted);
+        progressEvent.setProperty ("length", length);
+        progressEvent.setProperty ("lengthComputable", length.toBool ());
+        JavascriptBridge::warnJsError (callback.callWithInstance (this->xmlHttpRequestObject, QJSValueList() << progressEvent), QString("[XHR#%1] Uncaught exception received while firing a ProgressEvent!").arg(this->networkRequestId));
+    }
+}
+
+bool JavascriptNetworkRequest::isFinalAnswer () {
+    int httpStatusCode = this->networkReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    return ((httpStatusCode >= 200 && httpStatusCode < 300) || (httpStatusCode >= 400 && httpStatusCode < 600));
+}
+
+void JavascriptNetworkRequest::networkReplyDownloadProgress (qint64 bytesReceived, qint64 bytesTotal) {
+    if (this->isFinalAnswer ()) {
+        if (! this->downloadStarted) {
+#error Continue from here
+            this->downloadStarted = true;
+        }
+
+#error Then, go here
+    }
+    qFatal("Not done yet.");
+}
+
+void JavascriptNetworkRequest::networkReplyFinished () {
+    qFatal("Not done yet.");
+}
+
+void JavascriptNetworkRequest::networkReplyUploadProgress (qint64 bytesSent, qint64 bytesTotal) {
+    if (bytesTotal >= 0) {
+        this->fireProgressEvent (true, "onprogress", bytesSent, bytesTotal);
+        if (bytesSent == bytesTotal) {
+            this->setPrivateData ("uploadCompleteFlag", true);
+            this->fireProgressEvent (true, "onload", bytesSent, bytesTotal);
+            this->fireProgressEvent (true, "onloadend", bytesSent, bytesTotal);
+        }
+    } else {
+        this->fireProgressEvent (true, "onprogress", bytesSent, 0);
+    }
+}
+
+void JavascriptNetworkRequest::timeoutTimerTimeout () {
+    this->setPrivateData ("timedOutFlag", true);
+}
+
+JavascriptNetworkRequest::JavascriptNetworkRequest (QObject *parent) :
+    QObject (parent),
+    jsEngine (qjsEngine (parent)),
+    requestBodyStream (Q_NULLPTR),
+    networkReply (Q_NULLPTR),
+    downloadStarted (false) {
+    if (this->jsEngine == Q_NULLPTR) {
+        qFatal("JavascriptBridge object must be bound to a QJSEngine! Invoke 'QJSEngine::newQObject();'!");
+    }
+    this->timeoutTimer.setSingleShot (true);
+    QObject::connect (&(this->timeoutTimer), &QTimer::timeout, this, &JavascriptNetworkRequest::timeoutTimerTimeout);
+}
+
+JavascriptNetworkRequest::~JavascriptNetworkRequest () {
+    if (this->networkReply != Q_NULLPTR) {
+        this->networkReply->disconnect ();
+        if (this->networkReply->isRunning()) {
+            this->networkReply->abort ();
+            /*
+             * http://doc.qt.io/qt-5/qnetworkaccessmanager.html#sendCustomRequest
+             *
+             * I have to make sure there is no QNetworkReply linked to 'this->requestBodyStream',
+             * because I must destroy it now! QDataStream::deleteLater() method does not exist...
+             * This statement satisfies that requirement because I just invoked QNetworkReply::abort().
+             * It will emit QNetworkReply::finished() signal and free the link.
+             *
+             */
+            QCoreApplication::processEvents ();
+        }
+        this->networkReply->deleteLater ();
+    }
+    if (this->requestBodyStream != Q_NULLPTR) {
+        delete (this->requestBodyStream);
+    }
+}
+
+void JavascriptNetworkRequest::setTimerInterval (int msec) {
+    this->timeoutTimer.setInterval (msec);
+    if (this->timeoutTimer.isActive()) {
+        if (msec <= 0) {
+            this->timeoutTimer.stop ();
+        }
+    } else {
+        if (msec > 0) {
+            this->timeoutTimer.start ();
+        }
+    }
+}
+
+void JavascriptNetworkRequest::start (QNetworkAccessManager& networkManager, unsigned int networkRequestId) {
+    this->networkRequestId = networkRequestId;
+    this->maxRedirects = 20;
+    if (this->setPrivateData ("requestId", networkRequestId)) {
+        this->fulfillRequest (networkManager);
+    } else {
+        emit networkRequestFinished (networkRequestId);
+    }
+}
+
+void JavascriptNetworkRequest::abort () {
+    qFatal("Not done yet.");
+}
+
+//////////////////////////////////////////////////////////////////
+
 QJsonValue JavascriptBridge::QJS2QJsonValue (const QJSValue& value) {
     if (value.isBool ()) {
         return (QJsonValue (value.toBool ()));
@@ -109,10 +359,10 @@ QJSValue JavascriptBridge::QJson2QJS (QJSEngine& jsEngine, const QJsonValue& val
     }
 }
 
-QJSValue JavascriptBridge::createTimer (const bool repeat, const QJSValue& callback, const int interval) {
+unsigned int JavascriptBridge::createTimer (const bool repeat, const QJSValue& callback, const int interval) {
     QJSEngine* jsEngine (qjsEngine (this));
     if (jsEngine != Q_NULLPTR) {
-        int timerId (this->javascriptTimerId);
+        unsigned int timerId (this->javascriptTimerId);
         this->javascriptTimerId += 4;
         if (repeat) {
             timerId += 2;
@@ -133,7 +383,13 @@ JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestC
     myself (jsEngine.newQObject (this)),
     requestChannel (requestChannel),
     transactionId (1),
-    javascriptTimerId (1) {
+    javascriptTimerId (1),
+    networkManager (new QNetworkAccessManager (this)),
+    networkRequestId (1) {
+    // I will handle redirects at application nevel
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 9, 0))
+    this->networkManager->setRedirectPolicy (QNetworkRequest::ManualRedirectPolicy);
+#endif
     // "require();" function implementation
     jsEngine.globalObject().setProperty ("require", this->myself.property ("require"));
     // "set/clear Timeout/Interval" functions implementation
@@ -166,9 +422,18 @@ JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestC
         QJSValue xmlHttpRequestFunction = jsEngine.evaluate (xmlHttpCode, ":/xmlhttprequest.js");
         if (! JavascriptBridge::warnJsError (xmlHttpRequestFunction, "Unable to initialize XMLHttpRequest object within the QJSEngine!")) {
             if (xmlHttpRequestFunction.isCallable ()) {
+                // Make sure C++ and Javascript agree with the XMLHttpRequest status codes.
+                QJSValue xmlHttpRequest_statusCodes = jsEngine.newObject ();
+                xmlHttpRequest_statusCodes.setProperty ("UNSENT", JavascriptNetworkRequest::status_UNSENT);
+                xmlHttpRequest_statusCodes.setProperty ("OPENED", JavascriptNetworkRequest::status_OPENED);
+                xmlHttpRequest_statusCodes.setProperty ("HEADERS_RECEIVED", JavascriptNetworkRequest::status_HEADERS_RECEIVED);
+                xmlHttpRequest_statusCodes.setProperty ("LOADING", JavascriptNetworkRequest::status_LOADING);
+                xmlHttpRequest_statusCodes.setProperty ("DONE", JavascriptNetworkRequest::status_DONE);
                 QJSValue xmlHttpRequest = xmlHttpRequestFunction.call (QJSValueList()
                     << this->myself.property ("xmlHttpRequest_send")
                     << this->myself.property ("xmlHttpRequest_abort")
+                    << this->myself.property ("xmlHttpRequest_setTimeout")
+                    << xmlHttpRequest_statusCodes
                 );
                 if (! JavascriptBridge::warnJsError (xmlHttpRequest, "Unable to retrieve the XMLHttpRequest constructor from the code!")) {
                     jsEngine.globalObject().setProperty ("XMLHttpRequest", xmlHttpRequest);
@@ -178,6 +443,14 @@ JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestC
             }
         }
     }
+}
+
+JavascriptBridge::~JavascriptBridge () {
+    for (QMap<unsigned int,JavascriptNetworkRequest*>::iterator request = this->pendingNetworkRequests.begin(); request != this->pendingNetworkRequests.end(); request++) {
+        delete (*request);
+    }
+    this->pendingNetworkRequests.clear ();
+    delete (this->networkManager);
 }
 
 QJSValue JavascriptBridge::QJson2QJS (QJSEngine& jsEngine, const QJsonDocument& value) {
@@ -334,11 +607,11 @@ void JavascriptBridge::require (const QJSValue& library) {
     }
 }
 
-QJSValue JavascriptBridge::setTimeout (const QJSValue& callback, const int interval) {
+unsigned int JavascriptBridge::setTimeout (const QJSValue& callback, const int interval) {
     return (this->createTimer (false, callback, interval));
 }
 
-QJSValue JavascriptBridge::setInterval (const QJSValue& callback, const int interval) {
+unsigned int JavascriptBridge::setInterval (const QJSValue& callback, const int interval) {
     return (this->createTimer (true, callback, interval));
 }
 
@@ -356,72 +629,51 @@ void JavascriptBridge::clearInterval (unsigned int timerId) {
     }
 }
 
-void JavascriptBridge::xmlHttpRequest_abort (QJSValue& object, QJSValue& getPrivateData, QJSValue& setPrivateData) {
-    qFatal("Not done yet!");
+void JavascriptBridge::xmlHttpRequest_send (QJSValue& object, QJSValue& getPrivateData, QJSValue& setPrivateData) {
+    unsigned int networkRequestId = this->networkRequestId;
+    this->networkRequestId += 2;
+    JavascriptNetworkRequest* networkRequest = new JavascriptNetworkRequest (this);
+    this->pendingNetworkRequests.insert (networkRequestId, networkRequest);
+    QObject::connect (networkRequest, &JavascriptNetworkRequest::networkRequestFinished, this, &JavascriptBridge::networkRequestFinished);
+    networkRequest->setXMLHttpRequestObject (object);
+    networkRequest->setPrivateDataCallbacks (getPrivateData, setPrivateData);
+    networkRequest->start (*(this->networkManager), networkRequestId);
 }
 
-void JavascriptBridge::xmlHttpRequest_send (QJSValue& object, QJSValue& requestBody, QJSValue& getPrivateData, QJSValue& setPrivateData) {
-    qFatal("Not done yet!");
+void JavascriptBridge::xmlHttpRequest_abort (const unsigned int networkRequestId) {
+    QMap<unsigned int, JavascriptNetworkRequest*>::iterator networkRequest = this->pendingNetworkRequests.find (networkRequestId);
+    if (networkRequest != this->pendingNetworkRequests.end ()) {
+        (*networkRequest)->abort ();
+    }
 }
 
-QJSValue JavascriptBridge::textDecode (const QJSValue& bytes, const QJSValue& fallbackCharset) {
-    QJSValue answer ("");
-    QByteArray inputBuffer;
-    if (bytes.isArray ()) {
-        uint length = bytes.property("length").toUInt();
-        for (uint i = 0; i < length; i++) {
-            inputBuffer.append ((char) bytes.property(i).toUInt());
-        }
-        QMutexLocker m_lck (&AppRuntime::textCoDecMutex);
-        QTextCodec* textCodec = QTextCodec::codecForUtfText (inputBuffer, QTextCodec::codecForName (fallbackCharset.toString().toUtf8()));
-        if (textCodec != Q_NULLPTR) {
-            QTextDecoder textDecoder (textCodec, QTextCodec::ConvertInvalidToNull);
-            answer = textDecoder.toUnicode (inputBuffer);
-        }
+void JavascriptBridge::xmlHttpRequest_setTimeout (const unsigned int networkRequestId, const int msec) {
+    QMap<unsigned int, JavascriptNetworkRequest*>::iterator networkRequest = this->pendingNetworkRequests.find (networkRequestId);
+    if (networkRequest != this->pendingNetworkRequests.end ()) {
+        (*networkRequest)->setTimerInterval (msec);
+    }
+}
+
+QString JavascriptBridge::textDecode (const QByteArray& bytes, const QString& fallbackCharset) {
+    QString answer;
+    QMutexLocker m_lck (&AppRuntime::textCoDecMutex);
+    QTextCodec* textCodec = QTextCodec::codecForUtfText (bytes, QTextCodec::codecForName (fallbackCharset.toUtf8()));
+    if (textCodec != Q_NULLPTR) {
+        QTextDecoder textDecoder (textCodec, QTextCodec::ConvertInvalidToNull);
+        answer = textDecoder.toUnicode (bytes);
     }
     return (answer);
 }
 
-QJSValue JavascriptBridge::textEncode (const QJSValue& string, const QJSValue& charset) {
-    QJSEngine* jsEngine (qjsEngine (this));
-    if (jsEngine != Q_NULLPTR) {
-        QByteArray outputBuffer;
-        {
-            QMutexLocker m_lck (&AppRuntime::textCoDecMutex);
-            QTextCodec* textCodec = QTextCodec::codecForName (charset.toString().toUtf8());
-            if (textCodec != Q_NULLPTR) {
-                QTextEncoder textEncoder (textCodec, QTextCodec::ConvertInvalidToNull);
-                outputBuffer = textEncoder.fromUnicode (string.toString());
-            }
-        }
-        uint len = outputBuffer.size ();
-        bool hasArrayBuffer = false;
-        QJSValue answer (jsEngine->globalObject().property("ArrayBuffer").callAsConstructor (QJSValueList() << len));
-        QJSValue answerView (jsEngine->newArray (len));
-        if (! JavascriptBridge::warnJsError (answer, "Unable to create an 'ArrayBuffer' object! Falling back to a classical 'Array' object; this may consume excessive memory...")) {
-            if (answer.isObject ()) {
-                QJSValue uInt8Array = jsEngine->globalObject().property("Uint8Array").callAsConstructor (QJSValueList() << answer);
-                if (! JavascriptBridge::warnJsError (uInt8Array, "Unable to create an 'Uint8Array' object! Falling back to classical 'Array' object; this may consume excessive memory...")) {
-                    if (uInt8Array.isObject ()) {
-                        hasArrayBuffer = true;
-                        answerView = uInt8Array;
-                    }
-                }
-            }
-        }
-        for (uint i = 0; i < len; i++) {
-            answerView.setProperty (i, (uint) outputBuffer[i]);
-        }
-        if (hasArrayBuffer) {
-            answerView = QJSValue();
-            return (answer);
-        } else {
-            return (answerView);
-        }
-    } else {
-        qFatal("JavascriptBridge object must be bound to a QJSEngine! Invoke 'QJSEngine::newQObject();'!");
-        return (QJSValue());
+QByteArray JavascriptBridge::textEncode (const QString& string, const QString& charset) {
+    QByteArray answer;
+    QMutexLocker m_lck (&AppRuntime::textCoDecMutex);
+    QTextCodec* textCodec = QTextCodec::codecForName (charset.toUtf8());
+    if (textCodec != Q_NULLPTR) {
+        QTextEncoder textEncoder (textCodec, QTextCodec::ConvertInvalidToNull);
+        answer = textEncoder.fromUnicode (string);
     }
+    return (answer);
 }
 
 #if (QT_VERSION < QT_VERSION_CHECK(5, 6, 0))
@@ -448,5 +700,15 @@ void JavascriptBridge::timerFinished (unsigned int timerId) {
         JavascriptTimer* oldTimer = (*timerIdIterator);
         this->javascriptTimers.erase (timerIdIterator);
         oldTimer->deleteLater ();
+    }
+}
+
+void JavascriptBridge::networkRequestFinished (unsigned int networkRequestId) {
+    QMap<unsigned int,JavascriptNetworkRequest*>::iterator networkRequestIterator = this->pendingNetworkRequests.find (networkRequestId);
+    if (networkRequestIterator != this->pendingNetworkRequests.end()) {
+        JavascriptNetworkRequest* oldNetworkRequest = (*networkRequestIterator);
+        this->pendingNetworkRequests.erase (networkRequestIterator);
+        oldNetworkRequest->deleteLater ();
+        qDebug() << QString("XMLHttpRequest #%1 has finished.").arg(networkRequestId);
     }
 }

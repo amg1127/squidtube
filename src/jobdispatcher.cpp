@@ -205,7 +205,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
         }
         carrier->squidRequestIn (squidRequest, this->currentTimestamp);
     } else {
-        qFatal("Invalid procedure call!");
+        qFatal("Invalid procedure call: either 'requestChannelNumber' is a negative number, 'requestUrl' is invalid or 'requestData' is empty!");
     }
 }
 
@@ -235,7 +235,7 @@ JobDispatcher::~JobDispatcher () {
 
 void JobDispatcher::start (QThread::Priority priority) {
     if (this->started) {
-        qFatal("Invalid procedure call! This method must be called only once!");
+        qFatal("Invalid procedure call: this method must be called only once!");
     } else {
         this->setCurrentTimestamp ();
         this->clockTimer->start ();
