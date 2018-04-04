@@ -71,6 +71,16 @@ void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkMan
         this->networkReply->disconnect ();
         if (this->networkReply->isRunning()) {
             this->networkReply->abort ();
+            /*
+             * http://doc.qt.io/qt-5/qnetworkaccessmanager.html#sendCustomRequest
+             *
+             * I have to make sure there is no QNetworkReply linked to 'this->requestBodyStream',
+             * because I must destroy it now! QDataStream::deleteLater() method does not exist...
+             * This statement satisfies that requirement because I just invoked QNetworkReply::abort().
+             * It will emit QNetworkReply::finished() signal and free the link.
+             *
+             */
+            QCoreApplication::processEvents ();
         }
         this->networkReply->deleteLater ();
         this->networkReply = Q_NULLPTR;
@@ -121,9 +131,10 @@ void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkMan
                 delete (this->requestBodyStream);
                 this->requestBodyStream = Q_NULLPTR;
             }
+            QString strRequestMethod (requestMethod.toString());
             bool uploadCompleteFlagBool = uploadCompleteFlag.toBool();
             int requestBodySize = this->requestBody.count();
-            if (! uploadCompleteFlagBool) {
+            if (((! uploadCompleteFlagBool) || requestBodySize > 0) && strRequestMethod.compare("GET", Qt::CaseInsensitive) && strRequestMethod.compare("HEAD", Qt::CaseInsensitive)) {
                 this->requestBody = requestBuffer.toVariant().toByteArray();
                 networkRequest.setRawHeader ("content-length", QString::number(requestBodySize).toLocal8Bit());
                 this->requestBodyStream = new QDataStream (this->requestBody);
@@ -142,7 +153,6 @@ void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkMan
                     }
                 }
             }
-            QString strRequestMethod (requestMethod.toString());
             int msec = requestTimeout.toInt ();
             qDebug() << QString("[XHR#%1] Performing a HTTP %2 request against '%3'...").arg(this->networkRequestId).arg(strRequestMethod).str(url.toString(QUrl::RemoveUserInfo | QUrl::RemoveQuery));
             this->downloadStarted = false;
