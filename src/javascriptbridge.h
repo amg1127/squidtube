@@ -20,6 +20,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QObject>
+#include <QPair>
 #include <QtDebug>
 #include <QTextCodec>
 #include <QTextEncoder>
@@ -33,10 +34,6 @@ public:
     static const int getPropertiesFromObject;
     static const QStringList requiredMethods;
 };
-
-#warning Definir XMLHttpRequest no Javascript
-#warning Definir o metodo XMLHttpRequest.send() dentro do C++, passando todo o XMLHttpRequest como um QJSValue
-#warning Chamar os event handlers usando QJSValue.call()
 
 class JavascriptTimer : public QTimer {
     Q_OBJECT
@@ -59,19 +56,45 @@ private:
     unsigned int networkRequestId;
     unsigned int maxRedirects;
     QJSValue xmlHttpRequestObject;
-    QJSValue getPrivateDataCallback;
-    QJSValue setPrivateDataCallback;
+    QJSValue getPrivateDataCallback1;
+    QJSValue getPrivateDataCallback2;
+    QJSValue setPrivateDataCallback1;
+    QJSValue setPrivateDataCallback2;
     QByteArray requestBody;
     QDataStream* requestBodyStream;
     QNetworkReply* networkReply;
     QTimer timeoutTimer;
     bool downloadStarted;
-    bool getPrivateData (QString key, QJSValue& value);
-    bool setPrivateData (QString key, const QJSValue& value);
+    int httpStatus;
+    QString httpRequestMethod;
+    bool getPrivateData (const QString& key, QJSValue& value);
+    bool setPrivateData (const QString& key, const QJSValue& value);
+    bool getPrivateData (const QString& key, const QString& subKey, QJSValue& value);
+    bool setPrivateData (const QString& key, const QString& subKey, const QJSValue& value);
+    void cancelRequest (bool emitNetworkRequestFinished = false);
     void fulfillRequest (QNetworkAccessManager& networkManager);
-    void fireProgressEvent (bool isUpload, const QString& callback, const QJSValue& transmitted, const QJSValue& length);
-    void fireProgressEvent (const QJSValue& callback, const QJSValue& transmitted, const QJSValue& length);
-    bool isFinalAnswer ();
+    void fireProgressEvent (bool isUpload, const QString& callback, qint64 transmitted, qint64 length);
+    void fireProgressEvent (const QJSValue& callback, qint64 transmitted, qint64 length);
+    inline bool isGetOrHeadRequest () {
+        return (! (this->httpRequestMethod.compare("GET", Qt::CaseInsensitive) &&
+                   this->httpRequestMethod.compare("HEAD", Qt::CaseInsensitive)));
+    }
+    // https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#3xx_Redirection
+    inline bool isRedirectWithMethodChange () {
+        return (this->httpStatus == 302 ||
+                this->httpStatus == 303);
+    }
+    // https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#3xx_Redirection
+    inline bool isRedirectWithoutMethodChange () {
+        return ((this->httpStatus == 301 && this->isGetOrHeadRequest()) ||
+                this->httpStatus == 307 ||
+                this->httpStatus == 308);
+    }
+    inline bool isFinalAnswer () {
+        return (this->maxRedirects <= 0 ||
+                (! this->isRedirectWithMethodChange()) ||
+                (! this->isRedirectWithoutMethodChange()));
+    }
 private slots:
     void networkReplyDownloadProgress (qint64 bytesReceived, qint64 bytesTotal);
     void networkReplyFinished ();
@@ -86,8 +109,15 @@ public:
     JavascriptNetworkRequest (QObject* parent = Q_NULLPTR);
     ~JavascriptNetworkRequest ();
     void setTimerInterval (int msec);
-    inline void setXMLHttpRequestObject (QJSValue& object) { this->xmlHttpRequestObject = object; }
-    inline void setPrivateDataCallbacks (QJSValue& getPrivateData, QJSValue& setPrivateData) { this->getPrivateDataCallback = getPrivateData; this->setPrivateDataCallback = setPrivateData; }
+    inline void setXMLHttpRequestObject (QJSValue& object) {
+        this->xmlHttpRequestObject = object;
+    }
+    inline void setPrivateDataCallbacks (QJSValue& getPrivateData1, QJSValue& setPrivateData1, QJSValue& getPrivateData2, QJSValue& setPrivateData2) {
+        this->getPrivateDataCallback1 = getPrivateData1;
+        this->setPrivateDataCallback1 = setPrivateData1;
+        this->getPrivateDataCallback2 = getPrivateData2;
+        this->setPrivateDataCallback2 = setPrivateData2;
+    }
     void start (QNetworkAccessManager& networkManager, unsigned int networkRequestId);
     void abort ();
 signals:
@@ -126,7 +156,7 @@ public:
     Q_INVOKABLE unsigned int setInterval (const QJSValue& callback, const int interval);
     Q_INVOKABLE void clearTimeout (unsigned int timerId);
     Q_INVOKABLE void clearInterval (unsigned int timerId);
-    Q_INVOKABLE void xmlHttpRequest_send (QJSValue& object, QJSValue& getPrivateData, QJSValue& setPrivateData);
+    Q_INVOKABLE void xmlHttpRequest_send (QJSValue& object, QJSValue& getPrivateData1, QJSValue& setPrivateData1, QJSValue& getPrivateData2, QJSValue& setPrivateData2);
     Q_INVOKABLE void xmlHttpRequest_abort (const unsigned int networkRequestId);
     Q_INVOKABLE void xmlHttpRequest_setTimeout (const unsigned int networkRequestId, const int msec);
     Q_INVOKABLE QString textDecode (const QByteArray& bytes, const QString& fallbackCharset);

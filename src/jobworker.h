@@ -96,9 +96,13 @@ private:
 public:
     JobCarrier (const QString& requestChannel, QObject* parent = Q_NULLPTR);
     ~JobCarrier ();
-    inline JobWorker* worker () { return (this->workerObj); }
+    inline JobWorker* worker () {
+        return (this->workerObj);
+    }
     void start (QThread::Priority priority = QThread::InheritPriority);
-    inline bool wait (unsigned long time = ULONG_MAX) { return (this->threadObj->wait (time)); }
+    inline bool wait (unsigned long time = ULONG_MAX) {
+        return (this->threadObj->wait (time));
+    }
     void squidRequestIn (const AppSquidRequest& squidRequest, const qint64 timestampNow);
 signals:
     void squidRequestOut (const AppSquidRequest& squidRequest, const qint64 timestampNow);

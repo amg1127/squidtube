@@ -121,7 +121,6 @@
             "requestUrl"            : "",
             "requestHeaders"        : [],
             "requestTimeout"        : 0,
-            "requestTimeoutCallback": 0,
             "requestUsername"       : null,
             "requestPassword"       : null,
             "responseType"          : "",
@@ -135,7 +134,19 @@
             "uploadCompleteFlag"    : false,
             "timedOutFlag"          : false,
             "sendFlag"              : false,
-            "withCredentialsFlag"   : false
+            "abortedFlag"           : false,
+            "withCredentialsFlag"   : false,
+            "appendResponseBuffer"  : function (buffer) {
+                if (XMLHttpRequestPrivate["responseBuffer"]) {
+                    // https://gist.github.com/72lions/4528834
+                    var tmp = new Uint8Array (XMLHttpRequestPrivate["responseBuffer"].byteLength + buffer.byteLength);
+                    tmp.set (new Uint8Array (XMLHttpRequestPrivate["responseBuffer"]), 0);
+                    tmp.set (new Uint8Array (buffer), XMLHttpRequestPrivate["responseBuffer"].byteLength);
+                    XMLHttpRequestPrivate["responseBuffer"] = tmp.buffer;
+                } else {
+                    XMLHttpRequestPrivate["responseBuffer"] = buffer;
+                }
+            }
         };
 
         var getArrayBufferResponse = function () {
@@ -346,6 +357,11 @@
             if (XMLHttpRequestPrivate["requestId"]) {
                 abortCallback (XMLHttpRequestPrivate["requestId"]);
             }
+            if (XMLHttpRequestPrivate["state"] == status_DONE) {
+                XMLHttpRequestPrivate["state"] = status_UNSENT;
+                XMLHttpRequestPrivate["responseObject"]["type"] = "failure";
+                XMLHttpRequestPrivate["responseObject"]["value"] = "NetworkError";
+            }
         };
 
         var forbiddenHeaderNames = [
@@ -376,6 +392,19 @@
             'Sec-'
         ];
         var forbiddenHeaderPrefixesLength = forbiddenHeaderPrefixes.length;
+
+        var getPrivateData1 = function (key) {
+            return (XMLHttpRequestPrivate[key]);
+        };
+        var setPrivateData1 = function (key, value) {
+            XMLHttpRequestPrivate[key] = value;
+        };
+        var getPrivateData2 = function (key, subkey) {
+            return (XMLHttpRequestPrivate[key][subkey]);
+        };
+        var setPrivateData2 = function (key, subkey, value) {
+            XMLHttpRequestPrivate[key][subkey] = value;
+        };
 
         Object.defineProperties (this, {
             // event handlers
@@ -419,7 +448,7 @@
                 XMLHttpRequestPrivate["requestUsername"] = username;
                 XMLHttpRequestPrivate["requestPassword"] = password;
                 XMLHttpRequestPrivate["responseObject"]["type"] = "failure";
-                XMLHttpRequestPrivate["responseObject"]["value"] = "network error";
+                XMLHttpRequestPrivate["responseObject"]["value"] = "NetworkError";
                 XMLHttpRequestPrivate["requestBuffer"] = null;
                 XMLHttpRequestPrivate["responseBuffer"] = null;
                 XMLHttpRequestPrivate["responseBlob"] = null;
@@ -535,17 +564,20 @@
                 }
                 XMLHttpRequestPrivate["uploadCompleteFlag"] = false;
                 XMLHttpRequestPrivate["timedOutFlag"] = false;
+                XMLHttpRequestPrivate["abortedFlag"] = false; // The XMLHttpRequest specification did not rule this...
                 if (! body) {
                     XMLHttpRequestPrivate["uploadCompleteFlag"] = true;
                 }
                 XMLHttpRequestPrivate["sendFlag"] = true;
                 // From step 11 onwards, let the C++ stack assume the control
-                // sendCallback (object, requestBody, setPrivateData)
-                sendCallback (this, function (name) {
-                    return (XMLHttpRequestPrivate[name]);
-                }, function (name, value) {
-                    XMLHttpRequestPrivate[name] = value;
-                });
+                sendCallback (this, getPrivateData1, setPrivateData1, getPrivateData2, setPrivateData2);
+                if (XMLHttpRequestPrivate["synchronousFlag"] && XMLHttpRequestPrivate["responseObject"]["type"] == "failure") {
+                    var exception = XMLHttpRequestPrivate["responseObject"]["value"];
+                    var colonPos = exception.indexOf(":");
+                    if (colonPos >= 0) {
+                        throw new DOMException (exception.substring(colonPos + 1, exception.length).trim(), exception.substring(0, colonPos));
+                    }
+                }
             })},
             "abort"                : { "value": abortMethod },
 
@@ -669,7 +701,7 @@
             "responseXML"          : { "get": (function () {
                 if (XMLHttpRequestPrivate["responseType"] != "" && XMLHttpRequestPrivate["responseType"] != "document") {
                     throw new DOMException ("XMLHttpRequest responseType is " + XMLHttpRequestPrivate["responseType"], "InvalidStateError");
-                } else if (XMLHttpRequestPrivate["state"] != status_DONE) {
+                } else if (XMLHttpRequestPrivate["state"] != status_DONE || XMLHttpRequestPrivate["responseObject"]["type"] != "failure") {
                     return (null);
                 } else if (XMLHttpRequestPrivate["responseObject"]["type"] !== "null") {
                     return (XMLHttpRequestPrivate["responseObject"]["value"]);

@@ -11,7 +11,7 @@ public:
     QString configDescription;
     QRegExp configSyntax;
     QString* configValue;
-    inline AppConfigValidSetting(const QString configSection, const QString configName, const QString configDescription, const QRegExp configSyntax, QString& configValue) :
+    inline AppConfigValidSetting (const QString configSection, const QString configName, const QString configDescription, const QRegExp configSyntax, QString& configValue) :
         configSection(configSection),
         configName(configName),
         configDescription(configDescription),
