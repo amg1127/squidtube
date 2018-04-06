@@ -91,14 +91,14 @@ private:
                 this->httpStatus == 308);
     }
     inline bool isFinalAnswer () {
-        return (this->maxRedirects <= 0 ||
+        return ((! this->maxRedirects) ||
                 (! this->isRedirectWithMethodChange()) ||
                 (! this->isRedirectWithoutMethodChange()));
     }
 private slots:
+    void networkReplyUploadProgress (qint64 bytesSent, qint64 bytesTotal);
     void networkReplyDownloadProgress (qint64 bytesReceived, qint64 bytesTotal);
     void networkReplyFinished ();
-    void networkReplyUploadProgress (qint64 bytesSent, qint64 bytesTotal);
     void timeoutTimerTimeout ();
 public:
     static const short int status_UNSENT;
@@ -168,7 +168,7 @@ public:
     static QJSValue QJson2QJS (QJSEngine& jsEngine, const QJsonDocument& value);
     static QString QJS2QString (const QJSValue& value);
     static QJSValue QByteArray2ArrayBuffer (QJSEngine& jsEngine, const QByteArray& value);
-    static QByteArray ArrayBuffer2QByteArray (const QJSValue& value);
+    static QByteArray ArrayBuffer2QByteArray (QJSEngine&, const QJSValue& value);
     static QRegExp RegExp2QRegExp (const QJSValue& jsValue);
     static bool warnJsError (QJSEngine& jsEngine, const QJSValue& jsValue, const QString& msg = QString());
     inline static bool valueIsEmpty (const QJSValue& value) {

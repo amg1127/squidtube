@@ -84,20 +84,20 @@ bool JavascriptNetworkRequest::setPrivateData (const QString& key, const QString
 
 void JavascriptNetworkRequest::cancelRequest (bool emitNetworkRequestFinished) {
     if (this->networkReply != Q_NULLPTR) {
-        this->networkReply->disconnect ();
+        this->networkReply->disconnect (this);
         if (this->networkReply->isRunning()) {
             this->networkReply->abort ();
-            /*
-             * http://doc.qt.io/qt-5/qnetworkaccessmanager.html#sendCustomRequest
-             *
-             * I have to make sure there is no QNetworkReply linked to 'this->requestBodyBuffer',
-             * because I may want to destroy it later...
-             * This statement satisfies that requirement because I just invoked QNetworkReply::abort().
-             * It will emit QNetworkReply::finished() signal and free the link.
-             *
-             */
-            QCoreApplication::processEvents ();
         }
+        /*
+         * http://doc.qt.io/qt-5/qnetworkaccessmanager.html#sendCustomRequest
+         *
+         * I have to make sure there is no QNetworkReply linked to 'this->requestBodyBuffer',
+         * because I may want to destroy it later...
+         * This statement satisfies that requirement because I just invoked QNetworkReply::abort().
+         * It will emit QNetworkReply::finished() signal and free the link.
+         *
+         */
+        QCoreApplication::processEvents ();
         this->networkReply->deleteLater ();
         this->networkReply = Q_NULLPTR;
     }
@@ -162,7 +162,7 @@ void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkMan
             if (! JavascriptBridge::valueIsEmpty (requestMethod)) {
                 this->httpRequestMethod = requestMethod.toString();
                 if (! this->httpRequestMethod.isEmpty()) {
-                    this->requestBodyBuffer.setData (JavascriptBridge::ArrayBuffer2QByteArray (requestBuffer));
+                    this->requestBodyBuffer.setData (JavascriptBridge::ArrayBuffer2QByteArray ((*(this->jsEngine)), requestBuffer));
                     if (! this->requestBodyBuffer.open (QIODevice::ReadOnly)) {
                         qCritical() << QString("[XHR#%1] Internal error while allocating request body buffer: %2").arg(this->networkRequestId).arg(this->requestBodyBuffer.errorString());
                     }
@@ -196,7 +196,6 @@ void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkMan
                     if (synchronousFlagBool) {
                         QEventLoop eventLoop;
                         QObject::connect (this->networkReply, &QNetworkReply::finished, this, &JavascriptNetworkRequest::networkReplyFinished, Qt::DirectConnection);
-#error TODO: BUG: Because I am disconnecting this->networkReply, this event loop never finishes!
                         QObject::connect (this->networkReply, &QNetworkReply::finished, &eventLoop, &QEventLoop::quit);
                         eventLoop.exec ();
                     } else {
@@ -243,15 +242,31 @@ void JavascriptNetworkRequest::fireProgressEvent (QJSValue& callback, qint64 tra
 
 void JavascriptNetworkRequest::appendResponseBuffer () {
     if (this->networkReply->isOpen ()) {
-        QByteArray availableData (this->networkReply->readAll());
-        QJSValue appendResponseBuffer;
-        if (this->getPrivateData ("appendResponseBuffer", appendResponseBuffer)) {
-            JavascriptBridge::warnJsError ((*(this->jsEngine)), appendResponseBuffer.call (QJSValueList() << JavascriptBridge::QByteArray2ArrayBuffer ((*(this->jsEngine)), availableData)), QString("[XHR#%1] Uncaught exception received while appending data to response buffer!").arg(this->networkRequestId));
+        QJSValue responseBuffer;
+        if (this->getPrivateData ("responseBuffer", responseBuffer)) {
+            this->setPrivateData ("responseBuffer", JavascriptBridge::QByteArray2ArrayBuffer ((*(this->jsEngine)), JavascriptBridge::ArrayBuffer2QByteArray ((*(this->jsEngine)), responseBuffer) + this->networkReply->readAll ()));
+        }
+    }
+}
+
+void JavascriptNetworkRequest::networkReplyUploadProgress (qint64 bytesSent, qint64 bytesTotal) {
+    if (this->networkReply->error() == QNetworkReply::NoError) {
+        if (bytesTotal >= 0) {
+            this->fireProgressEvent (true, "onprogress", bytesSent, bytesTotal);
+            if (bytesSent == bytesTotal) {
+                this->setPrivateData ("uploadCompleteFlag", true);
+                this->fireProgressEvent (true, "onload", bytesSent, bytesTotal);
+                this->fireProgressEvent (true, "onloadend", bytesSent, bytesTotal);
+            }
+        } else {
+            this->fireProgressEvent (true, "onprogress", bytesSent, 0);
         }
     }
 }
 
 void JavascriptNetworkRequest::networkReplyDownloadProgress (qint64 bytesReceived, qint64 bytesTotal) {
+#error This function is not called in synchronous mode. Therefore, a synchronous XMLHttpRequest() does not get response headers nor status
+#error This is a bug!
     if (! this->httpStatus) {
         this->httpStatus = this->networkReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     }
@@ -373,29 +388,14 @@ void JavascriptNetworkRequest::networkReplyFinished () {
             requestHeaderReferer.setProperty (0, requestUrl);
             this->setPrivateData ("requestHeaders", "referer", requestHeaderReferer);
         }
-        QString location = this->networkReply->header(QNetworkRequest::LocationHeader).toString();
-        if (location.isEmpty ()) {
-            qInfo() << QString("[XHR#%1] Server replied HTTP status '%2 %3' and did not send a 'Location:' header. I will fetch the same URL again!").arg(this->networkRequestId).arg(this->networkReply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString()).arg(this->httpStatus);
+        QVariant locationVariant = this->networkReply->header(QNetworkRequest::LocationHeader);
+        if (locationVariant.isValid ()) {
+            this->setPrivateData ("requestUrl", this->networkReply->url().resolved (locationVariant.toUrl()).toString());
         } else {
-            this->setPrivateData ("requestUrl", location);
+            qInfo() << QString("[XHR#%1] Server replied HTTP status '%2 %3' and did not send a 'Location:' header. I will fetch the same URL again!").arg(this->networkRequestId).arg(this->networkReply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString()).arg(this->httpStatus);
         }
         this->maxRedirects--;
         this->fulfillRequest (*(this->networkReply->manager ()));
-    }
-}
-
-void JavascriptNetworkRequest::networkReplyUploadProgress (qint64 bytesSent, qint64 bytesTotal) {
-    if (this->networkReply->error() == QNetworkReply::NoError) {
-        if (bytesTotal >= 0) {
-            this->fireProgressEvent (true, "onprogress", bytesSent, bytesTotal);
-            if (bytesSent == bytesTotal) {
-                this->setPrivateData ("uploadCompleteFlag", true);
-                this->fireProgressEvent (true, "onload", bytesSent, bytesTotal);
-                this->fireProgressEvent (true, "onloadend", bytesSent, bytesTotal);
-            }
-        } else {
-            this->fireProgressEvent (true, "onprogress", bytesSent, 0);
-        }
     }
 }
 
@@ -731,7 +731,7 @@ void JavascriptBridge::xmlHttpRequest_setTimeout (const unsigned int networkRequ
 
 QString JavascriptBridge::textDecode (const QJSValue& bytes, const QString& fallbackCharset) {
     QString answer;
-    QByteArray inputBuffer (JavascriptBridge::ArrayBuffer2QByteArray (bytes));
+    QByteArray inputBuffer (JavascriptBridge::ArrayBuffer2QByteArray ((*(this->jsEngine)), bytes));
     QMutexLocker m_lck (&AppRuntime::textCoDecMutex);
     QTextCodec* textCodec = QTextCodec::codecForUtfText (inputBuffer, QTextCodec::codecForName (fallbackCharset.toUtf8()));
     if (textCodec != Q_NULLPTR) {
@@ -833,20 +833,22 @@ QString JavascriptBridge::QJS2QString (const QJSValue& value) {
 
 QJSValue JavascriptBridge::QByteArray2ArrayBuffer (QJSEngine& jsEngine, const QByteArray& value) {
     uint length = value.size ();
-    QJSValue answer;
-    QJSValue uInt8Array (jsEngine.globalObject().property("Uint8Array").callAsConstructor(QJSValueList() << length));
-    if (! JavascriptBridge::warnJsError (jsEngine, uInt8Array, "Uncaught exception while creating 'Uint8Array' object!")) {
-        if (uInt8Array.isObject ()) {
-            for (uint pos = 0; pos < length; pos++) {
-                uInt8Array.setProperty (pos, (unsigned) value[pos]);
+    QJSValue answer = QVariant(value).value<QJSValue>();
+    if (answer.property("byteLength").toUInt() != length) {
+        QJSValue uInt8Array (jsEngine.globalObject().property("Uint8Array").callAsConstructor(QJSValueList() << length));
+        if (! JavascriptBridge::warnJsError (jsEngine, uInt8Array, "Uncaught exception while creating 'Uint8Array' object!")) {
+            if (uInt8Array.isObject ()) {
+                for (uint pos = 0; pos < length; pos++) {
+                    uInt8Array.setProperty (pos, (unsigned) value[pos]);
+                }
+                answer = uInt8Array.property("buffer");
             }
-            answer = uInt8Array.property("buffer");
         }
     }
     return (answer);
 }
 
-QByteArray JavascriptBridge::ArrayBuffer2QByteArray (const QJSValue& value) {
+QByteArray JavascriptBridge::ArrayBuffer2QByteArray (QJSEngine&, const QJSValue& value) {
     return (value.toVariant().toByteArray());
 }
 

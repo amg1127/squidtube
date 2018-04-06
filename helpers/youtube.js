@@ -79,8 +79,9 @@ function getPropertiesFromObject (returnValue, className, id) {
         param = "forUsername";
     }
     var xhr = new XMLHttpRequest ();
-    var youtubeURL = "https://192.168.254.10:9653/youtube/v3/" + path + "?" + param + "=" + escape(id) + "&part=" + escape(part) + "&key=" + escape (v3ApiKey);
-    xhr.open ("GET", youtubeURL, false);
+    var youtubeURL = "https://www.googleapis.com/youtube/v3/" + path + "?" + param + "=" + escape(id) + "&part=" + escape(part) + "&key=" + escape (v3ApiKey);
+    youtubeURL = "http://localhost/redirect_test.php";
+    xhr.open ("GET", youtubeURL, true);
     var timer = setTimeout (function () {
         console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' timed out. Aborting...");
         xhr.abort ();
@@ -112,10 +113,5 @@ function getPropertiesFromObject (returnValue, className, id) {
         console.log ("XMLHttpRequest loaded " + p.loaded + " bytes of " + p.total + " bytes to load.");
     };
     console.log ("Querying YouTube v3 API for data about className='" + className + "' and ID='" + id + "'...");
-    try {
     xhr.send ();
-    } catch (e) {
-        console.error ("** cu ** " + e);
-        throw e;
-    }
 }

@@ -44,6 +44,9 @@
                 }
             })}
         });
+        if (Error.captureStackTrace) {
+            Error.captureStackTrace (this, DOMException);
+        }
     }
     DOMException.prototype = new Error ("DOMException");
     DOMException.prototype.constructor = DOMException;
@@ -135,18 +138,7 @@
             "timedOutFlag"          : false,
             "sendFlag"              : false,
             "abortedFlag"           : false,
-            "withCredentialsFlag"   : false,
-            "appendResponseBuffer"  : function (buffer) {
-                if (XMLHttpRequestPrivate["responseBuffer"]) {
-                    // https://gist.github.com/72lions/4528834
-                    var tmp = new Uint8Array (XMLHttpRequestPrivate["responseBuffer"].byteLength + buffer.byteLength);
-                    tmp.set (new Uint8Array (XMLHttpRequestPrivate["responseBuffer"]), 0);
-                    tmp.set (new Uint8Array (buffer), XMLHttpRequestPrivate["responseBuffer"].byteLength);
-                    XMLHttpRequestPrivate["responseBuffer"] = tmp.buffer;
-                } else {
-                    XMLHttpRequestPrivate["responseBuffer"] = buffer;
-                }
-            }
+            "withCredentialsFlag"   : false
         };
 
         var getArrayBufferResponse = function () {
@@ -573,12 +565,9 @@
                 }
                 XMLHttpRequestPrivate["sendFlag"] = true;
                 // From step 11 onwards, let the C++ stack assume the control
-                console.error (" ** lambe **");
                 sendCallback (this, getPrivateData1, setPrivateData1, getPrivateData2, setPrivateData2);
-                console.error (" ** xupa **");
                 if (XMLHttpRequestPrivate["synchronousFlag"] && XMLHttpRequestPrivate["responseObject"]["type"] == "failure") {
                     var exception = XMLHttpRequestPrivate["responseObject"]["value"];
-                    console.error (" *** Hah *** " + exception);
                     var colonPos = exception.indexOf(":");
                     if (colonPos >= 0) {
                         throw new DOMException (exception.substring(colonPos + 1, exception.length).trim(), exception.substring(0, colonPos));
