@@ -30,8 +30,8 @@ void JobWorker::processSupportedUrls (int helperInstance, const QJSValue& appHel
             QRegExp regExpSupportedUrl;
             if (appHelperSupportedUrl.isString ()) {
                 regExpSupportedUrl = QRegExp (appHelperSupportedUrl.toString(), Qt::CaseInsensitive, QRegExp::WildcardUnix);
-            } else if (appHelperSupportedUrl.isRegExp ()) {
-                regExpSupportedUrl = appHelperSupportedUrl.toVariant().toRegExp();
+            } else {
+                regExpSupportedUrl = JavascriptBridge::RegExp2QRegExp (appHelperSupportedUrl);
             }
             if (regExpSupportedUrl.isValid ()) {
                 if (regExpSupportedUrl.isEmpty ()) {
@@ -73,7 +73,7 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
             qint64 objectTimestamp;
             CacheStatus cacheStatus = appHelperInfo->memoryCache->read (squidRequest.objectClassName, squidRequest.objectId, this->currentTimestamp, objectData, objectTimestamp);
             if (cacheStatus == CacheHitPositive) {
-                qInfo() << QString("[%1] Information retrieved from the cache concerning 'className=%2, id=%3' is fresh. Now the matching test begins.").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
+                qDebug() << QString("[%1] Information retrieved from the cache concerning 'className=%2, id=%3' is fresh. Now the matching test begins.").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
                 bool matchResult = this->processCriteria (
                     squidRequest.requestHelperName,
                     squidRequest.requestProperties.count(),
@@ -98,7 +98,7 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                     this->retryTimer->start (AppConstants::AppHelperTimerTimeout);
                 }
             } else if (cacheStatus == CacheMiss) {
-                qInfo() << QString("[%1] Information concerning 'className=%2, id=%3' was not found in the cache. Invoking 'getPropertiesFromObject ();', RequestID #%4").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(requestId);
+                qDebug() << QString("[%1] Information concerning 'className=%2, id=%3' was not found in the cache. Invoking 'getPropertiesFromObject ();', RequestID #%4").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(requestId);
                 this->runningRequests[requestId] = squidRequest;
                 // Note: remember the reminder saved into 'objectcache.cpp'...
                 QJsonDocument empty;
@@ -115,7 +115,7 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                     this->squidResponseOut (requestId, "'getPropertiesFromObject ();' function returned an error!", true, false);
                 }
             } else {
-                qFatal ("Unexpected code flow!");
+                qFatal("Unexpected code flow!");
             }
         }
     } else {
@@ -303,13 +303,13 @@ bool JobWorker::processCriteria (
                 } else if (requestPropertiesItem.matchQuantity == MatchAny) {
                     return (false);
                 } else {
-                    qFatal ("Unexpected code flow!");
+                    qFatal("Unexpected code flow!");
                 }
             } else {
                 qInfo() << QString("[%1] Unexpected JSON type '%2' while parsing '%3'. A '%4' was expected.").arg(requestHelperName).arg(JobWorker::jsonType(jsonValueInformation)).arg(requestPropertiesItem.componentName).arg(JobWorker::jsonType(QJsonValue::Array));
             }
         } else {
-            qFatal ("Unexpected code flow!");
+            qFatal("Unexpected code flow!");
         }
     } else {
         // Match the leaf as Bool, Double or String
@@ -446,7 +446,7 @@ JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
     rngdInitialized (false),
     requestChannel (requestChannel),
     runtimeEnvironment (new QJSEngine (this)),
-    javascriptBridge (new JavascriptBridge ((*runtimeEnvironment), requestChannel)),
+    javascriptBridge (new JavascriptBridge ((*runtimeEnvironment), requestChannel, this)),
     requestId (1),
     retryTimer (new QTimer (this)),
     currentTimestamp (0) {
@@ -460,7 +460,7 @@ JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
         appHelperInfo->databaseCache = new ObjectCacheDatabase (appHelperInfo->name, AppRuntime::dbTblPrefix);
         appHelperInfo->memoryCache = new ObjectCacheMemory (appHelperInfo->name, (*(appHelperInfo->databaseCache)));
         appHelperInfo->entryPoint = this->runtimeEnvironment->evaluate (AppRuntime::helperSourcesByName[appHelperInfo->name], AppConstants::AppHelperSubDir + "/" + appHelperInfo->name + AppConstants::AppHelperExtension);
-        if (! JavascriptBridge::warnJsError (appHelperInfo->entryPoint, QString("A Javascript exception occurred while the helper '%1' was initializing. It will be disabled!").arg(appHelperInfo->name))) {
+        if (! JavascriptBridge::warnJsError ((*runtimeEnvironment), appHelperInfo->entryPoint, QString("A Javascript exception occurred while the helper '%1' was initializing. It will be disabled!").arg(appHelperInfo->name))) {
             this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, this->helperInstances.count(), JavascriptMethod::getSupportedUrls);
         }
     }
@@ -559,9 +559,9 @@ void JobWorker::quit () {
         qInfo() << QString("Finished handler for channel #%1.").arg(this->requestChannel);
         emit finished ();
     } else if (numPendingRequests == 1) {
-        qInfo() << QString("Finish request received by handler for channel #%1, but there is a pending answer.").arg(this->requestChannel);
+        qInfo() << QString("A finish request was received by handler for channel #%1, but there is a pending answer.").arg(this->requestChannel);
     } else {
-        qInfo() << QString("Finish request received by handler for channel #%1, but there are %2 pending answers.").arg(this->requestChannel).arg(numPendingRequests);
+        qInfo() << QString("A finish request was received by handler for channel #%1, but there are %2 pending answers.").arg(this->requestChannel).arg(numPendingRequests);
     }
 }
 
@@ -588,7 +588,7 @@ JobCarrier::~JobCarrier () {
 
 void JobCarrier::start (QThread::Priority priority) {
     if (this->started) {
-        qFatal ("Invalid procedure call: this method must be called only once!");
+        qFatal("Invalid procedure call: this method must be called only once!");
     } else {
         this->threadObj->start (priority);
         this->started = true;

@@ -79,36 +79,43 @@ function getPropertiesFromObject (returnValue, className, id) {
         param = "forUsername";
     }
     var xhr = new XMLHttpRequest ();
-    var youtubeURL = "https://www.googleapis.com/youtube/v3/" + path + "?" + param + "=" + escape(id) + "&part=" + escape(part) + "&key=" + escape (v3ApiKey);
-    xhr.open ("GET", youtubeURL, true);
+    var youtubeURL = "https://192.168.254.10:9653/youtube/v3/" + path + "?" + param + "=" + escape(id) + "&part=" + escape(part) + "&key=" + escape (v3ApiKey);
+    xhr.open ("GET", youtubeURL, false);
     var timer = setTimeout (function () {
         console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' timed out. Aborting...");
         xhr.abort ();
-    }, 30000);
-    xhr.timeout = 5000;
+    }, 120000);
+    xhr.timeout = 30000;
     xhr.responseType = "json";
     xhr.onload = function () {
         clearTimeout (timer);
         if (xhr.status >= 200 && xhr.status < 300) {
-            var jsonResponse = xhr.response;
             console.log ("Data about className='" + className + "' and ID='" + id + "' was retrieved successfully.");
-            returnValue (jsonResponse.items[0]);
+            returnValue (xhr.response.items[0]);
         } else {
             console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' returned HTTP status code " + xhr.status + ": '" + xhr.statusText + "'!");
-            returnValue (null);
         }
     };
     xhr.onerror = function () {
         console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' failed!");
-        returnValue (null);
+    };
+    xhr.ontimeout = function () {
+        console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' timed out!");
     };
     xhr.onabort = function () {
         console.warn ("XMLHttpRequest() for className='" + className + "' and ID='" + id + "' was aborted!");
-        returnValue (null);
     };
     xhr.onreadystatechange = function () {
         console.log ("XMLHttpRequest.readyState is now #" + xhr.readyState + "...");
-    }
-    xhr.send ();
+    };
+    xhr.onprogress = function (p) {
+        console.log ("XMLHttpRequest loaded " + p.loaded + " bytes of " + p.total + " bytes to load.");
+    };
     console.log ("Querying YouTube v3 API for data about className='" + className + "' and ID='" + id + "'...");
+    try {
+    xhr.send ();
+    } catch (e) {
+        console.error ("** cu ** " + e);
+        throw e;
+    }
 }

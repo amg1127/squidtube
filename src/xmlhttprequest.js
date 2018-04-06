@@ -416,6 +416,9 @@
             "HEADERS_RECEIVED"     : { "value": status_HEADERS_RECEIVED },
             "LOADING"              : { "value": status_LOADING },
             "DONE"                 : { "value": status_DONE },
+            "readyState"           : { "get": (function () {
+                return (XMLHttpRequestPrivate["state"]);
+            })},
 
             // request
             "open"                 : { "value": (function (method, url, async, username, password) {
@@ -570,9 +573,12 @@
                 }
                 XMLHttpRequestPrivate["sendFlag"] = true;
                 // From step 11 onwards, let the C++ stack assume the control
+                console.error (" ** lambe **");
                 sendCallback (this, getPrivateData1, setPrivateData1, getPrivateData2, setPrivateData2);
+                console.error (" ** xupa **");
                 if (XMLHttpRequestPrivate["synchronousFlag"] && XMLHttpRequestPrivate["responseObject"]["type"] == "failure") {
                     var exception = XMLHttpRequestPrivate["responseObject"]["value"];
+                    console.error (" *** Hah *** " + exception);
                     var colonPos = exception.indexOf(":");
                     if (colonPos >= 0) {
                         throw new DOMException (exception.substring(colonPos + 1, exception.length).trim(), exception.substring(0, colonPos));

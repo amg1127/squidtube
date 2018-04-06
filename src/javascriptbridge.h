@@ -3,8 +3,8 @@
 
 #include "appruntime.h"
 
+#include <QBuffer>
 #include <QCoreApplication>
-#include <QDataStream>
 #include <QDateTime>
 #include <QEventLoop>
 #include <QJSEngine>
@@ -60,8 +60,7 @@ private:
     QJSValue getPrivateDataCallback2;
     QJSValue setPrivateDataCallback1;
     QJSValue setPrivateDataCallback2;
-    QByteArray requestBody;
-    QDataStream* requestBodyStream;
+    QBuffer requestBodyBuffer;
     QNetworkReply* networkReply;
     QTimer timeoutTimer;
     bool downloadStarted;
@@ -74,7 +73,8 @@ private:
     void cancelRequest (bool emitNetworkRequestFinished = false);
     void fulfillRequest (QNetworkAccessManager& networkManager);
     void fireProgressEvent (bool isUpload, const QString& callback, qint64 transmitted, qint64 length);
-    void fireProgressEvent (const QJSValue& callback, qint64 transmitted, qint64 length);
+    void fireProgressEvent (QJSValue& callback, qint64 transmitted, qint64 length);
+    void appendResponseBuffer ();
     inline bool isGetOrHeadRequest () {
         return (! (this->httpRequestMethod.compare("GET", Qt::CaseInsensitive) &&
                    this->httpRequestMethod.compare("HEAD", Qt::CaseInsensitive)));
@@ -106,13 +106,13 @@ public:
     static const short int status_HEADERS_RECEIVED;
     static const short int status_LOADING;
     static const short int status_DONE;
-    JavascriptNetworkRequest (QObject* parent = Q_NULLPTR);
+    JavascriptNetworkRequest (QJSEngine& jsEngine, QObject *parent = Q_NULLPTR);
     ~JavascriptNetworkRequest ();
     void setTimerInterval (int msec);
-    inline void setXMLHttpRequestObject (QJSValue& object) {
+    inline void setXMLHttpRequestObject (const QJSValue& object) {
         this->xmlHttpRequestObject = object;
     }
-    inline void setPrivateDataCallbacks (QJSValue& getPrivateData1, QJSValue& setPrivateData1, QJSValue& getPrivateData2, QJSValue& setPrivateData2) {
+    inline void setPrivateDataCallbacks (const QJSValue& getPrivateData1, const QJSValue& setPrivateData1, const QJSValue& getPrivateData2, const QJSValue& setPrivateData2) {
         this->getPrivateDataCallback1 = getPrivateData1;
         this->setPrivateDataCallback1 = setPrivateData1;
         this->getPrivateDataCallback2 = getPrivateData2;
@@ -127,6 +127,7 @@ signals:
 class JavascriptBridge : public QObject {
     Q_OBJECT
 private:
+    QJSEngine* jsEngine;
     QJSValue myself;
     QString requestChannel;
     QMap<unsigned int,unsigned int> pendingTransactions;
@@ -137,16 +138,12 @@ private:
     QNetworkAccessManager* networkManager;
     QMap<unsigned int, JavascriptNetworkRequest*> pendingNetworkRequests;
     unsigned int networkRequestId;
+    unsigned int createTimer (const bool repeat, const QJSValue& callback, const int interval);
     static QJsonValue QJS2QJsonValue (const QJSValue& value);
     static QJSValue QJson2QJS (QJSEngine& jsEngine, const QJsonValue& value);
-    unsigned int createTimer (const bool repeat, const QJSValue& callback, const int interval);
 public:
-    JavascriptBridge (QJSEngine& jsEngine, const QString& requestChannel);
+    JavascriptBridge (QJSEngine& jsEngine, const QString& requestChannel, QObject* parent = Q_NULLPTR);
     ~JavascriptBridge ();
-    static QJsonDocument QJS2QJsonDocument (const QJSValue& value);
-    static QJSValue QJson2QJS (QJSEngine& jsEngine, const QJsonDocument& value);
-    static QString QJS2QString (const QJSValue& value);
-    static bool warnJsError (const QJSValue& jsValue, const QString& msg = QString());
     bool invokeMethod (QJSValue& entryPoint, unsigned int context, int method, QJSValue args = QJSValue(QJSValue::UndefinedValue));
     bool invokeMethod (QJSValue& entryPoint, unsigned int context, const QString& method, QJSValue args = QJSValue(QJSValue::UndefinedValue));
     // http://doc.qt.io/qt-5/qtqml-cppintegration-data.html#conversion-between-qt-and-javascript-types
@@ -156,17 +153,27 @@ public:
     Q_INVOKABLE unsigned int setInterval (const QJSValue& callback, const int interval);
     Q_INVOKABLE void clearTimeout (unsigned int timerId);
     Q_INVOKABLE void clearInterval (unsigned int timerId);
-    Q_INVOKABLE void xmlHttpRequest_send (QJSValue& object, QJSValue& getPrivateData1, QJSValue& setPrivateData1, QJSValue& getPrivateData2, QJSValue& setPrivateData2);
+    Q_INVOKABLE void xmlHttpRequest_send (const QJSValue& object, const QJSValue& getPrivateData1, const QJSValue& setPrivateData1, const QJSValue& getPrivateData2, const QJSValue& setPrivateData2);
     Q_INVOKABLE void xmlHttpRequest_abort (const unsigned int networkRequestId);
     Q_INVOKABLE void xmlHttpRequest_setTimeout (const unsigned int networkRequestId, const int msec);
-    Q_INVOKABLE QString textDecode (const QByteArray& bytes, const QString& fallbackCharset);
-    Q_INVOKABLE QByteArray textEncode (const QString& string, const QString& charset);
+    Q_INVOKABLE QString textDecode (const QJSValue& bytes, const QString& fallbackCharset);
+    Q_INVOKABLE QJSValue textEncode (const QString& string, const QString& charset);
 #if (QT_VERSION < QT_VERSION_CHECK(5, 6, 0))
     Q_INVOKABLE void console_log (const QJSValue& msg);
     Q_INVOKABLE void console_info (const QJSValue& msg);
     Q_INVOKABLE void console_warn (const QJSValue& msg);
     Q_INVOKABLE void console_error (const QJSValue& msg);
 #endif
+    static QJsonDocument QJS2QJsonDocument (const QJSValue& value);
+    static QJSValue QJson2QJS (QJSEngine& jsEngine, const QJsonDocument& value);
+    static QString QJS2QString (const QJSValue& value);
+    static QJSValue QByteArray2ArrayBuffer (QJSEngine& jsEngine, const QByteArray& value);
+    static QByteArray ArrayBuffer2QByteArray (const QJSValue& value);
+    static QRegExp RegExp2QRegExp (const QJSValue& jsValue);
+    static bool warnJsError (QJSEngine& jsEngine, const QJSValue& jsValue, const QString& msg = QString());
+    inline static bool valueIsEmpty (const QJSValue& value) {
+        return (value.isUndefined() || value.isNull());
+    }
 private slots:
     void timerFinished (unsigned int timerId);
     void networkRequestFinished (unsigned int networkRequestId);
