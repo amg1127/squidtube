@@ -145,18 +145,22 @@ void JobWorker::processPropertiesFromObject (unsigned int requestId, const QJSVa
         if (! appHelperInfo->memoryCache->write (squidRequest.objectClassName, squidRequest.objectId, objectData, this->currentTimestamp)) {
             qCritical() << QString("[%1] Failed to save object information! 'className=%2, id=%3, rawData=%4'!").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(QString::fromUtf8 (objectData.toJson (QJsonDocument::Compact)));
         }
-        bool matchResult = this->processCriteria (
-            squidRequest.requestHelperName,
-            squidRequest.requestProperties.count(),
-            squidRequest.requestProperties.constBegin(),
-            squidRequest.requestMathMatchOperator,
-            squidRequest.requestCaseSensitivity,
-            squidRequest.requestPatternSyntax,
-            squidRequest.requestInvertMatch,
-            squidRequest.requestCriteria,
-            objectData
-        );
-        this->squidResponseOut (requestId, QString("Retrieved data from the object with 'className=%1, id=%2' %3 specified criteria.").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), false, matchResult);
+        if (objectData.object().count()) {
+            bool matchResult = this->processCriteria (
+                squidRequest.requestHelperName,
+                squidRequest.requestProperties.count(),
+                squidRequest.requestProperties.constBegin(),
+                squidRequest.requestMathMatchOperator,
+                squidRequest.requestCaseSensitivity,
+                squidRequest.requestPatternSyntax,
+                squidRequest.requestInvertMatch,
+                squidRequest.requestCriteria,
+                objectData
+            );
+            this->squidResponseOut (requestId, QString("Retrieved data from the object with 'className=%1, id=%2' %3 specified criteria.").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), false, matchResult);
+        } else {
+            this->squidResponseOut (requestId, QString("Unable to retrieve data from the object with 'className=%1, id=%2'!").arg(squidRequest.objectClassName).arg(squidRequest.objectId), true, false);
+        }
     } else {
         qWarning() << QString("Invalid returned data: requestId=%1 , data='%2'").arg(requestId).arg(JavascriptBridge::QJS2QString(appHelperPropertiesFromObject));
     }

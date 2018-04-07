@@ -314,7 +314,7 @@
                 if (charset.toLowerCase() == 'utf7-empty') {
                     data = "";
                 } else {
-                    data = textDecode (buffer, charset);
+                    data = textDecode (XMLHttpRequestPrivate["responseBuffer"], charset);
                 }
             }
             XMLHttpRequestPrivate["responseTextLength"] = XMLHttpRequestPrivate["responseBuffer"].byteLength;
@@ -456,7 +456,7 @@
                     }
                 }
             })},
-            "setRequestReader"     : { "value": (function (name, value) {
+            "setRequestHeader"     : { "value": (function (name, value) {
                 if (XMLHttpRequestPrivate["state"] != status_OPENED) {
                     throw new DOMException ("XMLHttpRequest state is " + XMLHttpRequestPrivate["state"], "InvalidStateError");
                 }
@@ -521,27 +521,58 @@
                 if (body) {
                     var encoding = null;
                     var mimeType = null;
-                    if (body instanceof String) {
-                        encoding = 'UTF-8';
-                        XMLHttpRequestPrivate["requestBuffer"] = textEncode (body, encoding);
-                    } else if (body instanceof Blob) {
-                        throw new DOMException ("This XMLHttpRequest implementation can not receive a BLOB request body", "NotFoundError");
-                    } else if (body instanceof ArrayBuffer) {
-                        XMLHttpRequestPrivate["requestBuffer"] = body.slice (0);
-                        mimeType = 'application/octet-stream';
-                    } else if (body instanceof Object) {
-                        // I believe the caller intends to send JSON data...
-                        encoding = 'UTF-8';
-                        XMLHttpRequestPrivate["requestBuffer"] = textEncode (JSON.stringify (body), encoding);
-                    } else {
-                        throw new DOMException ("Unmanageable request body type: '" + (typeof body) + "'!", "SyntaxError");
+                    if (! (encoding || mimeType)) {
+                        try {
+                            if ((body instanceof String) || (typeof body) == "string") {
+                                encoding = 'UTF-8';
+                                XMLHttpRequestPrivate["requestBuffer"] = textEncode (body, encoding);
+                            }
+                        } finally {
+                        }
+                    }
+                    if (! (encoding || mimeType)) {
+                        try {
+                            if (body instanceof Blob) {
+                                mimeType = 'application/octet-stream';
+                            }
+                        } finally {
+                        }
+                        if (mimeType) {
+                            throw new DOMException ("This XMLHttpRequest implementation can not receive a BLOB request body", "NotFoundError");
+                        }
+                    }
+                    if (! (encoding || mimeType)) {
+                        try {
+                            if (body instanceof ArrayBuffer) {
+                                mimeType = 'application/octet-stream';
+                                XMLHttpRequestPrivate["requestBuffer"] = body;
+                            }
+                        } finally {
+                        }
+                    }
+                    if (! (encoding || mimeType)) {
+                        try {
+                            if (body instanceof Object) {
+                                // I believe the caller intends to send JSON data...
+                                encoding = 'UTF-8';
+                                XMLHttpRequestPrivate["requestBuffer"] = textEncode (JSON.stringify (body), encoding);
+                            }
+                        } finally {
+                        }
+                    }
+                    if (! (encoding || mimeType)) {
+                        if ((typeof body) == "object") {
+                            throw new DOMException ("Unmanageable request body type: '" + body.constructor.name + "'!", "SyntaxError");
+                        } else {
+                            throw new DOMException ("Unmanageable request body type: '" + (typeof body) + "'!", "SyntaxError");
+                        }
                     }
                     if (mimeType) {
                         if (! XMLHttpRequestPrivate["requestHeaders"]["content-type"]) {
                             XMLHttpRequestPrivate["requestHeaders"]["content-type"] = [mimeType];
                         }
                     }
-                    if (encoding) {
+                    if (encoding && XMLHttpRequestPrivate["requestHeaders"]["content-type"]) {
                         var contentTypeLen = XMLHttpRequestPrivate["requestHeaders"]["content-type"].length;
                         var contentTypePos, contentTypeValue, specifiedMimeType;
                         for (contentTypePos = 0; contentTypePos < contentTypeLen; contentTypePos++) {
@@ -549,7 +580,7 @@
                             specifiedMimeType = parseContentType (contentTypeValue);
                             if (specifiedMimeType) {
                                 if (specifiedMimeType["mimeType"] && specifiedMimeType["charset"] != encoding) {
-                                    XMLHttpRequestPrivate["requestHeaders"]["content-type"][contentTypePos] = contentTypeValue.replace (/\s*;\s*charset\s*=\s*([\w-]+|"([^"\\]|\\.)*")\s*/gi, '; charset="' + encoding.replace(/["\\]/g, '\\$1').replace(/\$/g, '$$') + "'");
+                                    XMLHttpRequestPrivate["requestHeaders"]["content-type"][contentTypePos] = contentTypeValue.replace (/\s*;\s*charset\s*=\s*([\w-]+|"([^"\\]|\\.)*")\s*/gi, '; charset="' + encoding.replace(/["\\]/g, '\\$1').replace(/\$/g, '$$') + '"');
                                 }
                             }
                         }
@@ -560,6 +591,10 @@
                 XMLHttpRequestPrivate["uploadCompleteFlag"] = false;
                 XMLHttpRequestPrivate["timedOutFlag"] = false;
                 XMLHttpRequestPrivate["abortedFlag"] = false; // The XMLHttpRequest specification did not rule this...
+                XMLHttpRequestPrivate["status"] = 0;          // The XMLHttpRequest specification did not rule this...
+                XMLHttpRequestPrivate["statusText"] = '';     // The XMLHttpRequest specification did not rule this...
+                XMLHttpRequestPrivate["responseURL"] = '';    // The XMLHttpRequest specification did not rule this...
+
                 if (! body) {
                     XMLHttpRequestPrivate["uploadCompleteFlag"] = true;
                 }

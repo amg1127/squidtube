@@ -17,6 +17,7 @@ ObjectCache::ObjectCache (const QString& helperName, ObjectCache* lowerCache) :
 
 CacheStatus ObjectCache::read (const QString& className, const QString& id, const qint64 timestampNow, QJsonDocument& data, qint64& timestampCreated) {
     bool cacheHit = false;
+    bool fromLower = false;
     CacheStatus returnValue = CacheMiss;
     QJsonDocument _data;
     qint64 _timestampCreated;
@@ -30,12 +31,16 @@ CacheStatus ObjectCache::read (const QString& className, const QString& id, cons
     if ((! cacheHit) && this->lowerCache != Q_NULLPTR) {
         returnValue = this->lowerCache->read (className, id, timestampNow, _data, _timestampCreated);
         cacheHit = (returnValue != CacheMiss);
+        fromLower = true;
     }
     if (cacheHit && returnValue == CacheMiss) {
         returnValue = ObjectCache::jsonDocumentIsFresh (_data, _timestampCreated, timestampNow);
         cacheHit = (returnValue != CacheMiss);
     }
     if (cacheHit) {
+        if (lockStatus && fromLower) {
+            this->unlockedWrite (className, id, _data, _timestampCreated);
+        }
         if (returnValue == CacheHitNegative || ObjectCache::jsonDocumentHasData (_data)) {
             data = _data;
             timestampCreated = _timestampCreated;
@@ -65,7 +70,7 @@ CacheStatus ObjectCache::read (const QString& className, const QString& id, cons
 
 bool ObjectCache::write (const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated) {
     bool returnValue = true;
-    qDebug() << QString("[%1] Trying to write on %2 cache information concerning 'className=%3, id=%4'...").arg(this->helperName).arg(this->cacheType).arg(className).arg(id);
+    qDebug() << QString("[%1] Trying to write into %2 cache information concerning 'className=%3, id=%4'...").arg(this->helperName).arg(this->cacheType).arg(className).arg(id);
     if (this->lock ()) {
         returnValue = this->unlockedWrite (className, id, data, timestampCreated);
         if (! this->unlock ()) {

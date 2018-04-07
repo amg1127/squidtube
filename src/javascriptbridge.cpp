@@ -146,67 +146,73 @@ void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkMan
         }
         QNetworkRequest networkRequest (url);
         QJSValueIterator requestHeader (requestHeaders);
+        QString requestHeaderName;
+        QJSValue requestHeaderValueList;
+        uint requestHeaderValueListLength;
+        uint requestHeaderValueListPos;
+        QStringList requestHeaderValues;
+        QJSValue requestHeaderValue;
         while (requestHeader.hasNext ()) {
             requestHeader.next ();
-            QString requestHeaderName (requestHeader.name());
-            QJSValue requestHeaderValue (requestHeader.value().property("join").call(QJSValueList() << ","));
-            if (JavascriptBridge::warnJsError ((*(this->jsEngine)), requestHeaderValue, QString("[XHR#%1] Internal error while fetching request header '%2'!").arg(this->networkRequestId).arg(requestHeaderName))) {
-                break;
-            } else {
-                networkRequest.setRawHeader (requestHeaderName.toLocal8Bit(), requestHeaderValue.toString().toLocal8Bit());
+            requestHeaderName = requestHeader.name();
+            requestHeaderValueList = requestHeader.value();
+            if (requestHeaderValueList.isArray()) {
+                requestHeaderValueListLength = requestHeaderValueList.property("length").toUInt();
+                for (requestHeaderValueListPos = 0; requestHeaderValueListPos < requestHeaderValueListLength; requestHeaderValueListPos++) {
+                    requestHeaderValue = requestHeaderValueList.property(requestHeaderValueListPos);
+                    if (! JavascriptBridge::valueIsEmpty (requestHeaderValue)) {
+                        requestHeaderValues.append (requestHeaderValue.toString());
+                    }
+                }
+                networkRequest.setRawHeader (requestHeaderName.toLocal8Bit(), requestHeaderValues.join(',').toLocal8Bit());
+                requestHeaderValues.clear ();
             }
         }
-        if (! requestHeader.hasNext ()) {
-            // Override the User Agent
-            networkRequest.setRawHeader ("user-agent", QString("%1.%2/%3").arg(APP_owner_name).arg(APP_project_name).arg(APP_project_version).toLocal8Bit());
-            if (! JavascriptBridge::valueIsEmpty (requestMethod)) {
-                this->httpRequestMethod = requestMethod.toString();
-                if (! this->httpRequestMethod.isEmpty()) {
-                    this->requestBodyBuffer.setData (JavascriptBridge::ArrayBuffer2QByteArray ((*(this->jsEngine)), requestBuffer));
-                    if (! this->requestBodyBuffer.open (QIODevice::ReadOnly)) {
-                        qCritical() << QString("[XHR#%1] Internal error while allocating request body buffer: %2").arg(this->networkRequestId).arg(this->requestBodyBuffer.errorString());
-                    }
-                    bool uploadCompleteFlagBool = uploadCompleteFlag.toBool();
-                    qint64 requestBodySize = this->requestBodyBuffer.size();
-                    if (! this->isGetOrHeadRequest ()) {
-                        if ((! uploadCompleteFlagBool) || requestBodySize > 0) {
-                            networkRequest.setRawHeader ("content-length", QString::number(requestBodySize).toLocal8Bit());
-                        }
-                    }
-                    bool synchronousFlagBool = synchronousFlag.toBool();
-                    if (! synchronousFlagBool) {
-                        this->fireProgressEvent (false, "onloadstart", 0, 0);
-                        if (! uploadCompleteFlagBool) {
-                            this->fireProgressEvent (true, "onloadstart", 0, requestBodySize);
-                            QJSValue state, sendFlag;
-                            bool fetchedState = (this->getPrivateData ("state", state) && this->getPrivateData ("sendFlag", sendFlag));
-                            if ((! fetchedState) || state.toInt() != JavascriptNetworkRequest::status_OPENED || (! sendFlag.toBool())) {
-                                this->cancelRequest (true);
-                                return;
-                            }
-                        }
-                    }
-                    int msec = requestTimeout.toInt ();
-                    qDebug() << QString("[XHR#%1] Performing a HTTP %2 request against '%3'...").arg(this->networkRequestId).arg(this->httpRequestMethod).arg(url.toString(QUrl::RemoveUserInfo | QUrl::RemoveQuery));
-                    this->downloadStarted = false;
-                    this->httpStatus = 0;
-                    this->networkReply = networkManager.sendCustomRequest (networkRequest, this->httpRequestMethod.toLocal8Bit(), &(this->requestBodyBuffer));
-                    QObject::connect (&(this->timeoutTimer), &QTimer::timeout, this->networkReply, &QNetworkReply::abort);
-                    this->setTimerInterval (msec);
-                    if (synchronousFlagBool) {
-                        QEventLoop eventLoop;
-                        QObject::connect (this->networkReply, &QNetworkReply::finished, this, &JavascriptNetworkRequest::networkReplyFinished, Qt::DirectConnection);
-                        QObject::connect (this->networkReply, &QNetworkReply::finished, &eventLoop, &QEventLoop::quit);
-                        eventLoop.exec ();
-                    } else {
-                        QObject::connect (this->networkReply, &QNetworkReply::finished, this, &JavascriptNetworkRequest::networkReplyFinished);
-                        QObject::connect (this->networkReply, &QNetworkReply::downloadProgress, this, &JavascriptNetworkRequest::networkReplyDownloadProgress);
-                        if (! uploadCompleteFlagBool) {
-                            QObject::connect (this->networkReply, &QNetworkReply::uploadProgress, this, &JavascriptNetworkRequest::networkReplyUploadProgress);
-                        }
-                    }
-                    return;
+        // Override the User Agent
+        networkRequest.setRawHeader ("user-agent", QString("%1.%2/%3").arg(APP_owner_name).arg(APP_project_name).arg(APP_project_version).toLocal8Bit());
+        if (! JavascriptBridge::valueIsEmpty (requestMethod)) {
+            this->synchronousFlag = synchronousFlag.toBool();
+            this->requestMethod = requestMethod.toString();
+            if (! this->requestMethod.isEmpty()) {
+                this->requestBodyBuffer.setData (JavascriptBridge::ArrayBuffer2QByteArray ((*(this->jsEngine)), requestBuffer));
+                if (! this->requestBodyBuffer.open (QIODevice::ReadOnly)) {
+                    qCritical() << QString("[XHR#%1] Internal error while allocating request body buffer: %2").arg(this->networkRequestId).arg(this->requestBodyBuffer.errorString());
                 }
+                bool uploadCompleteFlagBool = uploadCompleteFlag.toBool();
+                qint64 requestBodySize = this->requestBodyBuffer.size();
+                if (! this->isGetOrHeadRequest ()) {
+                    if ((! uploadCompleteFlagBool) || requestBodySize > 0) {
+                        networkRequest.setRawHeader ("content-length", QString::number(requestBodySize).toLocal8Bit());
+                    }
+                }
+                this->fireProgressEvent (false, "onloadstart", 0, 0);
+                if (! uploadCompleteFlagBool) {
+                    this->fireProgressEvent (true, "onloadstart", 0, requestBodySize);
+                    QJSValue state, sendFlag;
+                    bool fetchedState = (this->getPrivateData ("state", state) && this->getPrivateData ("sendFlag", sendFlag));
+                    if ((! fetchedState) || state.toInt() != JavascriptNetworkRequest::status_OPENED || (! sendFlag.toBool())) {
+                        this->cancelRequest (true);
+                        return;
+                    }
+                }
+                int msec = requestTimeout.toInt ();
+                qDebug() << QString("[XHR#%1] Performing a HTTP %2 request against '%3'...").arg(this->networkRequestId).arg(this->requestMethod).arg(url.toString(QUrl::RemoveUserInfo | QUrl::RemoveQuery));
+                this->downloadStarted = false;
+                this->responseStatus = 0;
+                this->networkReply = networkManager.sendCustomRequest (networkRequest, this->requestMethod.toLocal8Bit(), &(this->requestBodyBuffer));
+                QObject::connect (&(this->timeoutTimer), &QTimer::timeout, this->networkReply, &QNetworkReply::abort);
+                this->setTimerInterval (msec);
+                QObject::connect (this->networkReply, &QNetworkReply::finished, this, &JavascriptNetworkRequest::networkReplyFinished);
+                QObject::connect (this->networkReply, &QNetworkReply::downloadProgress, this, &JavascriptNetworkRequest::networkReplyDownloadProgress);
+                if (! uploadCompleteFlagBool) {
+                    QObject::connect (this->networkReply, &QNetworkReply::uploadProgress, this, &JavascriptNetworkRequest::networkReplyUploadProgress);
+                }
+                if (this->synchronousFlag) {
+                    QEventLoop eventLoop;
+                    QObject::connect (this->networkReply, &QNetworkReply::finished, &eventLoop, &QEventLoop::quit);
+                    eventLoop.exec ();
+                }
+                return;
             }
         }
     }
@@ -214,29 +220,40 @@ void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkMan
 }
 
 void JavascriptNetworkRequest::fireProgressEvent (bool isUpload, const QString& callback, qint64 transmitted, qint64 length) {
-    if (callback.startsWith ("on")) {
-        QJSValue jsCallback;
-        if (isUpload) {
-            jsCallback = this->xmlHttpRequestObject.property("upload").property(callback);
+    if (! this->synchronousFlag) {
+        if (callback.startsWith ("on")) {
+            QJSValue jsCallback;
+            if (isUpload) {
+                jsCallback = this->xmlHttpRequestObject.property("upload").property(callback);
+            } else {
+                jsCallback = this->xmlHttpRequestObject.property(callback);
+            }
+            this->fireProgressEvent (jsCallback, transmitted, length);
         } else {
-            jsCallback = this->xmlHttpRequestObject.property(callback);
+            qFatal("Invalid procedure call: 'callback' must start with 'on'!");
         }
-        this->fireProgressEvent (jsCallback, transmitted, length);
-    } else {
-        qFatal("Invalid procedure call: 'callback' must start with 'on'!");
     }
 }
 
 void JavascriptNetworkRequest::fireProgressEvent (QJSValue& callback, qint64 transmitted, qint64 length) {
-    if (callback.isCallable ()) {
+    if ((! this->synchronousFlag) && callback.isCallable ()) {
         QJSValue progressEvent = this->jsEngine->newObject ();
         // I will lose precision here...
         uint total = (uint) ((length > 0) ? length : 0);
         progressEvent.setProperty ("loaded", (uint) transmitted);
         progressEvent.setProperty ("total", total);
         progressEvent.setProperty ("lengthComputable", (bool) total);
-        QJSValue returnValue;
-        JavascriptBridge::warnJsError ((*(this->jsEngine)), returnValue = callback.callWithInstance (this->xmlHttpRequestObject, QJSValueList() << progressEvent), QString("[XHR#%1] Uncaught exception received while firing a ProgressEvent!").arg(this->networkRequestId));
+        JavascriptBridge::warnJsError ((*(this->jsEngine)), callback.callWithInstance (this->xmlHttpRequestObject, QJSValueList() << progressEvent), QString("[XHR#%1] Uncaught exception received while firing a ProgressEvent!").arg(this->networkRequestId));
+    }
+}
+
+void JavascriptNetworkRequest::fireEvent (const QString& callback) {
+    if (! this->synchronousFlag) {
+        if (callback.startsWith ("on")) {
+            JavascriptBridge::warnJsError ((*(this->jsEngine)), this->xmlHttpRequestObject.property(callback).callWithInstance (this->xmlHttpRequestObject), QString("[XHR#%1] Uncaught exception received while firing the '%2' event!").arg(this->networkRequestId).arg(callback));
+        } else {
+            qFatal("Invalid procedure call: 'callback' must start with 'on'!");
+        }
     }
 }
 
@@ -245,6 +262,8 @@ void JavascriptNetworkRequest::appendResponseBuffer () {
         QJSValue responseBuffer;
         if (this->getPrivateData ("responseBuffer", responseBuffer)) {
             this->setPrivateData ("responseBuffer", JavascriptBridge::QByteArray2ArrayBuffer ((*(this->jsEngine)), JavascriptBridge::ArrayBuffer2QByteArray ((*(this->jsEngine)), responseBuffer) + this->networkReply->readAll ()));
+
+            this->getPrivateData ("responseBuffer", responseBuffer);
         }
     }
 }
@@ -265,17 +284,15 @@ void JavascriptNetworkRequest::networkReplyUploadProgress (qint64 bytesSent, qin
 }
 
 void JavascriptNetworkRequest::networkReplyDownloadProgress (qint64 bytesReceived, qint64 bytesTotal) {
-#error This function is not called in synchronous mode. Therefore, a synchronous XMLHttpRequest() does not get response headers nor status
-#error This is a bug!
-    if (! this->httpStatus) {
-        this->httpStatus = this->networkReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (! this->responseStatus) {
+        this->responseStatus = this->networkReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     }
     if (this->networkReply->error() == QNetworkReply::NoError && this->isFinalAnswer ()) {
         if (! this->downloadStarted) {
             this->downloadStarted = true;
             QJSValue state (JavascriptNetworkRequest::status_HEADERS_RECEIVED);
             this->setPrivateData ("state", state);
-            this->setPrivateData ("status", this->httpStatus);
+            this->setPrivateData ("status", this->responseStatus);
             this->setPrivateData ("statusText", this->networkReply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString());
             this->setPrivateData ("responseURL", this->networkReply->url().toString());
             QJSValue responseHeadersObject = this->jsEngine->newObject ();
@@ -289,7 +306,7 @@ void JavascriptNetworkRequest::networkReplyDownloadProgress (qint64 bytesReceive
                 responseHeadersObject.property(headerName).setProperty (responseHeadersObject.property(headerName).property("length").toUInt(), headerValue);
             }
             this->setPrivateData ("responseHeaders", responseHeadersObject);
-            JavascriptBridge::warnJsError ((*(this->jsEngine)), this->xmlHttpRequestObject.property("onreadystatechange").callWithInstance (this->xmlHttpRequestObject), QString("[XHR#%1] Uncaught exception received while firing the 'onreadystatechanged' event!").arg(this->networkRequestId));
+            this->fireEvent ("onreadystatechange");
             if (this->getPrivateData ("state", state)) {
                 if (state.toInt() != JavascriptNetworkRequest::status_HEADERS_RECEIVED) {
                     this->cancelRequest (true);
@@ -302,14 +319,14 @@ void JavascriptNetworkRequest::networkReplyDownloadProgress (qint64 bytesReceive
         }
         this->appendResponseBuffer ();
         if (bytesReceived != bytesTotal) {
-            JavascriptBridge::warnJsError ((*(this->jsEngine)), this->xmlHttpRequestObject.property("onreadystatechange").callWithInstance (this->xmlHttpRequestObject), QString("[XHR#%1] Uncaught exception received while firing the 'onreadystatechanged' event!").arg(this->networkRequestId));
+            this->fireEvent ("onreadystatechange");
             this->fireProgressEvent (false, "onprogress", bytesReceived, bytesTotal);
         } else {
             this->fireProgressEvent (false, "onprogress", bytesReceived, bytesTotal);
             this->setPrivateData ("state", JavascriptNetworkRequest::status_DONE);
             this->setPrivateData ("sendFlag", false);
             this->setPrivateData ("responseObject", "type", "object"); // The XMLHttpRequest specification did not rule this...
-            JavascriptBridge::warnJsError ((*(this->jsEngine)), this->xmlHttpRequestObject.property("onreadystatechange").callWithInstance (this->xmlHttpRequestObject), QString("[XHR#%1] Uncaught exception received while firing the 'onreadystatechanged' event!").arg(this->networkRequestId));
+            this->fireEvent ("onreadystatechange");
             this->fireProgressEvent (false, "onload", bytesReceived, bytesTotal);
             this->fireProgressEvent (false, "onloadend", bytesReceived, bytesTotal);
         }
@@ -353,22 +370,17 @@ void JavascriptNetworkRequest::networkReplyFinished () {
                     }
                 }
                 this->setPrivateData ("responseObject", "value", QString("%1: %2").arg(exception).arg(this->networkReply->errorString ()));
-                QJSValue synchronousFlag;
-                if (this->getPrivateData ("synchronousFlag", synchronousFlag)) {
-                    if (! synchronousFlag.toBool ()) {
-                        JavascriptBridge::warnJsError ((*(this->jsEngine)), this->xmlHttpRequestObject.property("onreadystatechange").callWithInstance (this->xmlHttpRequestObject), QString("[XHR#%1] Uncaught exception received while firing the 'onreadystatechanged' event!").arg(this->networkRequestId));
-                        QJSValue uploadCompleteFlag;
-                        if (this->getPrivateData ("uploadCompleteFlag", uploadCompleteFlag)) {
-                            if (! uploadCompleteFlag.toBool()) {
-                                this->setPrivateData ("uploadCompleteFlag", true);
-                                this->fireProgressEvent (true, eventHandler, 0, 0);
-                                this->fireProgressEvent (true, "onloadend", 0, 0);
-                            }
-                        }
-                        this->fireProgressEvent (false, eventHandler, 0, 0);
-                        this->fireProgressEvent (false, "onloadend", 0, 0);
+                this->fireEvent ("onreadystatechange");
+                QJSValue uploadCompleteFlag;
+                if (this->getPrivateData ("uploadCompleteFlag", uploadCompleteFlag)) {
+                    if (! uploadCompleteFlag.toBool()) {
+                        this->setPrivateData ("uploadCompleteFlag", true);
+                        this->fireProgressEvent (true, eventHandler, 0, 0);
+                        this->fireProgressEvent (true, "onloadend", 0, 0);
                     }
                 }
+                this->fireProgressEvent (false, eventHandler, 0, 0);
+                this->fireProgressEvent (false, "onloadend", 0, 0);
             }
         }
         this->cancelRequest (true);
@@ -388,11 +400,11 @@ void JavascriptNetworkRequest::networkReplyFinished () {
             requestHeaderReferer.setProperty (0, requestUrl);
             this->setPrivateData ("requestHeaders", "referer", requestHeaderReferer);
         }
-        QVariant locationVariant = this->networkReply->header(QNetworkRequest::LocationHeader);
-        if (locationVariant.isValid ()) {
-            this->setPrivateData ("requestUrl", this->networkReply->url().resolved (locationVariant.toUrl()).toString());
+        QString location (QString::fromUtf8 (this->networkReply->rawHeader ("location")));
+        if (location.isEmpty()) {
+            qInfo() << QString("[XHR#%1] Server replied HTTP status '%2 %3' and did not send a 'Location:' header. I will fetch the same URL again!").arg(this->networkRequestId).arg(this->networkReply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString()).arg(this->responseStatus);
         } else {
-            qInfo() << QString("[XHR#%1] Server replied HTTP status '%2 %3' and did not send a 'Location:' header. I will fetch the same URL again!").arg(this->networkRequestId).arg(this->networkReply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString()).arg(this->httpStatus);
+            this->setPrivateData ("requestUrl", this->networkReply->url().resolved(location).toString());
         }
         this->maxRedirects--;
         this->fulfillRequest (*(this->networkReply->manager ()));
@@ -406,9 +418,7 @@ void JavascriptNetworkRequest::timeoutTimerTimeout () {
 JavascriptNetworkRequest::JavascriptNetworkRequest (QJSEngine& jsEngine, QObject *parent) :
     QObject (parent),
     jsEngine (&jsEngine),
-    networkReply (Q_NULLPTR),
-    downloadStarted (false),
-    httpStatus (0) {
+    networkReply (Q_NULLPTR) {
     if (this->jsEngine == Q_NULLPTR) {
         qFatal("JavascriptBridge object must be bound to a QJSEngine! Invoke 'QJSEngine::newQObject();'!");
     }
@@ -421,14 +431,16 @@ JavascriptNetworkRequest::~JavascriptNetworkRequest () {
 }
 
 void JavascriptNetworkRequest::setTimerInterval (int msec) {
-    this->timeoutTimer.setInterval (msec);
-    if (this->timeoutTimer.isActive()) {
-        if (msec <= 0) {
-            this->timeoutTimer.stop ();
+    if (msec > 0) {
+        if (this->timeoutTimer.interval() != msec) {
+            this->timeoutTimer.setInterval (msec);
+        }
+        if (! this->timeoutTimer.isActive()) {
+            this->timeoutTimer.start();
         }
     } else {
-        if (msec > 0) {
-            this->timeoutTimer.start ();
+        if (this->timeoutTimer.isActive()) {
+            this->timeoutTimer.stop();
         }
     }
 }
@@ -436,6 +448,8 @@ void JavascriptNetworkRequest::setTimerInterval (int msec) {
 void JavascriptNetworkRequest::start (QNetworkAccessManager& networkManager, unsigned int networkRequestId) {
     this->networkRequestId = networkRequestId;
     this->maxRedirects = 20;
+    this->responseStatus = 0;
+    this->downloadStarted = false;
     if (this->setPrivateData ("requestId", networkRequestId)) {
         this->fulfillRequest (networkManager);
     } else {
@@ -746,7 +760,7 @@ QJSValue JavascriptBridge::textEncode (const QString& string, const QString& cha
     QMutexLocker m_lck (&AppRuntime::textCoDecMutex);
     QTextCodec* textCodec = QTextCodec::codecForName (charset.toUtf8());
     if (textCodec != Q_NULLPTR) {
-        QTextEncoder textEncoder (textCodec, QTextCodec::ConvertInvalidToNull);
+        QTextEncoder textEncoder (textCodec, QTextCodec::ConvertInvalidToNull | QTextCodec::IgnoreHeader);
         answer = textEncoder.fromUnicode (string);
     }
     return (JavascriptBridge::QByteArray2ArrayBuffer ((*(this->jsEngine)), answer));

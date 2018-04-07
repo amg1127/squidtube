@@ -60,12 +60,13 @@ private:
     QJSValue getPrivateDataCallback2;
     QJSValue setPrivateDataCallback1;
     QJSValue setPrivateDataCallback2;
+    QString requestMethod;
     QBuffer requestBodyBuffer;
+    bool synchronousFlag;
+    int responseStatus;
     QNetworkReply* networkReply;
     QTimer timeoutTimer;
     bool downloadStarted;
-    int httpStatus;
-    QString httpRequestMethod;
     bool getPrivateData (const QString& key, QJSValue& value);
     bool setPrivateData (const QString& key, const QJSValue& value);
     bool getPrivateData (const QString& key, const QString& subKey, QJSValue& value);
@@ -74,26 +75,25 @@ private:
     void fulfillRequest (QNetworkAccessManager& networkManager);
     void fireProgressEvent (bool isUpload, const QString& callback, qint64 transmitted, qint64 length);
     void fireProgressEvent (QJSValue& callback, qint64 transmitted, qint64 length);
+    void fireEvent (const QString& callback);
     void appendResponseBuffer ();
     inline bool isGetOrHeadRequest () {
-        return (! (this->httpRequestMethod.compare("GET", Qt::CaseInsensitive) &&
-                   this->httpRequestMethod.compare("HEAD", Qt::CaseInsensitive)));
+        return (! (this->requestMethod.compare("GET", Qt::CaseInsensitive) &&
+                   this->requestMethod.compare("HEAD", Qt::CaseInsensitive)));
     }
     // https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#3xx_Redirection
     inline bool isRedirectWithMethodChange () {
-        return (this->httpStatus == 302 ||
-                this->httpStatus == 303);
+        return (this->responseStatus == 302 ||
+                this->responseStatus == 303);
     }
     // https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#3xx_Redirection
     inline bool isRedirectWithoutMethodChange () {
-        return ((this->httpStatus == 301 && this->isGetOrHeadRequest()) ||
-                this->httpStatus == 307 ||
-                this->httpStatus == 308);
+        return ((this->responseStatus == 301 && this->isGetOrHeadRequest()) ||
+                this->responseStatus == 307 ||
+                this->responseStatus == 308);
     }
     inline bool isFinalAnswer () {
-        return ((! this->maxRedirects) ||
-                (! this->isRedirectWithMethodChange()) ||
-                (! this->isRedirectWithoutMethodChange()));
+        return (! (this->maxRedirects && (this->isRedirectWithMethodChange() || this->isRedirectWithoutMethodChange())));
     }
 private slots:
     void networkReplyUploadProgress (qint64 bytesSent, qint64 bytesTotal);

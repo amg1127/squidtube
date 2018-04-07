@@ -32,6 +32,7 @@ void JobDispatcher::writeAnswerLine (const QString& channel, const QString& msg,
         msgpart1 += channel + " ";
         msgpart2 += QString(" from channel #") + channel;
     }
+#warning BH is only supported in Squid >= 3.4. I need to implement a compatibility setting
     std::cout << QString("%1%2 message=%3 log=%3")
         .arg(msgpart1)
         .arg((isError) ? "BH" : ((isMatch) ? "OK" : "ERR"))
