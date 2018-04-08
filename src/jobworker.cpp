@@ -138,14 +138,15 @@ void JobWorker::processPropertiesFromObject (unsigned int requestId, const QJSVa
                 qInfo() << QString("[%1] Data returned by the helper could not be parsed as JSON: 'className=%2, id=%3, offset=%4, errorString=%5'!").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(jsonParseError.offset).arg(jsonParseError.errorString());
             }
         }
-        if (! objectData.object().count()) {
-            qWarning() << QString("[%1] Data returned by the helper either is not an object or has no properties: 'className=%2, id=%3, rawData=%4'!").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(QString::fromUtf8 (objectData.toJson(QJsonDocument::Compact)));
+        bool validData = ObjectCache::jsonDocumentHasData (objectData);
+        if (! validData) {
+            qWarning() << QString("[%1] Data returned by the helper has no valid data: 'className=%2, id=%3, rawData=%4'!").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(QString::fromUtf8 (objectData.toJson(QJsonDocument::Compact)));
             objectData = QJsonDocument();
         }
         if (! appHelperInfo->memoryCache->write (squidRequest.objectClassName, squidRequest.objectId, objectData, this->currentTimestamp)) {
             qCritical() << QString("[%1] Failed to save object information! 'className=%2, id=%3, rawData=%4'!").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg(QString::fromUtf8 (objectData.toJson (QJsonDocument::Compact)));
         }
-        if (objectData.object().count()) {
+        if (validData) {
             bool matchResult = this->processCriteria (
                 squidRequest.requestHelperName,
                 squidRequest.requestProperties.count(),

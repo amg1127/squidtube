@@ -80,7 +80,7 @@ function getPropertiesFromObject (returnValue, className, id) {
     }
     var xhr = new XMLHttpRequest ();
     var youtubeURL = "https://www.googleapis.com/youtube/v3/" + path + "?" + param + "=" + escape(id) + "&part=" + escape(part) + "&key=" + escape (v3ApiKey);
-    var async = false;
+    var async = true;
     xhr.open ("GET", youtubeURL, async);
     xhr.timeout = 120000;
     xhr.responseType = "json";

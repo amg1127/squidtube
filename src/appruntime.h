@@ -27,6 +27,7 @@ public:
     static QString helpers;
     static QString positiveTTL;
     static QString negativeTTL;
+    static QString squidProtocol;
     // Settings read from [db] section
     static QString dbDriver;
     static QString dbHost;

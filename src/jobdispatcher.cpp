@@ -20,7 +20,7 @@ void JobDispatcher::stdinReaderFinished () {
     if (this->numJobCarriers) {
         emit finishWorkers ();
     } else {
-        qDebug() << "There is no worker instances running. Immediate finish will take place.";
+        qDebug() << "There is no worker instance running. Immediate finish will take place.";
         emit finished ();
     }
 }
@@ -32,10 +32,9 @@ void JobDispatcher::writeAnswerLine (const QString& channel, const QString& msg,
         msgpart1 += channel + " ";
         msgpart2 += QString(" from channel #") + channel;
     }
-#warning BH is only supported in Squid >= 3.4. I need to implement a compatibility setting
     std::cout << QString("%1%2 message=%3 log=%3")
         .arg(msgpart1)
-        .arg((isError) ? "BH" : ((isMatch) ? "OK" : "ERR"))
+        .arg((isError) ? ((AppRuntime::squidProtocol.compare("3.0")) ? "BH" : "ERR") : ((isMatch) ? "OK" : "ERR"))
         .arg(QString::fromUtf8(QUrl::toPercentEncoding (msg)))
         .toLocal8Bit().constData() << std::endl;
     if (isError) {

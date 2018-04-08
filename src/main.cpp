@@ -232,10 +232,10 @@ bool loadRuntimeVariables () {
     }
 
     // Now figure what helpers are enabled
-    qDebug() << "Detecting active helpers...";
     QString configurationDir (QFileInfo(configFile).path());
     AppRuntime::helperNames = AppRuntime::helpers.split(",", QString::SkipEmptyParts);
     AppRuntime::helperNames.removeDuplicates();
+    qDebug() << "Detecting active helpers... Preliminary list is:" << AppRuntime::helperNames;
     QStringList unknownOptionNames(optionsParser.unknownOptionNames());
     // QStringList addOptionNames;
     QHash<QString,QString> globalVariables;

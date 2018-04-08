@@ -19,6 +19,9 @@ QList<AppConfigValidSetting> AppConfig::AppConfigValidSettings = QList<AppConfig
     << AppConfigValidSetting("main", "negativeTTL", "When a failure is registered while collecting video information from helpers, this value specifies how many seconds that failure registry is valid for.",
         QRegExp("\\d+"), AppRuntime::negativeTTL)
 
+    << AppConfigValidSetting("main", "protocol", "Sets the protocol compatibility mode to use while retrieving and answering request from Squid. Set '3.4' if using Squid >= 3.4 or '3.0' if using Squid >= 3.0 and < 3.4. Squid 2.x is not supported.",
+        QRegExp("(3\\.0|3\\.4)"), AppRuntime::squidProtocol)
+
     << AppConfigValidSetting("db", "driver", "SQL driver to use for database access. See documentation for QSqlDatabase::addDatabase() for driver names.",
         QRegExp("Q[A-Z]+"), AppRuntime::dbDriver)
 

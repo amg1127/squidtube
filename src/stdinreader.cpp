@@ -4,7 +4,7 @@ StdinReader::StdinReader (QObject *parent) : QThread (parent) {
 }
 
 void StdinReader::run () {
-    qDebug() << "stdinReader thread started.";
+    qInfo() << "StdinReader thread started.";
     std::string stdinLine;
     while (! std::getline (std::cin, stdinLine).eof()) {
         // Expected format is [channel-ID] %URI property [-flag [-flag [...] ] ] criteria [criteria [criteria [...]]]
@@ -46,5 +46,5 @@ void StdinReader::run () {
             }
         }
     }
-    qDebug() << "stdinReader thread finished.";
+    qInfo() << "StdinReader thread finished.";
 }

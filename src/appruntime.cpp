@@ -11,6 +11,7 @@ QString AppRuntime::loglevel("DEBUG");
 QString AppRuntime::helpers("");
 QString AppRuntime::positiveTTL("2592000");
 QString AppRuntime::negativeTTL("600");
+QString AppRuntime::squidProtocol("3.4");
 QString AppRuntime::dbDriver("QSQLITE");
 QString AppRuntime::dbHost("");
 QString AppRuntime::dbPort("0");
