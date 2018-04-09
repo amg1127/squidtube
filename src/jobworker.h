@@ -70,7 +70,6 @@ private:
         const AppSquidMathMatchOperator& requestMathMatchOperator,
         const Qt::CaseSensitivity& requestCaseSensitivity,
         const QRegExp::PatternSyntax& requestPatternSyntax,
-        bool requestInvertMatch,
         const QStringList& requestCriteria,
         const QJsonValue& jsonValueInformation);
     static bool regexMatches (const QRegExp& regularExpression, const QString& testString);

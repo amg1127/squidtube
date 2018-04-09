@@ -151,7 +151,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
                         squidRequest.requestPatternSyntax = QRegExp::FixedString;
                         stringMatch++;
                     } else {
-                        this->writeAnswerLine (requestChannel, "ACL specifies incompatible string matching flags!", true, false);
+                        this->writeAnswerLine (requestChannel, "ACL specifies incompatible string matching flags", true, false);
                         return;
                     }
                 } else if (requestFlag == "-w" || requestFlag == "--wildcard") {
@@ -159,7 +159,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
                         squidRequest.requestPatternSyntax = QRegExp::WildcardUnix;
                         stringMatch++;
                     } else {
-                        this->writeAnswerLine (requestChannel, "ACL specifies incompatible string matching flags!", true, false);
+                        this->writeAnswerLine (requestChannel, "ACL specifies incompatible string matching flags", true, false);
                         return;
                     }
                 } else if (requestFlag == "-i" || requestFlag == "--ignorecase") {
@@ -167,7 +167,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
                         squidRequest.requestCaseSensitivity = Qt::CaseInsensitive;
                         stringMatch++;
                     } else {
-                        this->writeAnswerLine (requestChannel, "ACL specifies incompatible string matching flags!", true, false);
+                        this->writeAnswerLine (requestChannel, "ACL specifies incompatible string matching flags", true, false);
                         return;
                     }
                 } else if (requestFlag == "--") {

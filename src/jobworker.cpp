@@ -103,7 +103,7 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                     squidRequest.requestCriteria,
                     objectData
                 );
-                this->squidResponseOut (requestId, QString("Cached data from the object with 'className=%1, id=%2' %3 specified criteria.").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), matchResult);
+                this->squidResponseOut (requestId, QString("Cached data from the object with 'className=%1, id=%2' %3 specified criteria").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), matchResult);
             } else if (cacheStatus == CacheHitNegative) {
                 qInfo() << QString("[%1] Another thread or process have recently tried to fetch information concerning the object with 'className=%2, id=%3' and failed to do so.").arg(squidRequest.requestHelperName).arg(squidRequest.objectClassName).arg(squidRequest.objectId);
                 this->tryNextHelper (requestIdIterator);
@@ -171,7 +171,7 @@ void JobWorker::processPropertiesFromObject (unsigned int requestId, const QJSVa
                 squidRequest.requestCriteria,
                 objectData
             );
-            this->squidResponseOut (requestId, QString("Retrieved data from the object with 'className=%1, id=%2' %3 specified criteria.").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), matchResult);
+            this->squidResponseOut (requestId, QString("Retrieved data from the object with 'className=%1, id=%2' %3 specified criteria").arg(squidRequest.objectClassName).arg(squidRequest.objectId).arg((matchResult) ? "matches" : "does not match"), matchResult);
         } else {
             this->tryNextHelper (requestIdIterator);
         }
@@ -211,8 +211,9 @@ bool JobWorker::processCriteria (
     bool requestInvertMatch,
     const QStringList& requestCriteria,
     const QJsonDocument& jsonDocumentInformation) {
+    bool answer;
     if (jsonDocumentInformation.isObject ()) {
-        return (JobWorker::processCriteria (
+        answer = JobWorker::processCriteria (
             requestHelperName,
             level,
             requestPropertiesIterator,
@@ -222,9 +223,9 @@ bool JobWorker::processCriteria (
             requestInvertMatch,
             requestCriteria,
             jsonDocumentInformation.object()
-        ));
+        );
     } else if (jsonDocumentInformation.isArray ()) {
-        return (JobWorker::processCriteria (
+        answer = JobWorker::processCriteria (
             requestHelperName,
             level,
             requestPropertiesIterator,
@@ -234,11 +235,16 @@ bool JobWorker::processCriteria (
             requestInvertMatch,
             requestCriteria,
             jsonDocumentInformation.array()
-        ));
+        );
     } else {
         qInfo() << QString("[%1] Unexpected JSON format while parsing '%2'.").arg(requestHelperName).arg(requestPropertiesIterator->componentName);
+        answer = false;
     }
-    return (false);
+    if (requestInvertMatch) {
+        return (! answer);
+    } else {
+        return (answer);
+    }
 }
 
 bool JobWorker::processCriteria (
@@ -248,7 +254,6 @@ bool JobWorker::processCriteria (
     const AppSquidMathMatchOperator& requestMathMatchOperator,
     const Qt::CaseSensitivity& requestCaseSensitivity,
     const QRegExp::PatternSyntax& requestPatternSyntax,
-    bool requestInvertMatch,
     const QStringList& requestCriteria,
     const QJsonValue& jsonValueInformation) {
     if (level > 0) {
@@ -262,7 +267,6 @@ bool JobWorker::processCriteria (
                     requestMathMatchOperator,
                     requestCaseSensitivity,
                     requestPatternSyntax,
-                    requestInvertMatch,
                     requestCriteria,
                     jsonValueInformation.toObject().value(requestPropertiesItem.componentName)
                 ));
@@ -303,7 +307,6 @@ bool JobWorker::processCriteria (
                             requestMathMatchOperator,
                             requestCaseSensitivity,
                             requestPatternSyntax,
-                            requestInvertMatch,
                             requestCriteria,
                             jsonArray.at (intervalItem))) {
                             if (requestPropertiesItem.matchQuantity == MatchAny) {
@@ -364,11 +367,7 @@ bool JobWorker::processCriteria (
                         return (false);
                     }
                 }
-                if (requestInvertMatch) {
-                    return (! matched);
-                } else {
-                    return (matched);
-                }
+                return (matched);
             } else {
                 qInfo() << QString("[%1] Unable to apply selected comparison operator on a boolean value!").arg(requestHelperName);
             }
@@ -391,14 +390,13 @@ bool JobWorker::processCriteria (
                             (requestMathMatchOperator == OperatorNotEquals && doubleValue != doubleComparison) ||
                             (requestMathMatchOperator == OperatorGreaterThanOrEquals && doubleValue >= doubleComparison) ||
                             (requestMathMatchOperator == OperatorGreaterThan && doubleValue > doubleComparison)) {
-                            return (! requestInvertMatch);
+                            return (true);
                         }
                     } else {
                         qInfo() << QString("[%1] Unable to evaluate '%2' as a numeric value").arg(requestHelperName).arg(*requestCriteriaIterator);
                         return (false);
                     }
                 }
-                return (requestInvertMatch);
             } else {
                 qInfo() << QString("[%1] Unable to apply selected comparison operator on a numeric value!").arg(requestHelperName);
             }
@@ -417,7 +415,7 @@ bool JobWorker::processCriteria (
                         QRegExp regexComparison ((*requestCriteriaIterator), requestCaseSensitivity, requestPatternSyntax);
                         if (regexComparison.isValid()) {
                             if (JobWorker::regexMatches (regexComparison, stringValue)) {
-                                return (! requestInvertMatch);
+                                return (true);
                             }
                         } else {
                             qInfo() << QString("[%1] Expression specification '%2' could not be parsed: '%3'").arg(requestHelperName).arg(*requestCriteriaIterator).arg(regexComparison.errorString());
@@ -431,11 +429,10 @@ bool JobWorker::processCriteria (
                             (requestMathMatchOperator == OperatorNotEquals && compareResult != 0) ||
                             (requestMathMatchOperator == OperatorGreaterThanOrEquals && compareResult >= 0) ||
                             (requestMathMatchOperator == OperatorGreaterThan && compareResult > 0)) {
-                            return (! requestInvertMatch);
+                            return (true);
                         }
                     }
                 }
-                return (requestInvertMatch);
             } else {
                 qInfo() << QString("[%1] Unable to apply selected comparison operator on a string value!").arg(requestHelperName);
             }
@@ -549,12 +546,12 @@ void JobWorker::processIncomingRequest () {
                 this->retryTimer->start (AppConstants::AppHelperTimerTimeout);
             }
         } else {
-            this->squidResponseOut (0, "Unable to find a helper that can handle the requested URL.", false);
+            this->squidResponseOut (0, "Unable to find a helper that can handle the requested URL", false);
         }
     } else {
         unsigned int requestId (this->requestId);
         this->requestId += 2;
-        this->runningRequests[requestId] = squidRequest;
+        this->runningRequests.insert (requestId, squidRequest);
         qDebug() << QString("[%1] Invoking 'getObjectFromUrl ();', RequestID #%2").arg(appHelperInfo->name).arg(requestId);
         if (! this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, requestId, JavascriptMethod::getObjectFromUrl, urlString)) {
             this->tryNextHelper (requestId);

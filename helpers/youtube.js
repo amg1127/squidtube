@@ -1,3 +1,5 @@
+// API reference: https://developers.google.com/youtube/v3/docs/
+
 // This helper requires an implementation of the URL object: https://developer.mozilla.org/en-US/docs/Web/API/URL
 require ("URL");
 
