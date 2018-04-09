@@ -46,7 +46,9 @@ private:
     QTimer* retryTimer;
     QLinkedList<AppSquidRequest> incomingRequests;
     qint64 currentTimestamp;
-    void squidResponseOut (const unsigned int requestId, const QString& msg, bool isError, bool isMatch);
+    void tryNextHelper (unsigned int requestId);
+    void tryNextHelper (QMap<unsigned int,AppSquidRequest>::iterator requestIterator);
+    void squidResponseOut (const unsigned int requestId, const QString& msg, bool isMatch);
     void processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls);
     void processObjectFromUrl (unsigned int requestId, const QJSValue& appHelperObjectFromUrl);
     void processPropertiesFromObject (unsigned int requestId, const QJSValue& appHelperPropertiesFromObject);

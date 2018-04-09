@@ -63,9 +63,7 @@ function getObjectFromUrl (returnValue, url) {
                 };
             }
         }
-        setTimeout (function () {
-            returnValue (answer);
-        }, 1);
+        returnValue (answer);
     } else {
         throw new URIError ("Invalid URL: '" + url + "'!");
     }

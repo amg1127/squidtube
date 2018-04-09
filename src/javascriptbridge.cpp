@@ -648,7 +648,7 @@ bool JavascriptBridge::invokeMethod (QJSValue& entryPoint, unsigned int context,
             this->pendingTransactions.remove (transactionId);
         } else {
             if (! callReturn.isUndefined ()) {
-                qWarning() << QString("Value '%1' returned from a call to method '%2' on channel #%3 will be discarded. Please, return values by using the following statement: 'arguments[0].call (returnValue);' !").arg(JavascriptBridge::QJS2QString (entryPoint)).arg(method).arg(this->requestChannel);
+                qWarning() << QString("Value '%1' returned from a call to method '%2' on channel #%3 will be discarded. Please return values by using the following statement: 'arguments[0].call (returnValue);' !").arg(JavascriptBridge::QJS2QString (entryPoint)).arg(method).arg(this->requestChannel);
             }
             return (true);
         }

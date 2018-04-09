@@ -46,6 +46,7 @@ public:
     // I don't need a QMutex protection to helperSources* because JobWorker::JobWorker() constructor runs in the main thread
     static QHash<QString,QString> helperSourcesByName;
     static QStringList helperNames;
+    static int helperSourcesStartLine;
     static QMutex commonSourcesMutex;
     static QHash<QString,QString> commonSources; // All functions in class QHash<Key,T> are reentrant
     // Database information
@@ -145,6 +146,7 @@ public:
     QStringList requestCriteria;
     QString requestHelperName;
     int requestHelperId;
+    bool hasRequestHelperOnProgress;
     QString objectClassName;
     QString objectId;
     // Method that forces a deep copy of the object

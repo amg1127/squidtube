@@ -24,6 +24,9 @@
  *   received as its first parameter to the other callbacks which will receive the data. Then, such
  *   callbacks invoke the function.
  *
+ * Important: helpers must not execute statements after calling the supplied callback. If they do, any
+ * eventual exception generated will render the C++ environment inconsistent.
+ *
  */
 
 (function () {
@@ -58,7 +61,7 @@
  *
  *   Returns an array of String or/and RegExp objects, which will be used by C++ program
  *   to determine what URL's the helper is able to process.
- *   If 'getSupportedUrls' returns fixed strings, wildcard characters will be matched (QRegExp::WildcardUnix)
+ *   If 'getSupportedUrls' returns fixed strings, they will be interpreted as wildcard patterns (QRegExp::WildcardUnix)
  *   If 'getSupportedUrls' returns regular expressions, they will be used as they are.
  *
  * * function getObjectFromUrl (callback, url) { }

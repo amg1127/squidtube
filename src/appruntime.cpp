@@ -28,6 +28,7 @@ QString AppRuntime::dbTblPrefix("tblHelper_");
 QMutex AppRuntime::helperMemoryCacheMutex;
 QList<AppHelperObjectCache*> AppRuntime::helperMemoryCache;
 QHash<QString,QString> AppRuntime::helperSourcesByName;
+int AppRuntime::helperSourcesStartLine;
 QStringList AppRuntime::helperNames;
 QMutex AppRuntime::commonSourcesMutex;
 QHash<QString,QString> AppRuntime::commonSources;
@@ -157,6 +158,7 @@ AppSquidRequest AppSquidRequest::deepCopy () const {
     AppRuntime::deepCopyList (returnValue.requestCriteria, this->requestCriteria);
     returnValue.requestHelperName = QString("%1").arg (this->requestHelperName);
     returnValue.requestHelperId = this->requestHelperId;
+    returnValue.hasRequestHelperOnProgress = this->hasRequestHelperOnProgress;
     returnValue.objectClassName = QString("%1").arg (this->objectClassName);
     returnValue.objectId = QString("%1").arg (this->objectId);
     return (returnValue);
