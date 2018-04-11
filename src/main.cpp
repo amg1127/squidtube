@@ -39,9 +39,6 @@ int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
     qDebug() << "Starting...";
 
-    // Manually register some QtMetaTypes, so I can queue variables of those types under QObject::connect
-    qRegisterMetaType<AppSquidRequest>("AppSquidRequest");
-
     // Make sure that default program settings are valid
     // The validation code builds only if debug build is requested during compilation
 #ifndef QT_NO_DEBUG
@@ -304,7 +301,7 @@ bool loadRuntimeVariables () {
         QHash<QString,QString>::iterator helperCode (AppRuntime::helperSourcesByName.insert ((*helper), ""));
         for (QHash<QString,QString>::const_iterator variable = globalVariables.constBegin(); variable != globalVariables.constEnd(); variable++) {
             if (variable.key().startsWith ((*helper) + ".")) {
-                helperCode.value() += "var " + variable.key().mid(helper->length() + 1) + " = unescape ('" + QString::fromUtf8(QUrl::toPercentEncoding (variable.value())) + "');\n";
+                helperCode.value() += "var " + variable.key().mid(helper->length() + 1) + " = decodeURIComponent ('" + QString::fromUtf8(QUrl::toPercentEncoding (variable.value())) + "');\n";
             }
         }
     }

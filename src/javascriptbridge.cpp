@@ -102,8 +102,13 @@ void JavascriptNetworkRequest::cancelRequest (bool emitNetworkRequestFinished) {
         this->networkReply = Q_NULLPTR;
     }
     if (emitNetworkRequestFinished) {
-        this->setPrivateData ("requestId", QJSValue(QJSValue::NullValue));
-        emit networkRequestFinished (networkRequestId);
+        QJSValue networkRequestId;
+        if (this->getPrivateData ("requestId", networkRequestId)) {
+            if (networkRequestId.toUInt() == this->networkRequestId) {
+                this->setPrivateData ("requestId", QJSValue(QJSValue::NullValue));
+            }
+        }
+        emit networkRequestFinished (this->networkRequestId);
     }
 }
 
@@ -237,20 +242,30 @@ void JavascriptNetworkRequest::fireProgressEvent (bool isUpload, const QString& 
 
 void JavascriptNetworkRequest::fireProgressEvent (QJSValue& callback, qint64 transmitted, qint64 length) {
     if ((! this->synchronousFlag) && callback.isCallable ()) {
-        QJSValue progressEvent = this->jsEngine->newObject ();
-        // I will lose precision here...
-        uint total = (uint) ((length > 0) ? length : 0);
-        progressEvent.setProperty ("loaded", (uint) transmitted);
-        progressEvent.setProperty ("total", total);
-        progressEvent.setProperty ("lengthComputable", (bool) total);
-        JavascriptBridge::warnJsError ((*(this->jsEngine)), callback.callWithInstance (this->xmlHttpRequestObject, QJSValueList() << progressEvent), QString("[XHR#%1] Uncaught exception received while firing a ProgressEvent!").arg(this->networkRequestId));
+        QJSValue networkRequestId;
+        if (this->getPrivateData ("requestId", networkRequestId)) {
+            if (networkRequestId.toUInt() == this->networkRequestId) {
+                QJSValue progressEvent = this->jsEngine->newObject ();
+                // I will lose precision here...
+                uint total = (uint) ((length > 0) ? length : 0);
+                progressEvent.setProperty ("loaded", (uint) transmitted);
+                progressEvent.setProperty ("total", total);
+                progressEvent.setProperty ("lengthComputable", (bool) total);
+                JavascriptBridge::warnJsError ((*(this->jsEngine)), callback.callWithInstance (this->xmlHttpRequestObject, QJSValueList() << progressEvent), QString("[XHR#%1] Uncaught exception received while firing a ProgressEvent!").arg(this->networkRequestId));
+            }
+        }
     }
 }
 
 void JavascriptNetworkRequest::fireEvent (const QString& callback) {
     if (! this->synchronousFlag) {
         if (callback.startsWith ("on")) {
-            JavascriptBridge::warnJsError ((*(this->jsEngine)), this->xmlHttpRequestObject.property(callback).callWithInstance (this->xmlHttpRequestObject), QString("[XHR#%1] Uncaught exception received while firing the '%2' event!").arg(this->networkRequestId).arg(callback));
+            QJSValue networkRequestId;
+            if (this->getPrivateData ("requestId", networkRequestId)) {
+                if (networkRequestId.toUInt() == this->networkRequestId) {
+                    JavascriptBridge::warnJsError ((*(this->jsEngine)), this->xmlHttpRequestObject.property(callback).callWithInstance (this->xmlHttpRequestObject), QString("[XHR#%1] Uncaught exception received while firing the '%2' event!").arg(this->networkRequestId).arg(callback));
+                }
+            }
         } else {
             qFatal("Invalid procedure call: 'callback' must start with 'on'!");
         }
@@ -658,6 +673,19 @@ bool JavascriptBridge::invokeMethod (QJSValue& entryPoint, unsigned int context,
     return (false);
 }
 
+QJSValue JavascriptBridge::makeEntryPoint (int index) {
+    QString helperName (AppRuntime::helperNames.at(index));
+    QJSValue evaluatedFunction = this->jsEngine->evaluate (AppRuntime::helperSourcesByName[helperName], AppConstants::AppHelperSubDir + "/" + helperName + AppConstants::AppHelperExtension, AppRuntime::helperSourcesStartLine);
+    if (! JavascriptBridge::warnJsError ((*(this->jsEngine)), evaluatedFunction, QString("A Javascript exception occurred while the helper '%1' was being constructed. It will be disabled!").arg(helperName))) {
+        if (evaluatedFunction.isCallable ()) {
+            return (evaluatedFunction.call (QJSValueList() << index << this->myself.property("getPropertiesFromObjectCache")));
+        } else {
+            qCritical() << QString("The value generated from code evaluation of the helper '%1' is not a function. This is an internal error which will render the helper disabled!").arg(helperName);
+        }
+    }
+    return (QJSValue(QJSValue::NullValue));
+}
+
 void JavascriptBridge::receiveValue (unsigned int transactionId, const QString& method, const QJSValue& returnedValue) {
     QMap<unsigned int, unsigned int>::iterator transactionIdIterator = this->pendingTransactions.find (transactionId);
     if (transactionIdIterator != this->pendingTransactions.end()) {
@@ -764,6 +792,10 @@ QJSValue JavascriptBridge::textEncode (const QString& string, const QString& cha
         answer = textEncoder.fromUnicode (string);
     }
     return (JavascriptBridge::QByteArray2ArrayBuffer ((*(this->jsEngine)), answer));
+}
+
+void JavascriptBridge::getPropertiesFromObjectCache (unsigned int context, const QJSValue& returnValue) {
+    emit valueReturnedFromJavascript (context, "getPropertiesFromObjectCache", returnValue);
 }
 
 #if (QT_VERSION < QT_VERSION_CHECK(5, 6, 0))

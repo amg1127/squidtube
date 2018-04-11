@@ -12,6 +12,7 @@ QSqlDatabase DatabaseBridge::database () {
     QString dbOptions;
     QString dbName;
     QStringList dbStartupQueries;
+    dbStartupQueries << QString();
     {
         QMutexLocker locker (&AppRuntime::dbSettingsMutex);
         myDbInstance = AppRuntime::dbInstance++;
@@ -24,8 +25,9 @@ QSqlDatabase DatabaseBridge::database () {
         dbPassword = QString("%1").arg(AppRuntime::dbPassword);
         dbName = QString("%1").arg(AppRuntime::dbName);
         dbOptions = QString("%1").arg(AppRuntime::dbOptions);
-        AppRuntime::deepCopyList (dbStartupQueries, AppRuntime::dbStartupQueries);
+        dbStartupQueries << AppRuntime::dbStartupQueries;
     }
+    dbStartupQueries.removeFirst ();
     qDebug() << QString("Opening a new database connection #%1...").arg(myDbInstance);
     QSqlDatabase sqldb (QSqlDatabase::addDatabase (dbDriver, QString("C%1").arg(myDbInstance)));
     if (sqldb.isValid()) {

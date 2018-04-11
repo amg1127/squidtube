@@ -146,6 +146,7 @@ public:
     ~JavascriptBridge ();
     bool invokeMethod (QJSValue& entryPoint, unsigned int context, int method, QJSValue args = QJSValue(QJSValue::UndefinedValue));
     bool invokeMethod (QJSValue& entryPoint, unsigned int context, const QString& method, QJSValue args = QJSValue(QJSValue::UndefinedValue));
+    QJSValue makeEntryPoint (int index);
     // http://doc.qt.io/qt-5/qtqml-cppintegration-data.html#conversion-between-qt-and-javascript-types
     Q_INVOKABLE void receiveValue (unsigned int transactionId, const QString& method, const QJSValue& returnedValue);
     Q_INVOKABLE void require (const QJSValue& library);
@@ -158,6 +159,7 @@ public:
     Q_INVOKABLE void xmlHttpRequest_setTimeout (const unsigned int networkRequestId, const int msec);
     Q_INVOKABLE QString textDecode (const QJSValue& bytes, const QString& fallbackCharset);
     Q_INVOKABLE QJSValue textEncode (const QString& string, const QString& charset);
+    Q_INVOKABLE void getPropertiesFromObjectCache (unsigned int context, const QJSValue& returnValue);
 #if (QT_VERSION < QT_VERSION_CHECK(5, 6, 0))
     Q_INVOKABLE void console_log (const QJSValue& msg);
     Q_INVOKABLE void console_info (const QJSValue& msg);

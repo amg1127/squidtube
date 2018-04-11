@@ -82,19 +82,6 @@ QString AppRuntime::readFileContents (QFile& fileObj) {
     return (QString());
 }
 
-template<class T> void AppRuntime::deepCopyList (T& destination, const T& source) {
-    if (source.isEmpty ()) {
-        destination.clear ();
-    } else {
-        int size = destination.count() + 1;
-        destination << source.first();
-        destination << source;
-        while (size-- > 0) {
-            destination.removeFirst ();
-        }
-    }
-}
-
 //////////////////////////////////////////////////////////////////
 
 // Constants used by the memory cache system
@@ -146,20 +133,23 @@ AppHelperObjectCache::~AppHelperObjectCache () {
 
 //////////////////////////////////////////////////////////////////
 
-// Method that forces a deep copy of the object
-AppSquidRequest AppSquidRequest::deepCopy () const {
-    AppSquidRequest returnValue;
-    returnValue.requestUrl = QUrl::fromEncoded (this->requestUrl.toEncoded(QUrl::FullyEncoded), QUrl::StrictMode);
-    AppRuntime::deepCopyList (returnValue.requestProperties, this->requestProperties);
-    returnValue.requestMathMatchOperator = this->requestMathMatchOperator;
-    returnValue.requestCaseSensitivity = this->requestCaseSensitivity;
-    returnValue.requestPatternSyntax = this->requestPatternSyntax;
-    returnValue.requestInvertMatch = this->requestInvertMatch;
-    AppRuntime::deepCopyList (returnValue.requestCriteria, this->requestCriteria);
-    returnValue.requestHelperName = QString("%1").arg (this->requestHelperName);
-    returnValue.requestHelperId = this->requestHelperId;
-    returnValue.hasRequestHelperOnProgress = this->hasRequestHelperOnProgress;
-    returnValue.objectClassName = QString("%1").arg (this->objectClassName);
-    returnValue.objectId = QString("%1").arg (this->objectId);
-    return (returnValue);
+AppJobRequest::~AppJobRequest () {
+}
+
+//////////////////////////////////////////////////////////////////
+
+AppJobRequestFromSquid::~AppJobRequestFromSquid () {
+}
+
+AppRequestType AppJobRequestFromSquid::type () {
+    return (RequestFromSquid);
+}
+
+//////////////////////////////////////////////////////////////////
+
+AppJobRequestFromHelper::~AppJobRequestFromHelper () {
+}
+
+AppRequestType AppJobRequestFromHelper::type () {
+    return (RequestFromHelper);
 }

@@ -13,6 +13,7 @@ try {
             if (position) {
                 _start = position;
             }
+            // @disable-check M126
             return (this.substring (_start, _start + substr.length) == substr);
         }
     }
@@ -24,11 +25,13 @@ try {
             if (position) {
                 _end = position;
             }
+            // @disable-check M126
             return (this.substring (_end - substr.length, _end) == substr);
         }
     }
 
     var URL = function (urlString, baseString) {
+        // @disable-check M127
         "use strict";
 
         function path_resolution (path) {
@@ -43,10 +46,14 @@ try {
                 var pathComponent;
                 for (i = 0; i < pathLength; i++) {
                     pathComponent = pathComponents[i];
+                    // @disable-check M126
                     if (pathComponent == "..") {
                         resolvedPath.pop();
-                    } else if (pathComponent && pathComponent != ".") {
-                        resolvedPath.push (pathComponent);
+                    } else {
+                        // @disable-check M126
+                        if (pathComponent && pathComponent != ".") {
+                            resolvedPath.push (pathComponent);
+                        }
                     }
                 }
                 return (((pathComponents[0]) ? "" : "/") + resolvedPath.join ("/") + ((pathComponents[pathLength-1]) ? "" : "/"));
@@ -60,22 +67,22 @@ try {
 
             Object.defineProperties (this, {
                 "get"     : { "value": (function (param) {
-                    var escapedParam = escape (param) + "=";
+                    var escapedParam = encodeURIComponent (param) + "=";
                     var i;
                     for (i = 0; i < length; i++) {
                         if (searchComponents[i].startsWith (escapedParam)) {
-                            return (unescape (searchComponents[i].substring (escapedParam.length)));
+                            return (decodeURIComponent (searchComponents[i].substring (escapedParam.length)));
                         }
                     }
                     return (null);
                 })},
                 "getAll"  : { "value": (function (param) {
                     var returnValue = [];
-                    var escapedParam = escape (param) + "=";
+                    var escapedParam = encodeURIComponent (param) + "=";
                     var i;
                     for (i = 0; i < length; i++) {
                         if (searchComponents[i].startsWith (escapedParam)) {
-                            returnValue.push (unescape (searchComponents[i].substring (escapedParam.length)));
+                            returnValue.push (decodeURIComponent (searchComponents[i].substring (escapedParam.length)));
                         }
                     }
                     return (returnValue);

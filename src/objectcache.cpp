@@ -1,5 +1,8 @@
 #include "objectcache.h"
 
+ObjectCache::~ObjectCache () {
+}
+
 ObjectCache::ObjectCache (const QString& helperName, ObjectCache* lowerCache) :
     lowerCache (lowerCache),
     helperName (helperName),

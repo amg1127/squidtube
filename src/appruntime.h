@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QHash>
 #include <QJsonDocument>
+#include <QJSValue>
 #include <QLinkedList>
 #include <QList>
 #include <QMutex>
@@ -15,6 +16,12 @@
 #include <QtDebug>
 #include <QTextStream>
 #include <QUrl>
+
+#ifdef QT_NO_DEBUG
+#define downcast static_cast
+#else
+#define downcast dynamic_cast
+#endif
 
 class AppHelperObject;
 class AppHelperClass;
@@ -63,8 +70,6 @@ public:
     // Static methods for file reading. I use them several times along the program
     static QString readFileContents (const QString& fileName);
     static QString readFileContents (QFile& fileObj);
-    // Static method that forces a deep copy of a list
-    template<class T> static void deepCopyList (T& destination, const T& source);
 };
 
 class AppConstants {
@@ -135,22 +140,61 @@ enum AppSquidMathMatchOperator {
     OperatorGreaterThan = 6
 };
 
-class AppSquidRequest {
-public:
-    QUrl requestUrl;
-    QLinkedList<AppSquidPropertyMatch> requestProperties;
-    AppSquidMathMatchOperator requestMathMatchOperator;
-    Qt::CaseSensitivity requestCaseSensitivity;
-    QRegExp::PatternSyntax requestPatternSyntax;
-    bool requestInvertMatch;
-    QStringList requestCriteria;
-    QString requestHelperName;
-    int requestHelperId;
-    bool hasRequestHelperOnProgress;
-    QString objectClassName;
-    QString objectId;
-    // Method that forces a deep copy of the object
-    AppSquidRequest deepCopy () const;
+enum AppRequestType {
+    RequestFromSquid = 1,
+    RequestFromHelper = 2
 };
 
+class AppRequestObject {
+public:
+    QString className;
+    QString id;
+};
+
+class AppSquidRequest {
+public:
+    QUrl url;
+    QLinkedList<AppSquidPropertyMatch> properties;
+    AppSquidMathMatchOperator mathMatchOperator;
+    Qt::CaseSensitivity caseSensitivity;
+    QRegExp::PatternSyntax patternSyntax;
+    bool invertMatch;
+    QStringList criteria;
+    AppRequestObject object;
+};
+
+class AppHelperRequest {
+public:
+    AppRequestObject object;
+    QJSValue callback;
+};
+
+class AppRequestHelper {
+public:
+    QString name;
+    int id;
+    bool isOnProgress;
+};
+
+class AppJobRequest {
+protected:
+    ~AppJobRequest ();
+public:
+    AppRequestHelper helper;
+    virtual AppRequestType type() = 0;
+};
+
+class AppJobRequestFromSquid : public AppJobRequest {
+public:
+    virtual ~AppJobRequestFromSquid ();
+    AppSquidRequest data;
+    virtual AppRequestType type();
+};
+
+class AppJobRequestFromHelper : public AppJobRequest {
+public:
+    virtual ~AppJobRequestFromHelper ();
+    AppHelperRequest data;
+    virtual AppRequestType type();
+};
 #endif // APPRUNTIME_H

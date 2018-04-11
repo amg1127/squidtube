@@ -3,7 +3,8 @@
 // This helper requires an implementation of the URL object: https://developer.mozilla.org/en-US/docs/Web/API/URL
 require ("URL");
 
-// This helper requires a global variable named 'v3ApiKey', which stores the
+// This helper requires a global variable named 'v3ApiKey', which stores the API key created
+// using instructions located in https://developers.google.com/youtube/registering_an_application#Create_API_Keys
 if (! v3ApiKey) {
     throw new ReferenceError ("Global variable 'v3ApiKey' must be set in configuration!");
 }
@@ -79,19 +80,26 @@ function getPropertiesFromObject (returnValue, className, id) {
         param = "forUsername";
     }
     var xhr = new XMLHttpRequest ();
-    var youtubeURL = "https://www.googleapis.com/youtube/v3/" + path + "?" + param + "=" + escape(id) + "&part=" + escape(part) + "&key=" + escape (v3ApiKey);
+    var youtubeURL = "https://www.googleapis.com/youtube/v3/" + path + "?" + param + "=" + encodeURIComponent(id) + "&part=" + encodeURIComponent(part) + "&key=" + encodeURIComponent (v3ApiKey);
     var async = true;
     xhr.open ("GET", youtubeURL, async);
     xhr.timeout = 120000;
     xhr.responseType = "json";
     xhr.onloadend = function () {
+        var answer = null;
         if (xhr.status >= 200 && xhr.status < 300) {
-            console.log ("Data about className='" + className + "' and ID='" + id + "' was retrieved successfully.");
-            returnValue (xhr.response.items[0]);
+            answer = xhr.response;
+            if (answer.items.length) {
+                console.log ("Data about className='" + className + "' and ID='" + id + "' was retrieved successfully.");
+                answer = answer.items[0];
+            } else {
+                console.warn ("Retrieved data about className='" + className + "' and ID='" + id + "' is invalid: '" + JSON.stringify(answer) + "'");
+                answer = null;
+            }
         } else {
             console.error ("Data about className='" + className + "' and ID='" + id + "' failed! status='" + xhr.status + ": " + xhr.statusText + "'");
-            returnValue (xhr.response);
         }
+        returnValue (answer);
     };
     if (async) {
         xhr.send ();
@@ -100,7 +108,7 @@ function getPropertiesFromObject (returnValue, className, id) {
             xhr.send ();
             xhr.onloadend ();
         } catch (e) {
-            console.error ("XMLHttpRequest exception: " + e);
+            console.error ("XMLHttpRequest exception while retrieving data about className='" + className + "' and ID='" + id + "': " + e.toString());
             returnValue (null);
         }
     }

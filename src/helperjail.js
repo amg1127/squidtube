@@ -29,28 +29,43 @@
  *
  */
 
-(function () {
+// @disable-check M127
+(function (/* helperIndex, getPropertiesFromObjectCacheEntryPoint */) {
+    // @disable-check M127
     "use strict";
-    /* var global_variable_a = unescape ('foo'); */
-    /* var global_variable_b = unescape ('bar'); */
 
-    /* Helper code goes here - this placeholder must not be removed! */
+    var getPropertiesFromObjectCache = (function (helperIndex, getPropertiesFromObjectCacheEntryPoint) {
+        return (function (/* callback, className, id */) {
+            getPropertiesFromObjectCacheEntryPoint (helperIndex, {
+                "callback": arguments[0],
+                "className": arguments[1],
+                "id": arguments[2]
+            });
+        });
+    }) (arguments[0], arguments[1]);
 
-    return (function (/* callback, context, method, args */) {
-        return ({
-                /* This is the list of functions that
-                    a helper must define in the code */
-                "getSupportedUrls": getSupportedUrls,
-                "getObjectFromUrl": getObjectFromUrl,
-                "getPropertiesFromObject": getPropertiesFromObject
-            } [arguments[2]].apply (undefined, [ (function (callback, context, method) {
-                return (function (returnedValue) {
-                    callback.call (undefined, context, method, returnedValue);
-                });
-            }) (arguments[0], arguments[1], arguments[2]) ].concat(arguments[3]))
-        );
-    });
-}) ();
+    return ((function () {
+        /* var global_variable_a = decodeURIComponent ('foo'); */
+        /* var global_variable_b = decodeURIComponent ('bar'); */
+
+        /* Helper code goes here - this placeholder must not be removed! */
+
+        return (function (/* callback, context, method, args */) {
+            return ({
+                    /* This is the list of functions that
+                        a helper must define in the code */
+                    "getSupportedUrls": getSupportedUrls,
+                    "getObjectFromUrl": getObjectFromUrl,
+                    "getPropertiesFromObject": getPropertiesFromObject
+                } [arguments[2]].apply (undefined, [ (function (callback, context, method) {
+                    return (function (returnedValue) {
+                        callback.call (undefined, context, method, returnedValue);
+                    });
+                }) (arguments[0], arguments[1], arguments[2]) ].concat(arguments[3]))
+            );
+        });
+    }) ());
+});
 
 /*
  * More comments about the javascript snippets:
@@ -75,5 +90,11 @@
  *
  *   Returns either an object or a JSON string with data associated to an object whose type is <className> and
  *   name is <id>.
+ *
+ * If necessary, the helper can retrieve information from the cache by calling the defined
+ * 'getPropertiesFromObjectCache (callback, className, id);' function. As specified for the opposite direction,
+ * C++ will send data through the function object provided in 'callback' parameter.
+ * Warning: if there is no cached data about the object with specified 'className' and 'id' supplied,
+ * C++ will invoke 'getPropertiesFromObject()'. This may result in an endless recursion!
  *
  */

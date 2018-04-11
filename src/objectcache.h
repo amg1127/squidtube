@@ -25,6 +25,7 @@ class ObjectCache {
 private:
     ObjectCache* lowerCache;
 protected:
+    ~ObjectCache ();
     QString helperName;
     QString cacheType;
     virtual bool lock () = 0;

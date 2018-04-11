@@ -42,12 +42,12 @@ private:
     QJSEngine* runtimeEnvironment;
     JavascriptBridge* javascriptBridge;
     unsigned int requestId;
-    QMap<unsigned int,AppSquidRequest> runningRequests;
+    QMap<unsigned int,AppJobRequest*> runningRequests;
     QTimer* retryTimer;
-    QLinkedList<AppSquidRequest> incomingRequests;
+    QLinkedList<AppJobRequest*> incomingRequests;
     qint64 currentTimestamp;
     void tryNextHelper (unsigned int requestId);
-    void tryNextHelper (QMap<unsigned int,AppSquidRequest>::iterator requestIterator);
+    void tryNextHelper (QMap<unsigned int,AppJobRequest*>::iterator requestIdIterator);
     void squidResponseOut (const unsigned int requestId, const QString& msg, bool isMatch);
     void processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls);
     void processObjectFromUrl (unsigned int requestId, const QJSValue& appHelperObjectFromUrl);
@@ -81,7 +81,7 @@ private slots:
     void processIncomingRequest ();
     void setCurrentTimestamp ();
 public slots:
-    void squidRequestIn (const AppSquidRequest& squidRequest, const qint64 timestampNow);
+    void squidRequestIn (AppJobRequestFromSquid* request, const qint64 timestampNow);
     void quit ();
 signals:
     void writeAnswerLine (const QString& channel, const QString& msg, bool isError, bool isMatch);
@@ -104,9 +104,9 @@ public:
     inline bool wait (unsigned long time = ULONG_MAX) {
         return (this->threadObj->wait (time));
     }
-    void squidRequestIn (const AppSquidRequest& squidRequest, const qint64 timestampNow);
+    void squidRequestIn (AppJobRequestFromSquid* request, const qint64 timestampNow);
 signals:
-    void squidRequestOut (const AppSquidRequest& squidRequest, const qint64 timestampNow);
+    void squidRequestOut (AppJobRequestFromSquid* request, const qint64 timestampNow);
     void finished ();
 };
 
