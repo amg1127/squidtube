@@ -102,7 +102,7 @@ const int AppConstants::AppHelperTimerTimeout = 1000;
 // How long the program will wait for such thread or process. If this timer expires,
 // The program will by itself fetch data from the object
 // Unit is seconds.
-const int AppConstants::AppHelperMaxWait = 300;
+const int AppConstants::AppHelperMaxWait = 30;
 
 // Path component where common libraries will be searched for
 const QString AppConstants::AppCommonSubDir("common");

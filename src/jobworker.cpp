@@ -117,7 +117,7 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                     );
                     this->squidResponseOut (requestId, QString("Cached data from the object with 'className=%1, id=%2' %3 specified criteria").arg(squidRequest->data.object.className).arg(squidRequest->data.object.id).arg((matchResult) ? "matches" : "does not match"), matchResult);
                 } else if (cacheStatus == CacheHitNegative) {
-                    qInfo() << QString("[%1] Another thread or process have recently tried to fetch information concerning the object with 'className=%2, id=%3' and failed to do so.").arg(squidRequest->helper.name).arg(squidRequest->data.object.className).arg(squidRequest->data.object.id);
+                    qInfo() << QString("[%1] Another thread or process tried to fetch information concerning the object with 'className=%2, id=%3' recently and failed to do so.").arg(squidRequest->helper.name).arg(squidRequest->data.object.className).arg(squidRequest->data.object.id);
                     this->tryNextHelper (requestIdIterator);
                 } else if (cacheStatus == CacheOnProgress) {
                     qDebug() << QString("[%1] Another thread or process is currently fetching information concerning 'className=%2, id=%3'. I will try to wait for it...").arg(squidRequest->helper.name).arg(squidRequest->data.object.className).arg(squidRequest->data.object.id);

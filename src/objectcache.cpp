@@ -41,10 +41,10 @@ CacheStatus ObjectCache::read (const QString& className, const QString& id, cons
         cacheHit = (returnValue != CacheMiss);
     }
     if (cacheHit) {
-        if (lockStatus && fromLower) {
-            this->unlockedWrite (className, id, _data, _timestampCreated);
-        }
         if (returnValue == CacheHitNegative || ObjectCache::jsonDocumentHasData (_data)) {
+            if (lockStatus && fromLower) {
+                this->unlockedWrite (className, id, _data, _timestampCreated);
+            }
             data = _data;
             timestampCreated = _timestampCreated;
         } else if ((_timestampCreated + AppConstants::AppHelperMaxWait) >= timestampNow) {
