@@ -93,7 +93,7 @@ function getPropertiesFromObject (returnValue, className, id) {
             if (jsonResponse.stat == "ok") {
                 delete jsonResponse.stat;
                 jsonResponse = jsonResponse[Object.keys(jsonResponse)[0]];
-                console.log ("Data about className='" + className + "' and ID='" + id + "' was retrieved successfully.");
+                console.log ("Data about (className='" + className + "', id='" + id + "') was retrieved successfully.");
                 if (className == "photos" && jsonResponse.owner && jsonResponse.owner.nsid) {
                     getPropertiesFromObjectCache (function (data) {
                         jsonResponse["owner"] = data;
@@ -137,7 +137,7 @@ function getPropertiesFromObject (returnValue, className, id) {
                                 return;
                             }
                         } else {
-                            console.error ("Data about className='" + className + "' and ID='" + id + "' failed! status='" + xhr.status + ": " + xhr.statusText + "'");
+                            console.error ("Data retrieval about (className='" + className + "', id='" + id + "') failed! status='" + xhr.status + ": " + xhr.statusText + "'");
                         }
                         returnValue (null);
                     };
@@ -156,7 +156,7 @@ function getPropertiesFromObject (returnValue, className, id) {
                 }
             }
         } else {
-            console.error ("Data about className='" + className + "' and ID='" + id + "' failed! status='" + xhr.status + ": " + xhr.statusText + "'");
+            console.error ("Data retrieval about (className='" + className + "', id='" + id + "') failed! status='" + xhr.status + ": " + xhr.statusText + "'");
         }
         returnValue (null);
     };
@@ -167,7 +167,7 @@ function getPropertiesFromObject (returnValue, className, id) {
             xhr.send ();
             xhr.onloadend ();
         } catch (e) {
-            console.error ("XMLHttpRequest exception while retrieving data about className='" + className + "' and ID='" + id + "': " + e.toString());
+            console.error ("XMLHttpRequest exception while retrieving data about (className='" + className + "', id='" + id + "'): " + e.toString());
             returnValue (null);
         }
     }

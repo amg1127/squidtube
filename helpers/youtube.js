@@ -37,26 +37,26 @@ function getObjectFromUrl (returnValue, url) {
                 }
                 subdir = urlObj.pathname.substring (dir.length + 2, pos);
                 if (dir == "user" || dir == "channel") {
-                    answerClassName = dir;
+                    answerClassName = dir + "s";
                     answerId = subdir;
                 } else if (dir == "v" || (dir == "embed" && subdir != "videoseries")) {
-                    answerClassName = "video";
+                    answerClassName = "videos";
                     answerId = subdir;
                 } else if (dir == "embed" && subdir == "videoseries") {
-                    answerClassName = "playlist";
+                    answerClassName = "playlists";
                     answerId = urlObj.searchParams.getAll("list").slice(-1)[0];
                 }
             } else {
                 dir = urlObj.pathname.substring (1);
             }
             if (dir == "watch") {
-                answerClassName = "video";
+                answerClassName = "videos";
                 answerId = urlObj.searchParams.getAll("v").slice(-1)[0];
             } else if (dir == "get_video_info") {
-                answerClassName = "video";
+                answerClassName = "videos";
                 answerId = urlObj.searchParams.getAll("video_id").slice(-1)[0];
             } else if (urlObj.hostname == "youtu.be") {
-                answerClassName = "video";
+                answerClassName = "videos";
                 answerId = dir;
             }
             if (answerClassName && answerId) {
@@ -73,9 +73,9 @@ function getObjectFromUrl (returnValue, url) {
 }
 
 function getPropertiesFromObject (returnValue, className, id) {
-    var path = className + "s";
+    var path = className;
     var param = "id";
-    if (className == "user") {
+    if (className == "users") {
         path = "channels";
         param = "forUsername";
     }
@@ -90,14 +90,23 @@ function getPropertiesFromObject (returnValue, className, id) {
         if (xhr.status >= 200 && xhr.status < 300) {
             answer = xhr.response;
             if (answer.items.length) {
-                console.log ("Data about className='" + className + "' and ID='" + id + "' was retrieved successfully.");
+                console.log ("Data about (className='" + className + "', id='" + id + "') was retrieved successfully.");
                 answer = answer.items[0];
+                if (answer["snippet"] && answer["snippet"]["categoryId"]) {
+                    getPropertiesFromObjectCache (function (data) {
+                        if (data["snippet"]) {
+                            answer["snippet"]["category"] = data["snippet"];
+                        }
+                        returnValue (answer);
+                    }, "videoCategories", answer["snippet"]["categoryId"]);
+                    return;
+                }
             } else {
-                console.warn ("Retrieved data about className='" + className + "' and ID='" + id + "' is invalid: '" + JSON.stringify(answer) + "'");
+                console.warn ("Retrieved data about (className='" + className + "', id='" + id + "') is invalid: '" + JSON.stringify(answer) + "'");
                 answer = null;
             }
         } else {
-            console.error ("Data about className='" + className + "' and ID='" + id + "' failed! status='" + xhr.status + ": " + xhr.statusText + "'");
+            console.error ("Data retrieval about (className='" + className + "', id='" + id + "') failed! status='" + xhr.status + ": " + xhr.statusText + "'");
         }
         returnValue (answer);
     };
@@ -108,7 +117,7 @@ function getPropertiesFromObject (returnValue, className, id) {
             xhr.send ();
             xhr.onloadend ();
         } catch (e) {
-            console.error ("XMLHttpRequest exception while retrieving data about className='" + className + "' and ID='" + id + "': " + e.toString());
+            console.error ("XMLHttpRequest exception while retrieving data about (className='" + className + "', id='" + id + "'): " + e.toString());
             returnValue (null);
         }
     }
