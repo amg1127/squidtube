@@ -160,13 +160,12 @@ public:
     QRegExp::PatternSyntax patternSyntax;
     bool invertMatch;
     QStringList criteria;
-    AppRequestObject object;
 };
 
 class AppHelperRequest {
 public:
-    AppRequestObject object;
     QJSValue callback;
+    QJSValue object;
 };
 
 class AppRequestHelper {
@@ -180,6 +179,7 @@ class AppJobRequest {
 protected:
     ~AppJobRequest ();
 public:
+    AppRequestObject object;
     AppRequestHelper helper;
     virtual AppRequestType type() = 0;
 };

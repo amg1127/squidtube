@@ -38,8 +38,10 @@
         return (function (/* callback, className, id */) {
             getPropertiesFromObjectCacheEntryPoint (helperIndex, {
                 "callback": arguments[0],
-                "className": arguments[1],
-                "id": arguments[2]
+                "object"  : {
+                    "className": arguments[1],
+                    "id": arguments[2]
+                }
             });
         });
     }) (arguments[0], arguments[1]);

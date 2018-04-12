@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
     QCoreApplication::setOrganizationName(APP_owner_name);
 
     QCoreApplication app(argc, argv);
-    qDebug() << "Starting...";
+    qDebug() << "Starting ...";
 
     // Make sure that default program settings are valid
     // The validation code builds only if debug build is requested during compilation
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
         QObject::connect (&jobDispatcher, &JobDispatcher::finished, &app, &QCoreApplication::quit, Qt::QueuedConnection);
         jobDispatcher.start ();
 
-        qDebug() << "Startup finished. Entering main loop...";
+        qDebug() << QString("Startup finished. Entering main loop... (appVer=%1, qtBuild=%2, qtRun=%3)").arg(APP_project_version).arg(QT_VERSION_STR).arg(qVersion());
         returnValue = app.exec ();
     }
 

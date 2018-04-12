@@ -678,7 +678,10 @@ QJSValue JavascriptBridge::makeEntryPoint (int index) {
     QJSValue evaluatedFunction = this->jsEngine->evaluate (AppRuntime::helperSourcesByName[helperName], AppConstants::AppHelperSubDir + "/" + helperName + AppConstants::AppHelperExtension, AppRuntime::helperSourcesStartLine);
     if (! JavascriptBridge::warnJsError ((*(this->jsEngine)), evaluatedFunction, QString("A Javascript exception occurred while the helper '%1' was being constructed. It will be disabled!").arg(helperName))) {
         if (evaluatedFunction.isCallable ()) {
-            return (evaluatedFunction.call (QJSValueList() << index << this->myself.property("getPropertiesFromObjectCache")));
+            QJSValue entryPoint (evaluatedFunction.call (QJSValueList() << index << this->myself.property("getPropertiesFromObjectCache")));
+            if (! JavascriptBridge::warnJsError ((*(this->jsEngine)), entryPoint, QString("A Javascript exception occurred while the helper '%1' was initializing. It will be disabled!").arg(helperName))) {
+                return (entryPoint);
+            }
         } else {
             qCritical() << QString("The value generated from code evaluation of the helper '%1' is not a function. This is an internal error which will render the helper disabled!").arg(helperName);
         }
@@ -800,19 +803,19 @@ void JavascriptBridge::getPropertiesFromObjectCache (unsigned int context, const
 
 #if (QT_VERSION < QT_VERSION_CHECK(5, 6, 0))
 void JavascriptBridge::console_log (const QJSValue& msg) {
-    qDebug() << QString("QJS: ") + msg.toString();
+    qDebug() << QString("[QJS] ") + msg.toString();
 }
 
 void JavascriptBridge::console_info (const QJSValue& msg) {
-    qInfo() << QString("QJS: ") + msg.toString();
+    qInfo() << QString("[QJS] ") + msg.toString();
 }
 
 void JavascriptBridge::console_warn (const QJSValue& msg) {
-    qWarning() << QString("QJS: ") + msg.toString();
+    qWarning() << QString("[QJS] ") + msg.toString();
 }
 
 void JavascriptBridge::console_error (const QJSValue& msg) {
-    qCritical() << QString("QJS: ") + msg.toString();
+    qCritical() << QString("[QJS] ") + msg.toString();
 }
 #endif
 

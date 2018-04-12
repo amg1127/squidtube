@@ -46,15 +46,21 @@ private:
     QTimer* retryTimer;
     QLinkedList<AppJobRequest*> incomingRequests;
     qint64 currentTimestamp;
+    void startRetryTimer ();
     void tryNextHelper (unsigned int requestId);
-    void tryNextHelper (QMap<unsigned int,AppJobRequest*>::iterator requestIdIterator);
-    void squidResponseOut (const unsigned int requestId, const QString& msg, bool isMatch);
+    void tryNextHelper (QMap<unsigned int,AppJobRequest*>::iterator& requestIdIterator);
+    void squidResponseOut (QMap<unsigned int,AppJobRequest*>::iterator& requestIdIterator, AppJobRequestFromSquid* squidRequest, const QString& msg, bool isMatch);
+    inline void scriptResponseOut (QMap<unsigned int,AppJobRequest*>::iterator& requestIdIterator, AppJobRequestFromHelper* helperRequest, QJSValue::SpecialValue returnValue) {
+        this->scriptResponseOut (requestIdIterator, helperRequest, QJSValue(returnValue));
+    }
+    void scriptResponseOut (QMap<unsigned int,AppJobRequest*>::iterator& requestIdIterator, AppJobRequestFromHelper* helperRequest, const QJSValue& returnValue);
     void processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls);
     void processObjectFromUrl (unsigned int requestId, const QJSValue& appHelperObjectFromUrl);
     void processPropertiesFromObject (unsigned int requestId, const QJSValue& appHelperPropertiesFromObject);
     static QString jsonType (const QJsonValue& jsonValue);
     static bool processCriteria (
         const QString& requestHelperName,
+        const unsigned int requestId,
         const int level,
         const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesIterator,
         const AppSquidMathMatchOperator& requestMathMatchOperator,
@@ -65,6 +71,7 @@ private:
         const QJsonDocument& jsonDocumentInformation);
     static bool processCriteria (
         const QString& requestHelperName,
+        const unsigned int requestId,
         const int level,
         const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesIterator,
         const AppSquidMathMatchOperator& requestMathMatchOperator,
