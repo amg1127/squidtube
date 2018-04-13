@@ -125,8 +125,9 @@ CacheStatus ObjectCache::jsonDocumentIsFresh (const QJsonDocument& data, const q
 ObjectCacheDatabase::ObjectCacheDatabase (const QString& helperName, const QString& dbTblPrefix) :
     ObjectCache (helperName, Q_NULLPTR) {
     this->cacheType = "database";
-    // Force a deep copy of the string
-    this->dbTable = QString("%1%2").arg(dbTblPrefix).arg(helperName);
+    QString helperNameModified (helperName);
+    helperNameModified.replace (QRegExp("\\W"), "_");
+    this->dbTable = dbTblPrefix + helperNameModified;
 }
 
 ObjectCacheDatabase::~ObjectCacheDatabase () {

@@ -6,7 +6,7 @@ if (! api_key) {
     throw new ReferenceError ("Global variable 'api_key' must be set in configuration!");
 }
 
-// These variable are used internally
+// These variables are used internally
 // Reference: https://www.flickr.com/services/api/misc.urls.html
 var photoSourceURLs = /^https?:\/\/[^\.\/]+\.static\.?flickr\.com(|:[0-9]+)\/+[^\/?]+\/+([^\/_?]+)(_[^\/_?])+\.\w+(|\?.*)$/i;
 var webPageURLs = /^https?:\/\/(|www\.)flickr\.com(:[0-9]+)?\/+(people|photos)\/+([^\/?]+)(|\/+(sets|[^\/?]+)(|\/+([^\/?]+)(|\/+[^?]*)))(|\?.*)$/i;
