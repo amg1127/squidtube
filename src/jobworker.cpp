@@ -9,13 +9,6 @@ void JobWorker::startRetryTimer () {
 }
 
 
-void JobWorker::tryNextHelper (unsigned int requestId) {
-    QMap<unsigned int,AppJobRequest*>::iterator requestIdIterator = this->runningRequests.find (requestId);
-    if (requestIdIterator != this->runningRequests.end ()) {
-        this->tryNextHelper (requestIdIterator);
-    }
-}
-
 void JobWorker::tryNextHelper (QMap<unsigned int,AppJobRequest*>::iterator& requestIdIterator) {
     AppJobRequestFromSquid* squidRequest = downcast<AppJobRequestFromSquid*> (*requestIdIterator);
     if (squidRequest != Q_NULLPTR) {
@@ -666,33 +659,36 @@ void JobWorker::processIncomingRequest () {
                         break;
                     }
                 }
-                if (squidRequest->helper.name.isEmpty ()) {
-                    if (squidRequest->helper.isOnProgress) {
-                        squidRequest->helper.isOnProgress = false;
-                        squidRequest->helper.id = 0;
-                        this->incomingRequests.prepend (squidRequest);
-                        this->startRetryTimer ();
-                    } else {
-                        QMap<unsigned int,AppJobRequest*>::iterator end(this->runningRequests.end());
-                        this->squidResponseOut (end, squidRequest, "Unable to find a helper that can handle the requested URL", false);
-                    }
-                }
             } else {
                 qFatal("Unexpected code flow!");
             }
         } else {
             appHelperInfo = this->helperInstances[request->helper.id];
         }
-        if (! request->helper.name.isEmpty ()) {
+        if (request->helper.name.isEmpty ()) {
+            if (requestType == RequestFromSquid) {
+                if (squidRequest->helper.isOnProgress) {
+                    squidRequest->helper.isOnProgress = false;
+                    squidRequest->helper.id = 0;
+                    this->incomingRequests.prepend (squidRequest);
+                    this->startRetryTimer ();
+                } else {
+                    QMap<unsigned int,AppJobRequest*>::iterator end(this->runningRequests.end());
+                    this->squidResponseOut (end, squidRequest, "Unable to find a helper that can handle the requested URL", false);
+                }
+            } else {
+                qFatal("Unexpected code flow!");
+            }
+        } else {
             unsigned int requestId (this->requestId);
             this->requestId += 2;
-            this->runningRequests.insert (requestId, request);
+            QMap<unsigned int,AppJobRequest*>::iterator requestIdIterator (this->runningRequests.insert (requestId, request));
             if (requestType == RequestFromHelper) {
                 this->processObjectFromUrl (requestId, helperRequest->data.object);
             } else if (requestType == RequestFromSquid) {
                 qDebug() << QString("[%1#%2] Invoking 'getObjectFromUrl();'...").arg(appHelperInfo->name).arg(requestId);
                 if (! this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, requestId, JavascriptMethod::getObjectFromUrl, urlString)) {
-                    this->tryNextHelper (requestId);
+                    this->tryNextHelper (requestIdIterator);
                 }
             } else {
                 qFatal("Unexpected code flow!");

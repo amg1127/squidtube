@@ -47,7 +47,6 @@ private:
     QLinkedList<AppJobRequest*> incomingRequests;
     qint64 currentTimestamp;
     void startRetryTimer ();
-    void tryNextHelper (unsigned int requestId);
     void tryNextHelper (QMap<unsigned int,AppJobRequest*>::iterator& requestIdIterator);
     void squidResponseOut (QMap<unsigned int,AppJobRequest*>::iterator& requestIdIterator, AppJobRequestFromSquid* squidRequest, const QString& msg, bool isMatch);
     inline void scriptResponseOut (QMap<unsigned int,AppJobRequest*>::iterator& requestIdIterator, AppJobRequestFromHelper* helperRequest, QJSValue::SpecialValue returnValue) {
