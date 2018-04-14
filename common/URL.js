@@ -1,42 +1,48 @@
 // Partial implementation of the URL object, according to specification found at https://developer.mozilla.org/en-US/docs/Web/API/URL
 
 try {
+
     if (! URL.prototype) {
         throw new ReferenceError ("There is no native URL() implementation here...");
     }
+
 } catch (e) {
 
-    // Added in Qt 5.8
-    if (! String.prototype.startsWith) {
-        String.prototype.startsWith = function (substr, position) {
-            var _start = 0;
-            if (position) {
-                _start = position;
-            }
-            // @disable-check M126
-            return (this.substring (_start, _start + substr.length) == substr);
-        }
-    }
-
-    // Added in Qt 5.8
-    if (! String.prototype.endsWith) {
-        String.prototype.endsWith = function (substr, position) {
-            var _end = this.length;
-            if (position) {
-                _end = position;
-            }
-            // @disable-check M126
-            return (this.substring (_end - substr.length, _end) == substr);
-        }
-    }
-
-    var URL = function (urlString, baseString) {
+    var URL = (function () {
         // @disable-check M127
         "use strict";
 
+        function stringStartsWith (str, substr, position) {
+            // Added in Qt 5.8
+            if (str.startsWith) {
+                return (str.startsWith (substr, position));
+            } else {
+                var _start = 0;
+                if (position) {
+                    _start = position;
+                }
+                // @disable-check M126
+                return (str.substring (_start, _start + substr.length) == substr);
+            }
+        }
+
+        function stringEndsWith (str, substr, position) {
+            // Added in Qt 5.8
+            if (str.endsWith) {
+                return (str.endsWith (substr, position));
+            } else {
+                var _end = str.length;
+                if (position) {
+                    _end = position;
+                }
+                // @disable-check M126
+                return (str.substring (_end - substr.length, _end) == substr);
+            }
+        }
+
         function path_resolution (path) {
             if (path) {
-                if (path.endsWith ("/.") || path.endsWith ("/..")) {
+                if (stringEndsWith (path, "/.") || stringEndsWith (path, "/..")) {
                     path += "/";
                 }
                 var pathComponents = path.split("/");
@@ -70,7 +76,7 @@ try {
                     var escapedParam = encodeURIComponent (param) + "=";
                     var i;
                     for (i = 0; i < length; i++) {
-                        if (searchComponents[i].startsWith (escapedParam)) {
+                        if (stringStartsWith (searchComponents[i], escapedParam)) {
                             return (decodeURIComponent (searchComponents[i].substring (escapedParam.length)));
                         }
                     }
@@ -81,7 +87,7 @@ try {
                     var escapedParam = encodeURIComponent (param) + "=";
                     var i;
                     for (i = 0; i < length; i++) {
-                        if (searchComponents[i].startsWith (escapedParam)) {
+                        if (stringStartsWith (searchComponents[i], escapedParam)) {
                             returnValue.push (decodeURIComponent (searchComponents[i].substring (escapedParam.length)));
                         }
                     }
@@ -105,57 +111,69 @@ try {
             });
         }
 
-        var regexpAbsoluteUrl = (/^(|[^:\s]+:)((|\/\/)(|([^:@\/\s]+)(|:([^@\/\s]*))@)((([\w-_]+\.)*[\w-_]+\.?)(|:(\d+))))(|\/[^?#\s]*)(|\?[^#\s]*)(|#.*)$/).exec (urlString);
-        if (regexpAbsoluteUrl) {
-            Object.defineProperties (this, {
-                "protocol"    : { "value": regexpAbsoluteUrl[1] },
-                "username"    : { "value": regexpAbsoluteUrl[5] },
-                "password"    : { "value": regexpAbsoluteUrl[7] },
-                "host"        : { "value": regexpAbsoluteUrl[8] },
-                "hostname"    : { "value": regexpAbsoluteUrl[9] },
-                "port"        : { "value": regexpAbsoluteUrl[12] },
-                "pathname"    : { "value": path_resolution (regexpAbsoluteUrl[13]) },
-                "search"      : { "value": regexpAbsoluteUrl[14] },
-                "hash"        : { "value": regexpAbsoluteUrl[15] },
-                "origin"      : { "value": (regexpAbsoluteUrl[1] + regexpAbsoluteUrl[3] + regexpAbsoluteUrl[8]) }
-            });
-            Object.defineProperties (this, {
-                "href"        : { "value": (regexpAbsoluteUrl[1] + regexpAbsoluteUrl[2] + this.pathname + this.search + this.hash) },
-                "searchParams": { "value": (new URLSearchParams (this.search.substring(1).split("&"))) }
-            });
-            Object.defineProperty (this, "toString", { "value": (function () { return (this.href); }) });
-        } else {
-            var regexpRelativeUrl = (/^(|\.?\.?\/[^?#\s]*)(|\?[^#\s]*)(|#.*)$/).exec (urlString);
-            if (baseString && regexpRelativeUrl) {
-                var baseUrlObject = new URL (baseString);
+        var regexpAbsoluteUrl = /^(|[^:\s]+:)((|\/\/)(|([^:@\/\s]+)(|:([^@\/\s]*))@)((([\w-_]+\.)*[\w-_]+\.?)(|:(\d+))))(|\/[^?#\s]*)(|\?[^#\s]*)(|#.*)$/;
+        var regexpRelativeUrl = /^(|\.?\.?\/[^?#\s]*)(|\?[^#\s]*)(|#.*)$/;
+
+        function URL (urlString, baseString) {
+
+            if (! (this instanceof URL)) {
+                return (new URL (urlString, baseString));
+            }
+
+            var absoluteUrlCaptures = regexpAbsoluteUrl.exec (urlString);
+            if (absoluteUrlCaptures) {
                 Object.defineProperties (this, {
-                    "protocol"    : { "value": baseUrlObject.protocol },
-                    "username"    : { "value": baseUrlObject.username },
-                    "password"    : { "value": baseUrlObject.password },
-                    "host"        : { "value": baseUrlObject.host },
-                    "hostname"    : { "value": baseUrlObject.hostname },
-                    "port"        : { "value": baseUrlObject.port },
-                    "search"      : { "value": ((regexpRelativeUrl[2]) ? regexpRelativeUrl[2] : baseUrlObject.search) },
-                    "hash"        : { "value": ((regexpRelativeUrl[3]) ? regexpRelativeUrl[3] : baseUrlObject.hash) },
-                    "origin"      : { "value": baseUrlObject.origin }
+                    "protocol"    : { "value": absoluteUrlCaptures[1] },
+                    "username"    : { "value": absoluteUrlCaptures[5] },
+                    "password"    : { "value": absoluteUrlCaptures[7] },
+                    "host"        : { "value": absoluteUrlCaptures[8] },
+                    "hostname"    : { "value": absoluteUrlCaptures[9] },
+                    "port"        : { "value": absoluteUrlCaptures[12] },
+                    "pathname"    : { "value": path_resolution (absoluteUrlCaptures[13]) },
+                    "search"      : { "value": absoluteUrlCaptures[14] },
+                    "hash"        : { "value": absoluteUrlCaptures[15] },
+                    "origin"      : { "value": (absoluteUrlCaptures[1] + absoluteUrlCaptures[3] + absoluteUrlCaptures[8]) }
                 });
-                var pathname;
-                if (regexpRelativeUrl[1].startsWith ("/")) {
-                    pathname = path_resolution (regexpRelativeUrl[1]);
-                } else if (baseUrlObject.pathname.endsWith ("/")) {
-                    pathname = path_resolution (baseUrlObject.pathname + regexpRelativeUrl[1]);
-                } else {
-                    pathname = path_resolution (baseUrlObject.pathname + "/../" + regexpRelativeUrl[1]);
-                }
                 Object.defineProperties (this, {
-                    "pathname"    : { "value": pathname },
-                    "href"        : { "value": (baseUrlObject.href.substring(0, baseUrlObject.href.length - baseUrlObject.pathname.length - baseUrlObject.search.length - baseUrlObject.hash.length) + this.pathname + this.search + this.hash) },
-                    "searchParams": { "value": (new URLSearchParams (this.search.substring(1).split("&"))) },
+                    "href"        : { "value": (absoluteUrlCaptures[1] + absoluteUrlCaptures[2] + this.pathname + this.search + this.hash) },
+                    "searchParams": { "value": (new URLSearchParams (this.search.substring(1).split("&"))) }
                 });
                 Object.defineProperty (this, "toString", { "value": (function () { return (this.href); }) });
             } else {
-                throw new TypeError ("URL syntax is not valid!");
+                var relativeUrlCaptures = regexpRelativeUrl.exec (urlString);
+                if (baseString && relativeUrlCaptures) {
+                    var baseUrlObject = new URL (baseString);
+                    Object.defineProperties (this, {
+                        "protocol"    : { "value": baseUrlObject.protocol },
+                        "username"    : { "value": baseUrlObject.username },
+                        "password"    : { "value": baseUrlObject.password },
+                        "host"        : { "value": baseUrlObject.host },
+                        "hostname"    : { "value": baseUrlObject.hostname },
+                        "port"        : { "value": baseUrlObject.port },
+                        "search"      : { "value": ((relativeUrlCaptures[2]) ? relativeUrlCaptures[2] : baseUrlObject.search) },
+                        "hash"        : { "value": ((relativeUrlCaptures[3]) ? relativeUrlCaptures[3] : baseUrlObject.hash) },
+                        "origin"      : { "value": baseUrlObject.origin }
+                    });
+                    var pathname;
+                    if (stringStartsWith (relativeUrlCaptures[1], "/")) {
+                        pathname = path_resolution (relativeUrlCaptures[1]);
+                    } else if (stringEndsWith (baseUrlObject.pathname, "/")) {
+                        pathname = path_resolution (baseUrlObject.pathname + relativeUrlCaptures[1]);
+                    } else {
+                        pathname = path_resolution (baseUrlObject.pathname + "/../" + relativeUrlCaptures[1]);
+                    }
+                    Object.defineProperties (this, {
+                        "pathname"    : { "value": pathname },
+                        "href"        : { "value": (baseUrlObject.href.substring(0, baseUrlObject.href.length - baseUrlObject.pathname.length - baseUrlObject.search.length - baseUrlObject.hash.length) + this.pathname + this.search + this.hash) },
+                        "searchParams": { "value": (new URLSearchParams (this.search.substring(1).split("&"))) },
+                    });
+                    Object.defineProperty (this, "toString", { "value": (function () { return (this.href); }) });
+                } else {
+                    throw new TypeError ("URL syntax is not valid!");
+                }
             }
         }
-    }
+
+        return (URL);
+    }) ();
 }

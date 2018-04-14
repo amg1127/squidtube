@@ -6,5 +6,5 @@ TEMPLATE = aux
 # Make install support
 
 commonfiles.path = $$sprintf("%1/common", $${install_share_dir})
-commonfiles.files = URL.js
+commonfiles.files = URL.js GenericJsonResolver.js
 INSTALLS += commonfiles

@@ -1,15 +1,27 @@
 // API reference: https://www.flickr.com/services/api/
 
+// Required global variables
+
 // This helper requires a global variable named 'api_key', which stores the API key
 // created for Flickr API calls: https://www.flickr.com/services/api/misc.api_keys.html
 if (! api_key) {
     throw new ReferenceError ("Global variable 'api_key' must be set in configuration!");
 }
 
-// These variables are used internally
+// Optional global variables
+
+// Internal variables
+
 // Reference: https://www.flickr.com/services/api/misc.urls.html
 var photoSourceURLs = /^https?:\/\/[^\.\/]+\.static\.?flickr\.com(|:[0-9]+)\/+[^\/?]+\/+([^\/_?]+)(_[^\/_?])+\.\w+(|\?.*)$/i;
 var webPageURLs = /^https?:\/\/(|www\.)flickr\.com(:[0-9]+)?\/+(people|photos)\/+([^\/?]+)(|\/+(sets|[^\/?]+)(|\/+([^\/?]+)(|\/+[^?]*)))(|\?.*)$/i;
+
+// Required common libraries
+require ("GenericJsonResolver");
+
+//////////////////////////////////////////////////////////////////
+
+// Functions go here
 
 function getSupportedUrls (returnValue) {
     returnValue ([photoSourceURLs, webPageURLs]);
@@ -63,129 +75,76 @@ function getObjectFromUrl (returnValue, url) {
 
 function getPropertiesFromObject (returnValue, className, id) {
     var method = "flickr." + className + ".getInfo";
+    if (className == "userIdByUrl") {
+        method = "flickr.urls.lookupUser";
+    }
     var flickrURLtemplate = "https://api.flickr.com/services/rest/?api_key=" + encodeURIComponent(api_key) + "&format=json&nojsoncallback=1";
     var flickrURL = flickrURLtemplate + "&method=" + encodeURIComponent(method);
-    var idObj = JSON.parse(id);
-    var keys = Object.keys (idObj);
-    var keysLength = keys.length;
-    var keyPos;
-    for (keyPos = 0; keyPos < keysLength; keyPos++) {
-        flickrURL += "&" + keys[keyPos] + "=" + encodeURIComponent(idObj[keys[keyPos]]);
-    }
-    var xhr = new XMLHttpRequest ();
-    var async = true;
-    xhr.open ("GET", flickrURL, async);
-    xhr.timeout = 120000;
-    xhr.responseType = "json";
-    xhr.onloadend = function () {
-        var jsonResponse;
-        if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-                jsonResponse = xhr.response;
-            } catch (e) {
-                console.warn ("Unable to parse Flickr JSON response: " + e.toString());
-                jsonResponse = {
-                    "stat": "fail",
-                    "code": -1,
-                    "message": ("Javascript exception while retrieving Flickr answer: " + e.toString())
-                };
-            }
-            if (jsonResponse.stat == "ok") {
-                delete jsonResponse.stat;
-                jsonResponse = jsonResponse[Object.keys(jsonResponse)[0]];
-                console.log ("Data about (className='" + className + "', id='" + id + "') was retrieved successfully.");
-                if (className == "photos" && jsonResponse.owner && jsonResponse.owner.nsid) {
-                    getPropertiesFromObjectCache (function (data) {
-                        jsonResponse["owner"] = data;
-                        returnValue (flickrFixJSONFormatting (jsonResponse));
-                    }, "people", JSON.stringify ({
-                        "user_id": jsonResponse.owner.nsid
-                    }));
-                } else if (className == "photosets" && jsonResponse.owner) {
-                    getPropertiesFromObjectCache (function (data) {
-                        jsonResponse["owner"] = data;
-                        returnValue (flickrFixJSONFormatting (jsonResponse));
-                    }, "people", JSON.stringify ({
-                        "user_id": jsonResponse.owner
-                    }));
-                } else {
-                    returnValue (flickrFixJSONFormatting (jsonResponse));
-                }
-                return;
-            } else if (idObj.user_id) {
-                if ((className == "people" && jsonResponse.code == 1) ||
-                    (className == "photoset" && jsonResponse.code == 2)) {
+    var idObj = JSON.parse (id);
+    Object.keys(idObj).map (function (currentValue) {
+        flickrURL += "&" + currentValue + "=" + encodeURIComponent(idObj[currentValue]);
+    });
+    var jsonResolver = new GenericJsonResolver (function (data) {
+        returnValue (flickrFixJSONFormatting (data));
+    }, className, id, getPropertiesFromObjectCache);
+    jsonResolver.setErrorHandler (function (step, residual) {
+        if (step == 1) {
+            if (residual["stat"] == "fail") {
+                if ((className == "people" && residual["code"] == 1) ||
+                    (className == "photosets" && residual["code"] == 2)) {
                     console.log ("Flickr API did not find an user with (nsid='" + idObj.user_id + "'). Calling 'urls.lookupUser' in order to get the actual 'nsid'...");
-                    flickrURL = flickrURLtemplate + "&method=" + encodeURIComponent("flickr.urls.lookupUser") + "&url=" + encodeURIComponent("https://www.flickr.com/people/" + idObj.user_id + "/");
-                    xhr.open ("GET", flickrURL, async);
-                    xhr.onloadend = function () {
-                        var otherJsonResponse;
-                        if (xhr.status >= 200 && xhr.status < 300) {
-                            try {
-                                otherJsonResponse = xhr.response;
-                            } catch (e) {
-                                console.warn ("Unable to parse Flickr JSON response for 'flickr.urls.lookupUser(\"" + idObj.user_id + "\")': " + e.toString());
-                                otherJsonResponse = {
-                                    "stat": "fail",
-                                    "code": -1,
-                                    "message": ("Javascript exception while retrieving Flickr answer for 'flickr.urls.lookupUser(\"" + idObj.user_id + "\")': " + e.toString())
-                                };
-                            }
-                            if (otherJsonResponse.stat == "ok") {
-                                idObj.user_id = otherJsonResponse.user.id;
-                                getPropertiesFromObjectCache (returnValue, className, JSON.stringify(idObj));
-                                return;
-                            }
+                    getPropertiesFromObjectCache (function (data) {
+                        if (data) {
+                            idObj.user_id = data.user.id;
+                            getPropertiesFromObjectCache (returnValue, className, JSON.stringify (idObj));
                         } else {
-                            console.error ("Data retrieval about (className='" + className + "', id='" + id + "') failed! status='" + xhr.status + ": " + xhr.statusText + "'");
-                        }
-                        returnValue (null);
-                    };
-                    if (async) {
-                        xhr.send();
-                    } else {
-                        try {
-                            xhr.send ();
-                            xhr.onloadend ();
-                        } catch (e) {
-                            console.error ("XMLHttpRequest exception while invoking 'flickr.urls.lookupUser(\"" + idObj.user_id + "\")': " + e.toString());
                             returnValue (null);
                         }
-                    }
-                    return;
+                    }, "userIdByUrl", JSON.stringify({ "url": ("https://www.flickr.com/people/" + idObj.user_id + "/") }));
+                    return (true);
                 }
             }
-        } else {
-            console.error ("Data retrieval about (className='" + className + "', id='" + id + "') failed! status='" + xhr.status + ": " + xhr.statusText + "'");
         }
-        returnValue (null);
-    };
-    if (async) {
-        xhr.send ();
-    } else {
-        try {
-            xhr.send ();
-            xhr.onloadend ();
-        } catch (e) {
-            console.error ("XMLHttpRequest exception while retrieving data about (className='" + className + "', id='" + id + "'): " + e.toString());
-            returnValue (null);
-        }
+    });
+    jsonResolver.get (flickrURL)
+        .test ({"stat":"ok"})
+        .remove ("stat");
+    if (className == "photos") {
+        jsonResolver.add ({"photo.owner": function (data) {
+            return ({
+                "objectClass": "people",
+                "id"         : JSON.stringify ({
+                    "user_id": data.photo.owner.nsid
+                })
+            });
+        }});
+    } else if (className == "photosets") {
+        jsonResolver.add ({"photoset.owner": function (data) {
+            return ({
+                "objectClass": "people",
+                "id"         : JSON.stringify ({
+                    "user_id": data.photoset.owner
+                })
+            });
+        }});
     }
 }
 
 function flickrFixJSONFormatting (jsonObject) {
     var keys, keysLength, keyPos;
-    if (Array.isArray (jsonObject)) {
-        return (jsonObject.map (flickrFixJSONFormatting));
-    } else if ((typeof jsonObject) == 'object') {
-        keys = Object.keys (jsonObject);
-        keysLength = keys.length;
-        keyPos;
-        if (keysLength == 1 && keys[0] == '_content') {
-            return (flickrFixJSONFormatting (jsonObject['_content']));
-        } else {
-            for (keyPos = 0; keyPos < keysLength; keyPos++) {
-                jsonObject[keys[keyPos]] = flickrFixJSONFormatting (jsonObject[keys[keyPos]]);
+    if (jsonObject) {
+        if (Array.isArray (jsonObject)) {
+            return (jsonObject.map (flickrFixJSONFormatting));
+        } else if ((typeof jsonObject) == 'object') {
+            keys = Object.keys (jsonObject);
+            keysLength = keys.length;
+            keyPos;
+            if (keysLength == 1 && keys[0] == '_content') {
+                return (flickrFixJSONFormatting (jsonObject['_content']));
+            } else {
+                for (keyPos = 0; keyPos < keysLength; keyPos++) {
+                    jsonObject[keys[keyPos]] = flickrFixJSONFormatting (jsonObject[keys[keyPos]]);
+                }
             }
         }
     }
