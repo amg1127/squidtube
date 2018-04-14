@@ -61,7 +61,7 @@ private:
     virtual bool lock (const unsigned int requestId);
     virtual bool unlock (const unsigned int);
     virtual bool unlockedRead (const unsigned int, const QString& className, const QString& id, QJsonDocument& data, qint64& timestampCreated);
-    virtual bool unlockedWrite (const unsigned int, const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated);
+    virtual bool unlockedWrite (const unsigned int requestId, const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated);
 public:
     ObjectCacheMemory (const QString& helperName, ObjectCacheDatabase& databaseCache);
     virtual ~ObjectCacheMemory ();

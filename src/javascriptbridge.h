@@ -149,7 +149,7 @@ public:
     QJSValue makeEntryPoint (int index);
     // http://doc.qt.io/qt-5/qtqml-cppintegration-data.html#conversion-between-qt-and-javascript-types
     Q_INVOKABLE void receiveValue (unsigned int transactionId, const QString& method, const QJSValue& returnedValue);
-    Q_INVOKABLE void require (const QJSValue& library);
+    Q_INVOKABLE bool require (const QJSValue& library);
     Q_INVOKABLE unsigned int setTimeout (const QJSValue& callback, const int interval);
     Q_INVOKABLE unsigned int setInterval (const QJSValue& callback, const int interval);
     Q_INVOKABLE void clearTimeout (unsigned int timerId);

@@ -383,11 +383,12 @@ bool loadRuntimeVariables () {
     }
 
     // Load helpers into the memory
-    qDebug() << "Loading helper contents into memory...";
-    QString helperJailTemplate (AppRuntime::readFileContents (":/helperjail.js"));
+    qDebug() << "Loading the helper jailer into memory...";
+    QString helperJailTemplate (AppRuntime::readFileContents (":/helperjailer.js"));
     if (helperJailTemplate.isNull ()) {
-        qFatal("Unable to read resource file ':/helperjail.js'!");
+        qFatal("Unable to read resource file ':/helperjailer.js'!");
     } else {
+        qDebug() << "Loading helper contents into memory...";
         QString helperContents;
         QRegExp helperJailPlaceHolder ("/\\*\\s*Helper\\s+code\\s+goes\\s+here\\W", Qt::CaseInsensitive);
         if (! helperJailPlaceHolder.isValid ()) {
@@ -422,7 +423,6 @@ bool loadRuntimeVariables () {
                     } else {
                         AppRuntime::helperSourcesByName[(*helper)] = helperJailTemplateBegin + "\n" + AppRuntime::helperSourcesByName[(*helper)] + "\n" + helperContents + helperJailTemplate;
                         AppRuntime::helperMemoryCache.append (new AppHelperObjectCache());
-                        qDebug() << QString("Loaded helper '%1' from script file '%2'.").arg(*helper).arg(helperFile.fileName());
                     }
                 }
                 if (! helpersLoaded) {

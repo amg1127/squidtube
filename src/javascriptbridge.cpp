@@ -366,6 +366,10 @@ void JavascriptNetworkRequest::networkReplyFinished () {
             this->setPrivateData ("sendFlag", false);
             this->setPrivateData ("responseObject", "type", "failure");
             if (networkError == QNetworkReply::RemoteHostClosedError && this->downloadStarted) {
+                if (this->responseStatus >= 200 && this->responseStatus < 300) {
+                    this->setPrivateData ("status", 0);
+                    this->setPrivateData ("statusText", QString("NetworkError: %1").arg(this->networkReply->errorString ()));
+                }
                 this->setPrivateData ("responseObject", "value", "NetworkError");
             } else {
                 QString exception ("NetworkError");
@@ -384,7 +388,10 @@ void JavascriptNetworkRequest::networkReplyFinished () {
                         }
                     }
                 }
-                this->setPrivateData ("responseObject", "value", QString("%1: %2").arg(exception).arg(this->networkReply->errorString ()));
+                QString errorString (QString("%1: %2").arg(exception).arg(this->networkReply->errorString ()));
+                this->setPrivateData ("status", 0);
+                this->setPrivateData ("statusText", errorString);
+                this->setPrivateData ("responseObject", "value", errorString);
                 this->fireEvent ("onreadystatechange");
                 QJSValue uploadCompleteFlag;
                 if (this->getPrivateData ("uploadCompleteFlag", uploadCompleteFlag)) {
@@ -578,7 +585,27 @@ JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestC
     this->networkManager->setRedirectPolicy (QNetworkRequest::ManualRedirectPolicy);
 #endif
     // "require();" function implementation
-    jsEngine.globalObject().setProperty ("require", this->myself.property ("require"));
+    int scriptLine = __LINE__ + 2;
+    QString requireCode (
+        "(function (callback) {\n"
+        "    return (function (library) {\n"
+        "        if (! callback (library)) {\n"
+        "            throw new ReferenceError (\"Unable to load library '\" + library + \" into the runtime environment!\");\n"
+        "        }\n"
+        "    });\n"
+        "});\n"
+    );
+    QJSValue requireEntryPoint = jsEngine.evaluate (requireCode, __FILE__, scriptLine);
+    if (! JavascriptBridge::warnJsError (jsEngine, requireEntryPoint, "Unable to initialize 'require' method within the QJSEngine!")) {
+        if (requireEntryPoint.isCallable ()) {
+            requireEntryPoint = requireEntryPoint.call (QJSValueList() << this->myself.property ("require"));
+            if (! JavascriptBridge::warnJsError (jsEngine, requireEntryPoint, "Unable to retrieve 'require' method implementation from the QJSEngine environment!")) {
+                 jsEngine.globalObject().setProperty ("require", requireEntryPoint);
+            }
+        } else {
+            qCritical() << "'require' method initialization procedure did not return a callable object!";
+        }
+    }
     // "set/clear Timeout/Interval" functions implementation
     jsEngine.globalObject().setProperty ("setTimeout", this->myself.property ("setTimeout"));
     jsEngine.globalObject().setProperty ("setInterval", this->myself.property ("setInterval"));
@@ -607,7 +634,7 @@ JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestC
         qFatal("Unable to read resource file ':/xmlhttprequest.js'!");
     } else {
         QJSValue xmlHttpRequestFunction = jsEngine.evaluate (xmlHttpCode, ":/xmlhttprequest.js");
-        if (! JavascriptBridge::warnJsError ((*(this->jsEngine)), xmlHttpRequestFunction, "Unable to initialize XMLHttpRequest object within the QJSEngine!")) {
+        if (! JavascriptBridge::warnJsError (jsEngine, xmlHttpRequestFunction, "Unable to initialize 'XMLHttpRequest' object within the QJSEngine!")) {
             if (xmlHttpRequestFunction.isCallable ()) {
                 // Make sure C++ and Javascript agree with the XMLHttpRequest status codes.
                 QJSValue xmlHttpRequest_statusCodes = jsEngine.newObject ();
@@ -622,11 +649,11 @@ JavascriptBridge::JavascriptBridge (QJSEngine& jsEngine, const QString& requestC
                     << this->myself.property ("xmlHttpRequest_setTimeout")
                     << xmlHttpRequest_statusCodes
                 );
-                if (! JavascriptBridge::warnJsError ((*(this->jsEngine)), xmlHttpRequest, "Unable to retrieve the XMLHttpRequest constructor from the code!")) {
+                if (! JavascriptBridge::warnJsError (jsEngine, xmlHttpRequest, "Unable to retrieve the 'XMLHttpRequest' object constructor from the QJSEngine environment!")) {
                     jsEngine.globalObject().setProperty ("XMLHttpRequest", xmlHttpRequest);
                 }
             } else {
-                qCritical() << "XMLHttpRequest initialization procedure did not return a callable object!";
+                qCritical() << "'XMLHttpRequest' object initialization procedure did not return a callable object!";
             }
         }
     }
@@ -700,31 +727,36 @@ void JavascriptBridge::receiveValue (unsigned int transactionId, const QString& 
     }
 }
 
-void JavascriptBridge::require (const QJSValue& library) {
+bool JavascriptBridge::require (const QJSValue& library) {
     if (library.isString ()) {
         QString libraryName (library.toString ());
         QString libraryCode;
-        if (! this->loadedLibraries.contains (libraryName)) {
+        if (this->loadedLibraries.contains (libraryName)) {
+            return (true);
+        } else {
             {
                 QMutexLocker m_lck (&AppRuntime::commonSourcesMutex);
                 QHash<QString,QString>::const_iterator librarySource (AppRuntime::commonSources.find(libraryName));
                 if (librarySource != AppRuntime::commonSources.constEnd()) {
-                    // Force a deep copy of the library source code
+                    // Also force a deep copy of the library source code
                     // http://doc.qt.io/qt-5/implicit-sharing.html
-                    libraryCode = QString("%1").arg(librarySource.value());
+                    libraryCode = QString("\"use strict\";\n%1").arg(librarySource.value());
                 }
             }
             if (libraryCode.isNull ()) {
                 qInfo() << QString("Library '%1' requested by a helper on channel #%2 was not found!").arg(libraryName).arg(this->requestChannel);
             } else {
                 qDebug() << QString("Loading library '%1' requested by a helper on channel #%2...").arg(libraryName).arg(this->requestChannel);
-                this->loadedLibraries.append (libraryName);
-                JavascriptBridge::warnJsError ((*(this->jsEngine)), this->jsEngine->evaluate(libraryCode, AppConstants::AppCommonSubDir + "/" + libraryName + AppConstants::AppHelperExtension), QString("Uncaught exception found while library '%1' was being loaded on channel #%2...").arg(libraryName).arg(this->requestChannel));
+                if (! JavascriptBridge::warnJsError ((*(this->jsEngine)), this->jsEngine->evaluate(libraryCode, AppConstants::AppCommonSubDir + "/" + libraryName + AppConstants::AppHelperExtension, 0), QString("Uncaught exception found while library '%1' was being loaded on channel #%2...").arg(libraryName).arg(this->requestChannel))) {
+                    this->loadedLibraries.append (libraryName);
+                    return (true);
+                }
             }
         }
     } else {
         qInfo() << QString("Unable to load a library requested by a helper on channel #%1 because an invalid specification!").arg(this->requestChannel);
     }
+    return (false);
 }
 
 unsigned int JavascriptBridge::setTimeout (const QJSValue& callback, const int interval) {

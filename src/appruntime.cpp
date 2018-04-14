@@ -73,7 +73,7 @@ QString AppRuntime::readFileContents (QFile& fileObj) {
         }
         fileObj.close ();
         if (read) {
-            qDebug() << QString("Sucessfully loaded contents of the file '%1'.").arg(fileObj.fileName());
+            qDebug() << QString("Successfully loaded contents of the file '%1'.").arg(fileObj.fileName());
             return (fileContents);
         }
     } else {

@@ -268,7 +268,7 @@ bool ObjectCacheMemory::unlockedRead (const unsigned int, const QString& classNa
     return (false);
 }
 
-bool ObjectCacheMemory::unlockedWrite (const unsigned int, const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated) {
+bool ObjectCacheMemory::unlockedWrite (const unsigned int requestId, const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated) {
     QHash<QString,AppHelperClass*>::iterator classNameIterator = this->objectCache->classNames.find (className);
     if (classNameIterator == this->objectCache->classNames.end()) {
         classNameIterator = this->objectCache->classNames.insert (className, new AppHelperClass ());
@@ -287,11 +287,13 @@ bool ObjectCacheMemory::unlockedWrite (const unsigned int, const QString& classN
         this->objectCache->cacheSize++;
         if (this->objectCache->cacheSize > AppConstants::AppHelperCacheMaxSize) {
             AppHelperObject* removedIdObj;
-            for (int i = 0; i < AppConstants::AppHelperCacheVacuumSize && this->objectCache->cacheSize > 1; i++, this->objectCache->cacheSize--) {
+            int i;
+            for (i = 0; i < AppConstants::AppHelperCacheVacuumSize && this->objectCache->cacheSize > 1; i++, this->objectCache->cacheSize--) {
                 removedIdObj = this->objectCache->cachedIds.takeLast ();
                 removedIdObj->objectClass->ids.erase (removedIdObj->classPosition);
                 delete (removedIdObj);
             }
+            qDebug() << QString("[%1#%2] %3 entries were deleted from %4 cache because the maximum number of entries (%5) had been reached.").arg(this->helperName).arg(requestId).arg(i).arg(this->cacheType).arg(AppConstants::AppHelperCacheMaxSize);
         }
     }
     idObj->data = data;
