@@ -65,7 +65,7 @@ INSTALLS += configfiles
 
 DISTFILES += \
     xmlhttprequest.js \
-    helperjail.js
+    helperjailer.js
 
 RESOURCES += \
     javascriptsources.qrc

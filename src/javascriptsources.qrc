@@ -1,6 +1,6 @@
 <RCC>
     <qresource prefix="/">
-        <file>helperjail.js</file>
+        <file>helperjailer.js</file>
         <file>xmlhttprequest.js</file>
     </qresource>
 </RCC>
