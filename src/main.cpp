@@ -97,6 +97,7 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
         QString msgLineContext ("");
         QString dateTimeFormat ("yyyy-MM-dd'T'HH:mm:sst");
 #else
+        prefix.prepend (QString("0x%1 ").arg((ulong) QThread::currentThreadId(), 16, 16, QChar('0')));
         QString msgLineContext (QString(" (%1:%2%3)").arg((context.file) ? ((context.file[0]) ? context.file : "(unknown)") : "(unknown)").arg((context.line) ? context.line : 0).arg((context.function) ? ((context.function[0]) ? (QString(", %1").arg(context.function)) : "") : ""));
         QString dateTimeFormat ("yyyy-MM-dd'T'HH:mm:ss.zzzt");
 #endif
@@ -110,7 +111,7 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
                 msgTransform.remove (0, 1);
             if (msgTransform.right(1) == "\"")
                 msgTransform.chop(1);
-            QString msgLineFormatted (QString("[%1] 0x%2 %3: %4").arg(AppRuntime::currentDateTime().toString(dateTimeFormat)).arg((ulong) QThread::currentThreadId(), 16, 16, QChar('0')).arg(prefix).arg(msgTransform.trimmed() + msgLineContext));
+            QString msgLineFormatted (QString("[%1] %2: %3").arg(AppRuntime::currentDateTime().toString(dateTimeFormat)).arg(prefix).arg(msgTransform.trimmed() + msgLineContext));
             std::cerr << msgLineFormatted.toLocal8Bit().constData() << std::endl;
         }
     }
