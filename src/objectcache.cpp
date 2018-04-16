@@ -47,7 +47,7 @@ CacheStatus ObjectCache::read (const unsigned int requestId, const QString& clas
             }
             data = _data;
             timestampCreated = _timestampCreated;
-        } else if ((_timestampCreated + AppConstants::AppHelperMaxWait) >= timestampNow) {
+        } else if ((_timestampCreated + AppConstants::AppHelperMaxWait) > timestampNow) {
             returnValue = CacheOnProgress;
         } else {
             /*
@@ -109,11 +109,11 @@ bool ObjectCache::jsonDocumentHasData (const QJsonDocument& data) {
 
 CacheStatus ObjectCache::jsonDocumentIsFresh (const QJsonDocument& data, const qint64 timestampCreated, const qint64 timestampNow) {
     if (jsonDocumentIsValid (data)) {
-        if ((timestampCreated + AppRuntime::positiveTTLint) >= timestampNow) {
+        if ((timestampCreated + AppRuntime::positiveTTLint) > timestampNow) {
             return (CacheHitPositive);
         }
     } else {
-        if ((timestampCreated + AppRuntime::negativeTTLint) >= timestampNow) {
+        if ((timestampCreated + AppRuntime::negativeTTLint) > timestampNow) {
             return (CacheHitNegative);
         }
     }
