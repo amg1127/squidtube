@@ -176,6 +176,7 @@ function cli_sapi () {
         msg_fatal ("Unable to launch the project executable!");
     }
     $GLOBALS['projectSTDIN'] = $pipes[0];
+    stream_set_write_buffer ($GLOBALS['projectSTDIN'], 0);
     $GLOBALS['projectSTDOUT'] = $pipes[1];
     $GLOBALS['projectSTDERR'] = fopen ($projectLogFile, "rt");
     if (! $GLOBALS['projectSTDERR']) {
@@ -193,6 +194,7 @@ function cli_sapi () {
         if (! stream_set_blocking ($fd, false)) {
             $unblocked = false;
         }
+        stream_set_read_buffer ($fd, 0);
     }
     if (! $unblocked) {
         msg_warning ("Unable to set nonblocking mode for file descriptors!");
@@ -342,6 +344,7 @@ function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $t
         if ($bytes === false) {
             break;
         }
+        fflush ($GLOBALS['projectSTDIN']);
     }
     if ($bytes !== false) {
         return (true);
@@ -352,32 +355,42 @@ function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $t
     }
 }
 
-function readLineFromDescriptor ($fd) {
-    $line = stream_get_line ($fd, 32768, "\n");
-    if ($line === false) {
-        $start = time ();
-        do {
-            usleep (250000);
-            if (($line = stream_get_line ($fd, 32768, "\n")) !== false) {
-                break;
-            }
-            $procStatus = getProcessExitCode ();
-            if ($procStatus !== false) {
-                msg_warning ("Project executable ended unexpectedly with code #" . $procStatus . "! Did it crash?");
-                $GLOBALS['exitCode'] = 1;
-                break;
-            }
-            msg_warning ('Input is not ready yet. Waiting...');
-        } while ((time() - $start) < 300);
+function readLineFromDescriptor ($fd, $timeout) {
+    $line = false;
+    $fdArray = array ($fd);
+    $selectStatus = stream_select ($fdArray, $writeFds = null, $exceptFds = null, $timeout);
+    if ($selectStatus || $selectStatus === false) {
+        $line = stream_get_line ($fd, 32768, "\n");
         if ($line === false) {
-            msg_warning ('Unable to read input!');
+            // It will perform a busy waiting as fallback if something goes wrong...
+            $start = $prev = time ();
+            do {
+                usleep (10000);
+                if (($line = stream_get_line ($fd, 32768, "\n")) !== false) {
+                    break;
+                }
+                $procStatus = getProcessExitCode ();
+                if ($procStatus !== false) {
+                    msg_warning ("Project executable ended unexpectedly with code #" . $procStatus . "! Did it crash?");
+                    $GLOBALS['exitCode'] = 1;
+                    break;
+                }
+                $now = time();
+                if ($prev < $now) {
+                    msg_warning ('Input is not ready yet. Waiting...');
+                    $prev = $now;
+                }
+            } while (($now - $start) < $timeout);
         }
+    }
+    if ($line === false) {
+        msg_warning ('Unable to read input!');
     }
     return ($line);
 }
 
-function stderrExpect ($regexp) {
-    while (($line = readLineFromDescriptor ($GLOBALS['projectSTDERR'])) !== false) {
+function stderrExpect ($regexp, $timeout = 30) {
+    while (($line = readLineFromDescriptor ($GLOBALS['projectSTDERR'], $timeout)) !== false) {
         $line = trim (preg_replace ('/^\\s*\\[\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(|\\.\\d+)(Z|UTC|[+-]\\d+(|:\\d+))\\]\\s+(|0[xX][a-fA-F0-9]+\\s+)(\\w+\\s*:\\s)/', '\\5', $line));
         if (preg_match ('/^' . $regexp . '/', $line)) {
             return (true);
@@ -388,16 +401,16 @@ function stderrExpect ($regexp) {
     return (false);
 }
 
-function stdoutExpect ($what) {
-    if (($line = readLineFromDescriptor ($GLOBALS['projectSTDOUT'])) !== false) {
+function stdoutExpect ($what, $timeout = 30) {
+    if (($line = readLineFromDescriptor ($GLOBALS['projectSTDOUT'], $timeout)) !== false) {
         $line = trim ($line);
         if (preg_match ('/^\\s*(|(\\d+)\\s+)(OK|ERR|BH)\\s+message=(\\S+)\\s+log=\\S+\\s*$/', $line, $matches)) {
             $matches[4] = urldecode ($matches[4]);
-            if ($what == STDOUT_EXPECT_MATCH && $matches[3] == "OK" && preg_match ('/^(Cached|Retrieved)\\s+data\\s+from\\s+.*\\)\\s+matches\\s+specified\\s+criteria\\.?$/', $matches[4])) {
+            if ($what == STDOUT_EXPECT_MATCH && $matches[3] == "OK" && preg_match ('/^\\[[^\\]]+#\\d+\\]\\s+(Cached|Retrieved)\\s+data\\s+from\\s+.*\\)\\s+matches\\s+specified\\s+criteria\\.?$/', $matches[4])) {
                 return ($matches[1]);
-            } else if ($what == STDOUT_EXPECT_NOMATCH && $match[3] == "ERR" && preg_match ('/^(Cached|Retrieved)\\s+data\\s+from\\s+.*\\)\\s+does\\s+not\\s+match\\s+specified\\s+criteria\\.?$/', $matches[4])) {
+            } else if ($what == STDOUT_EXPECT_NOMATCH && $matches[3] == "ERR" && preg_match ('/^\\[[^\\]]+#\\d+\\]\\s+(Cached|Retrieved)\\s+data\\s+from\\s+.*\\)\\s+does\\s+not\\s+match\\s+specified\\s+criteria\\.?$/', $matches[4])) {
                 return ($matches[1]);
-            } else if ($what == STDOUT_EXPECT_NOHELPER && $match[3] == "ERR" && preg_match ('/^Unable\\s+to\\s+find\\s+a\\s+helper\\s+/', $matches[4])) {
+            } else if ($what == STDOUT_EXPECT_NOHELPER && $matches[3] == "ERR" && preg_match ('/^Unable\\s+to\\s+find\\s+a\\s+helper\\s+/', $matches[4])) {
                 return ($matches[1]);
             }
         }
@@ -407,20 +420,20 @@ function stdoutExpect ($what) {
     return (false);
 }
 
-function stderrExpectAnswer () {
-    return (stderrExpect('INFO:\\s*Channel\\s+#\\d*\\s+answered\\s*:\\s+'));
+function stderrExpectAnswer ($timeout = 30) {
+    return (stderrExpect('INFO:\\s*Channel\\s+#\\d*\\s+answered\\s*:\\s+', $timeout));
 }
 
-function stdoutExpectMatch () {
-    return (stdoutExpect (STDOUT_EXPECT_MATCH) && stderrExpectAnswer ());
+function stdoutExpectMatch ($timeout = 30) {
+    return (stdoutExpect (STDOUT_EXPECT_MATCH, $timeout) && stderrExpectAnswer ($timeout));
 }
 
-function stdoutExpectNoMatch () {
-    return (stdoutExpect (STDOUT_EXPECT_NOMATCH) && stderrExpectAnswer ());
+function stdoutExpectNoMatch ($timeout = 30) {
+    return (stdoutExpect (STDOUT_EXPECT_NOMATCH, $timeout) && stderrExpectAnswer ($timeout));
 }
 
-function stdoutExpectNoHelper () {
-    return (stdoutExpect (STDOUT_EXPECT_NOHELPER) && stderrExpectAnswer ());
+function stdoutExpectNoHelper ($timeout = 30) {
+    return (stdoutExpect (STDOUT_EXPECT_NOHELPER, $timeout) && stderrExpectAnswer ($timeout));
 }
 
 function includeWithScopeProtection ($file) {
