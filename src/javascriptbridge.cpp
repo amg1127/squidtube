@@ -330,6 +330,7 @@ void JavascriptNetworkRequest::networkReplyDownloadProgress (qint64 bytesReceive
             }
             if (bytesReceived > 0 || bytesTotal > 0) {
                 this->setPrivateData ("state", JavascriptNetworkRequest::status_LOADING);
+                this->fireEvent ("onreadystatechange");
             }
         }
         this->appendResponseBuffer ();
