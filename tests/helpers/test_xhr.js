@@ -29,7 +29,7 @@ function getPropertiesFromObject (returnValue, className, id) {
             console.log ("|    loaded=" + eventData.loaded);
             console.log ("|    total=" + eventData.total);
             console.log ("|    XHR.status=" + xhr.status);
-            console.log ("|    XHR.statusText=" + xhr.statusText);
+            console.log ("|    XHR.statusText='" + xhr.statusText + "'");
         });
     };
 

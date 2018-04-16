@@ -1,9 +1,11 @@
 TEMPLATE = subdirs
-SUBDIRS += common helpers src
+SUBDIRS += common helpers src tests
 
 ###########################
 # Make test support
 
 include (project-defs.pri)
-test.commands = php -d allow_url_fopen=1 tests/test.php $${project_name}
-QMAKE_EXTRA_TARGETS += test
+test.commands = $(MAKE) -C tests test
+test.depends = build
+build.commands = $(MAKE)
+QMAKE_EXTRA_TARGETS += test build

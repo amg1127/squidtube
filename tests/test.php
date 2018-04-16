@@ -358,7 +358,9 @@ function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $t
 function readLineFromDescriptor ($fd, $timeout) {
     $line = false;
     $fdArray = array ($fd);
-    $selectStatus = stream_select ($fdArray, $writeFds = null, $exceptFds = null, $timeout);
+    $writeFds = null;
+    $exceptFds = null;
+    $selectStatus = stream_select ($fdArray, $writeFds, $exceptFds, $timeout);
     if ($selectStatus || $selectStatus === false) {
         $line = stream_get_line ($fd, 32768, "\n");
         if ($line === false) {
