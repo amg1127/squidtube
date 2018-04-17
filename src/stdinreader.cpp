@@ -4,12 +4,12 @@ StdinReader::StdinReader (QObject *parent) : QThread (parent) {
 }
 
 void StdinReader::run () {
-    qInfo() << "StdinReader thread started.";
+    qInfo ("StdinReader thread started.");
     std::string stdinLine;
     while (! std::getline (std::cin, stdinLine).eof()) {
         // Expected format is [channel-ID] %URI property [-flag [-flag [...] ] ] criteria [criteria [criteria [...]]]
         QString tokens (QString::fromLocal8Bit(stdinLine.data(), (int) stdinLine.size()).trimmed ());
-        qInfo() << QString("Received an ACL matching request: '%1'").arg(tokens);
+        qInfo ("Received an ACL matching request: '%s'", tokens.toLatin1().constData());
         if (tokens.isEmpty ()) {
             emit writeAnswerLine ("", "an empty request was received", true, false);
         } else {
@@ -46,5 +46,5 @@ void StdinReader::run () {
             }
         }
     }
-    qInfo() << "StdinReader thread finished.";
+    qInfo ("StdinReader thread finished.");
 }

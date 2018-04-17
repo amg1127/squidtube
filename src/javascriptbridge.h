@@ -21,7 +21,6 @@
 #include <QNetworkRequest>
 #include <QObject>
 #include <QPair>
-#include <QtDebug>
 #include <QTextCodec>
 #include <QTextEncoder>
 #include <QTextDecoder>

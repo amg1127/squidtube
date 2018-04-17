@@ -1,8 +1,6 @@
 #include "appconfig.h"
 #include "appruntime.h"
 
-#include <QtDebug>
-
 // Rules that dictate valid configuration parameters and their syntaxes go below
 
 QList<AppConfigValidSetting> AppConfig::AppConfigValidSettings = QList<AppConfigValidSetting>()
@@ -57,10 +55,10 @@ bool AppConfig::validateSettings () {
             if (i->configSyntax.exactMatch(*(i->configValue))) {
                 continue;
             } else {
-                qCritical() << QString("Invalid value '%3' is set for configuration key '%1/%2'.").arg(i->configSection).arg(i->configName).arg(*(i->configValue));
+                qCritical ("Configuration key '%s/%s' is set an invalid value '%s'!", i->configSection.toLatin1().constData(), i->configName.toLatin1().constData(), i->configValue->toLatin1().constData());
             }
         } else {
-            qCritical() << QString("Syntax check validator for configuration key '%1/%2' does not work!").arg(i->configSection).arg(i->configName);
+            qCritical ("Syntax check validator for configuration key '%s/%s' does not work!", i->configSection.toLatin1().constData(), i->configName.toLatin1().constData());
         }
         return (false);
     }

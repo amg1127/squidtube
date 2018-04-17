@@ -56,7 +56,7 @@ private:
     void processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls);
     void processObjectFromUrl (unsigned int requestId, const QJSValue& appHelperObjectFromUrl);
     void processPropertiesFromObject (unsigned int requestId, const QJSValue& appHelperPropertiesFromObject);
-    static QString jsonType (const QJsonValue& jsonValue);
+    static const char* jsonType (const QJsonValue& jsonValue);
     static bool processCriteria (
         const QString& requestHelperName,
         const unsigned int requestId,

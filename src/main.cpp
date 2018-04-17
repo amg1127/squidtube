@@ -16,7 +16,6 @@
 #include <QMutexLocker>
 #include <QNetworkProxyFactory>
 #include <QSettings>
-#include <QtDebug>
 
 #ifdef Q_OS_LINUX
 #include <cstring>
@@ -37,13 +36,13 @@ int main(int argc, char *argv[]) {
     QCoreApplication::setOrganizationName(APP_owner_name);
 
     QCoreApplication app(argc, argv);
-    qDebug() << "Starting ...";
+    qDebug ("Starting ...");
 
     // Make sure that default program settings are valid
     // The validation code builds only if debug build is requested during compilation
 #ifndef QT_NO_DEBUG
     if (! AppConfig::validateSettings ()) {
-        qFatal("Application default settings is invalid!");
+        qFatal ("Application default settings is invalid!");
     }
 #endif
 
@@ -60,11 +59,11 @@ int main(int argc, char *argv[]) {
         QObject::connect (&jobDispatcher, &JobDispatcher::finished, &app, &QCoreApplication::quit, Qt::QueuedConnection);
         jobDispatcher.start ();
 
-        qDebug() << QString("Startup finished. Entering main loop... (appVer=%1, qtBuild=%2, qtRun=%3)").arg(APP_project_version).arg(QT_VERSION_STR).arg(qVersion());
+        qDebug ("Startup finished. Entering main loop... (appVer=%s, qtBuild=%s, qtRun=%s)", APP_project_version, QT_VERSION_STR, qVersion());
         returnValue = app.exec ();
     }
 
-    qDebug() << "Performing final cleaning and finishing program...";
+    qDebug ("Performing final cleaning and finishing program...");
     unloadRuntimeVariables ();
     return (returnValue);
 }
@@ -98,7 +97,22 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
         QString dateTimeFormat ("yyyy-MM-dd'T'HH:mm:sst");
 #else
         prefix.prepend (QString("0x%1 ").arg((ulong) QThread::currentThreadId(), 16, 16, QChar('0')));
-        QString msgLineContext (QString(" (%1:%2%3)").arg((context.file) ? ((context.file[0]) ? context.file : "(unknown)") : "(unknown)").arg((context.line) ? context.line : 0).arg((context.function) ? ((context.function[0]) ? (QString(", %1").arg(context.function)) : "") : ""));
+        QString msgLineContext (" (");
+        if (context.file) {
+            if (context.file[0]) {
+                msgLineContext += QString("%1:%2").arg(context.file, QString::number (context.line));
+            }
+        }
+        if (context.function) {
+            if (context.function[0]) {
+                msgLineContext += QString(", %1").arg (context.function);
+            }
+        }
+        if (msgLineContext.length() > 2) {
+            msgLineContext += ")";
+        } else {
+            msgLineContext.clear ();
+        }
         QString dateTimeFormat ("yyyy-MM-dd'T'HH:mm:ss.zzzt");
 #endif
         QStringList msgLines (msg.split(QRegExp("[\\r\\n]+"), QString::SkipEmptyParts));
@@ -107,11 +121,7 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
             while ((! msgTransform.isEmpty ()) && msgTransform.right(1).at(0).isSpace()) {
                 msgTransform.chop(1);
             }
-            if (msgTransform.left(1) == "\"")
-                msgTransform.remove (0, 1);
-            if (msgTransform.right(1) == "\"")
-                msgTransform.chop(1);
-            QString msgLineFormatted (QString("[%1] %2: %3").arg(AppRuntime::currentDateTime().toString(dateTimeFormat)).arg(prefix).arg(msgTransform.trimmed() + msgLineContext));
+            QString msgLineFormatted (QString("[%1] %2: %3").arg(AppRuntime::currentDateTime().toString(dateTimeFormat), prefix, msgTransform + msgLineContext));
             std::cerr << msgLineFormatted.toLocal8Bit().constData() << std::endl;
         }
     }
@@ -123,17 +133,17 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
 void increaseMemoryLimit () {
 #ifdef Q_OS_LINUX
     // Tries to use the maximum memory allowed by the administrator
-    qDebug() << "Increasing memory limit...";
+    qDebug ("Increasing memory limit...");
     struct rlimit rlp;
     int ret = getrlimit(RLIMIT_AS, &rlp);
     if (ret) {
-        qWarning() << QString("'getrlimit' call failed: %1: %2").arg(errno).arg(strerror(errno));
+        qWarning ("'getrlimit' call failed: %d: %s", errno, strerror(errno));
     } else {
         rlp.rlim_cur = 3 << 30;
         if (rlp.rlim_cur < rlp.rlim_max || rlp.rlim_max == RLIM_INFINITY) {
             ret = setrlimit (RLIMIT_AS, &rlp);
             if (ret) {
-                qWarning() << QString("'setrlimit' call failed: %1: %2").arg(errno).arg(strerror(errno));
+                qWarning ("'setrlimit' call failed: %d: %s", errno, strerror(errno));
             }
         }
     }
@@ -142,11 +152,11 @@ void increaseMemoryLimit () {
 
 bool loadRuntimeVariables () {
     // Parse command line options
-    qDebug() << "Parsing command line options...";
+    qDebug ("Parsing command line options...");
     QStringList arguments(QCoreApplication::arguments());
     QCommandLineParser optionsParser;
     optionsParser.setApplicationDescription ("An external Squid ACL class helper that provides control over access to videos (through my own helpers).");
-    optionsParser.addOption (QCommandLineOption ("config", "Path of the program configuration file.", "config", QString("%1/%2.conf").arg(APP_install_etc_dir).arg(APP_project_name)));
+    optionsParser.addOption (QCommandLineOption ("config", "Path of the program configuration file.", "config", QString("%1/%2.conf").arg(APP_install_etc_dir, APP_project_name)));
     for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
         optionsParser.addOption (QCommandLineOption (i->configSection + "." + i->configName, i->configDescription, i->configName, *(i->configValue)));
     }
@@ -158,7 +168,7 @@ bool loadRuntimeVariables () {
         } else if (optionsParser.isSet (versionOption)) {
             optionsParser.showVersion (); return (false);
         } else if (! optionsParser.positionalArguments().isEmpty ()) {
-            qCritical() << "This program does not accept positional arguments!";
+            qCritical ("This program does not accept positional arguments!");
             optionsParser.showHelp (1); return (false);
         } else if (optionsParser.isSet ("main.loglevel")) {
             // Apply loglevel option in advance if it is specified
@@ -176,7 +186,7 @@ bool loadRuntimeVariables () {
     // The configuration file must be read before parsing command line options,
     // because they must override settings found in configuration file
     QString configFile(optionsParser.value ("config"));
-    qDebug() << QString("Reading configuration options from file '%1'...").arg(configFile);
+    qDebug ("Reading configuration options from file '%s'...", configFile.toLatin1().constData());
     QSettings configSettings (configFile, QSettings::IniFormat);
     QSettings::Status configStatus(configSettings.status());
     if (configStatus == QSettings::NoError) {
@@ -190,7 +200,7 @@ bool loadRuntimeVariables () {
             if (configValue.isValid() && (! configValue.isNull())) {
                 // https://stackoverflow.com/a/27558297
                 if (configValue.toStringList().count() != 1) {
-                    qCritical() << QString("Invalid value '%3' is set for configuration key '%1/%2'. Please, quote the parameter!").arg(configValue.toStringList().join(",").trimmed()).arg(i->configSection).arg(i->configName);
+                    qCritical ("Invalid value '%s' is set for configuration key '%s/%s'. Please, quote the parameter!", configValue.toStringList().join(",").trimmed().toLatin1().constData(), i->configSection.toLatin1().constData(), i->configName.toLatin1().constData());
                     return (false);
                 }
                 *(i->configValue) = configValue.toString().trimmed();
@@ -208,17 +218,17 @@ bool loadRuntimeVariables () {
                     }
                 }
                 if (! configNameIsValid) {
-                    qWarning() << QString("Invalid configuration key '%1/%2' found in the configuration file!").arg(*group).arg(*configName);
+                    qWarning ("Invalid configuration key '%s/%s' found in the configuration file!", group->toLatin1().constData(), configName->toLatin1().constData());
                 }
             }
             configSettings.endGroup ();
         }
     } else {
-        qWarning() << QString("Error #%1 while reading configuration file '%2'!").arg(configStatus).arg(configFile);
+        qWarning ("Error #%d while reading configuration file '%s'!", configStatus, configFile.toLatin1().constData());
     }
 
     // Override definitions specified in command line
-    qDebug() << "Overriding configuration options specified in command line...";
+    qDebug ("Overriding configuration options specified in command line...");
     for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
         if (optionsParser.isSet (i->configSection + "." + i->configName)) {
             *(i->configValue) = optionsParser.value(i->configSection + "." + i->configName).trimmed();
@@ -233,24 +243,24 @@ bool loadRuntimeVariables () {
     QString configurationDir (QFileInfo(configFile).path());
     AppRuntime::helperNames = AppRuntime::helpers.split(",", QString::SkipEmptyParts);
     AppRuntime::helperNames.removeDuplicates();
-    qDebug() << "Detecting active helpers... Preliminary list is:" << AppRuntime::helperNames;
+    qDebug ("Detecting active helpers... Preliminary list is: ('%s').", AppRuntime::helperNames.join("', '").toLatin1().constData());
     QStringList unknownOptionNames(optionsParser.unknownOptionNames());
     // QStringList addOptionNames;
     QHash<QString,QString> globalVariables;
     for (QStringList::iterator helper = AppRuntime::helperNames.begin(); helper != AppRuntime::helperNames.end(); helper++) {
         (*helper) = helper->trimmed ();
         if (helper->isEmpty()) {
-            qCritical() << QString("Helper names can not be empty!");
+            qCritical ("Helper names can not be empty!");
             return (false);
         }
         for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
-            if (! i->configSection.compare (*helper, Qt::CaseInsensitive)) {
-                qCritical() << QString("Invalid helper specification: '%1'!").arg(*helper);
+            if (! i->configSection.compare ((*helper), Qt::CaseInsensitive)) {
+                qCritical ("Invalid helper specification: '%s'!", helper->toLatin1().constData());
                 return (false);
             }
         }
         if (! (QFile::exists (QString(APP_install_share_dir) + "/" + AppConstants::AppHelperSubDir + "/" + (*helper) + AppConstants::AppHelperExtension) || QFile::exists (configurationDir + "/" + AppConstants::AppHelperSubDir + "/" + (*helper) + AppConstants::AppHelperExtension))) {
-            qCritical() << QString("Helper name '%1' is not defined!").arg(*helper);
+            qCritical ("Helper name '%s' is not defined!", helper->toLatin1().constData());
             return (false);
         }
         // Get helper variables from configuration file
@@ -260,7 +270,7 @@ bool loadRuntimeVariables () {
             QVariant configValue (configSettings.value(*globalVariable));
             // https://stackoverflow.com/a/27558297
             if (configValue.toStringList().count() != 1) {
-                qCritical() << QString("Invalid value '%3' is set for configuration key '%1/%2'. Please, quote the parameter!").arg(*helper).arg(*globalVariable).arg(configValue.toStringList().join(",").trimmed());
+                qCritical ("Configuration key '%s/%s' has an invalid value '%s'. Please, quote the parameter!", helper->toLatin1().constData(), globalVariable->toLatin1().constData(), configValue.toStringList().join(",").trimmed().toLatin1().constData());
                 return (false);
             }
             globalVariables[(*helper) + "." + (*globalVariable)] = configValue.toString().trimmed();
@@ -275,7 +285,7 @@ bool loadRuntimeVariables () {
 
     // Parse command line arguments again, considering variables set for helpers
     // This time, parse errors are fatal
-    qDebug() << "Parsing command line options again...";
+    qDebug ("Parsing command line options again...");
     for (QHash<QString,QString>::const_iterator globalVariable = globalVariables.constBegin(); globalVariable != globalVariables.constEnd(); globalVariable++) {
         optionsParser.addOption (QCommandLineOption (globalVariable.key(), QString("Custom value for a global variable '%1'").arg(globalVariable.key()), (globalVariable.key()), (globalVariable.key())));
     }
@@ -285,7 +295,7 @@ bool loadRuntimeVariables () {
         } else if (optionsParser.isSet (versionOption)) {
             optionsParser.showVersion (); return (false);
         } else if (! optionsParser.positionalArguments().isEmpty ()) {
-            qCritical() << "This program does not accept positional arguments!";
+            qCritical ("This program does not accept positional arguments!");
             optionsParser.showHelp (1); return (false);
         }
     } else {
@@ -324,7 +334,7 @@ bool loadRuntimeVariables () {
     AppRuntime::negativeTTLint = AppRuntime::negativeTTL.toLongLong (Q_NULLPTR, 10);
 
     // Load common libraries into the memory
-    qDebug() << "Loading common library contents into memory...";
+    qDebug ("Loading common library contents into memory...");
     bool librariesLoaded = true;
     QLinkedList<QFileInfo> libraries;
 
@@ -373,7 +383,7 @@ bool loadRuntimeVariables () {
     for (QHash<QString,QString>::const_iterator library = libraryCandidates.constBegin(); librariesLoaded && library != libraryCandidates.constEnd(); library++) {
         QString libraryFileContents (AppRuntime::readFileContents (library.value()));
         if (libraryFileContents.isNull ()) {
-            qCritical() << QString("Unable to read library file '%1'!").arg(library.value());
+            qCritical ("Unable to read library file '%s'!", library.value().toLatin1().constData());
             librariesLoaded = false;
         } else {
             AppRuntime::commonSources.insert (library.key(), libraryFileContents);
@@ -384,16 +394,16 @@ bool loadRuntimeVariables () {
     }
 
     // Load helpers into the memory
-    qDebug() << "Loading the helper jailer into memory...";
+    qDebug ("Loading the helper jailer into memory...");
     QString helperJailTemplate (AppRuntime::readFileContents (":/helperjailer.js"));
     if (helperJailTemplate.isNull ()) {
-        qFatal("Unable to read resource file ':/helperjailer.js'!");
+        qFatal ("Unable to read resource file ':/helperjailer.js'!");
     } else {
-        qDebug() << "Loading helper contents into memory...";
+        qDebug ("Loading helper contents into memory...");
         QString helperContents;
         QRegExp helperJailPlaceHolder ("/\\*\\s*Helper\\s+code\\s+goes\\s+here\\W", Qt::CaseInsensitive);
         if (! helperJailPlaceHolder.isValid ()) {
-            qFatal(QString("'helperJailPlaceHolder' regular expression did not build: '%1'!").arg(helperJailPlaceHolder.errorString()).toLocal8Bit().constData());
+            qFatal ("'helperJailPlaceHolder' regular expression did not build: '%s'!", helperJailPlaceHolder.errorString().toLatin1().constData());
         }
         int helperPlaceHolderBegin = helperJailTemplate.indexOf (helperJailPlaceHolder);
         if (helperPlaceHolderBegin >= 0) {
@@ -419,7 +429,7 @@ bool loadRuntimeVariables () {
                     }
                     helperContents = AppRuntime::readFileContents (helperFile);
                     if (helperContents.isNull ()) {
-                        qCritical() << QString("Unable to read helper file '%1'!").arg(helperFile.fileName());
+                        qCritical ("Unable to read helper file '%s'!", helperFile.fileName().toLatin1().constData());
                         helpersLoaded = false;
                     } else {
                         AppRuntime::helperSourcesByName[(*helper)] = helperJailTemplateBegin + "\n" + AppRuntime::helperSourcesByName[(*helper)] + "\n" + helperContents + helperJailTemplate;
@@ -430,10 +440,10 @@ bool loadRuntimeVariables () {
                     return (false);
                 }
             } else {
-                qFatal("'helperPlaceHolderEnd' search did not succeed!");
+                qFatal ("'helperPlaceHolderEnd' search did not succeed!");
             }
         } else {
-            qFatal("'helperPlaceHolderBegin' search did not succeed!");
+            qFatal ("'helperPlaceHolderBegin' search did not succeed!");
         }
     }
 

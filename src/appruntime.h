@@ -13,7 +13,6 @@
 #include <QRegExp>
 #include <QSemaphore>
 #include <QString>
-#include <QtDebug>
 #include <QTextStream>
 #include <QUrl>
 
@@ -110,7 +109,7 @@ public:
 };
 
 // QHash<QString,AppHelperObjectCache> helperMemoryCache
-// qDebug() << helperMemoryCache["youtube"]->className["video"]->id["dQw4w9WgXcQ"]->data;
+// qDebug ("%s", helperMemoryCache["youtube"]->className["video"]->id["dQw4w9WgXcQ"]->data.toLatin1().constData());
 
 enum PropertyMatchType {
     MatchObject = 1,

@@ -64,20 +64,20 @@ QString AppRuntime::readFileContents (QFile& fileObj) {
             fileContents = fileStreamObj.readAll ();
         }
         if (fileObj.error() != QFileDevice::NoError) {
-            qWarning() << QString("Error reading contents of file '%1': '%2'!").arg(fileObj.fileName()).arg(fileObj.errorString());
+            qWarning ("Error reading contents of file '%s': '%s'!", fileObj.fileName().toLatin1().constData(), fileObj.errorString().toLatin1().constData());
             read = false;
         }
         if (! fileObj.atEnd ()) {
-            qWarning() << QString("The file '%1' was not read completely!").arg(fileObj.fileName());
+            qWarning ("The file '%s' was not read completely!", fileObj.fileName().toLatin1().constData());
             read = false;
         }
         fileObj.close ();
         if (read) {
-            qDebug() << QString("Successfully loaded contents of the file '%1'.").arg(fileObj.fileName());
+            qDebug ("Successfully loaded contents of the file '%s'.", fileObj.fileName().toLatin1().constData());
             return (fileContents);
         }
     } else {
-        qWarning() << QString("Unable to open file '%1' for reading: '%2'!").arg(fileObj.fileName()).arg(fileObj.errorString());
+        qWarning ("Unable to open file '%s' for reading: '%s'!", fileObj.fileName().toLatin1().constData(), fileObj.errorString().toLatin1().constData());
     }
     return (QString());
 }

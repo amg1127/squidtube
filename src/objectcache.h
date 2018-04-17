@@ -12,7 +12,6 @@
 #include <QMultiMap>
 #include <QMutex>
 #include <QString>
-#include <QtDebug>
 
 enum CacheStatus {
     CacheMiss = 1,

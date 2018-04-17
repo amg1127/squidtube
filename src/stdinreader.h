@@ -7,7 +7,6 @@
 #include <string>
 
 #include <QStringList>
-#include <QtDebug>
 #include <QThread>
 #include <QUrl>
 

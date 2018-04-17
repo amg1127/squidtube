@@ -10,7 +10,6 @@
 #include <QRegExp>
 #include <QString>
 #include <QStringList>
-#include <QtDebug>
 #include <QTimer>
 #include <QUrl>
 

@@ -43,6 +43,10 @@ CONFIG += warn_on
 QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion
 DEFINES += QT_DEPRECATED_WARNINGS
 
+# I want to handle character conversion explicitly
+DEFINES += QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII
+
+
 ###########################
 # Make project variables available inside the C++ code
 DEFINES += APP_project_name=\"\\\"$${project_name}\\\"\" \
