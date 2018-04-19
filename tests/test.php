@@ -1,5 +1,9 @@
 <?php
-
+@$tz = date_default_timezone_get ();
+if (empty ($tz)) {
+    $tz = "UTC";
+}
+date_default_timezone_set ($tz);
 error_reporting (-1);
 $sapi = php_sapi_name ();
 
