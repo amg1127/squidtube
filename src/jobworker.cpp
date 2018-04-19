@@ -577,7 +577,7 @@ JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
         AppHelperInfo* appHelperInfo = new AppHelperInfo;
         this->helperInstances.append (appHelperInfo);
         appHelperInfo->name = AppRuntime::helperNames.at(helperNamesPos);
-        appHelperInfo->databaseCache = new ObjectCacheDatabase (appHelperInfo->name, AppRuntime::dbTblPrefix);
+        appHelperInfo->databaseCache = new ObjectCacheDatabase (appHelperInfo->name.toLocal8Bit(), AppRuntime::dbTblPrefix);
         appHelperInfo->memoryCache = new ObjectCacheMemory (appHelperInfo->name, (*(appHelperInfo->databaseCache)));
         appHelperInfo->entryPoint = javascriptBridge->makeEntryPoint (helperNamesPos);
         if (appHelperInfo->entryPoint.isCallable ()) {

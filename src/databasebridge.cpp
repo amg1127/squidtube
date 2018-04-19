@@ -18,18 +18,18 @@ QSqlDatabase DatabaseBridge::database () {
         myDbInstance = AppRuntime::dbInstance++;
         // Also force a deep copy of the database configuration
         // http://doc.qt.io/qt-5/implicit-sharing.html
-        dbDriver = AppRuntime::dbDriver.toLocal8Bit();
-        dbHost = QString("%1").arg(AppRuntime::dbHost);
-        dbPort = QString("%1").arg(AppRuntime::dbPort);
-        dbUser = QString("%1").arg(AppRuntime::dbUser);
-        dbPassword = QString("%1").arg(AppRuntime::dbPassword);
-        dbName = QString("%1").arg(AppRuntime::dbName);
-        dbOptions = QString("%1").arg(AppRuntime::dbOptions);
+        dbDriver = QStringLiteral("%1").arg(AppRuntime::dbDriver);
+        dbHost = QStringLiteral("%1").arg(AppRuntime::dbHost);
+        dbPort = QStringLiteral("%1").arg(AppRuntime::dbPort);
+        dbUser = QStringLiteral("%1").arg(AppRuntime::dbUser);
+        dbPassword = QStringLiteral("%1").arg(AppRuntime::dbPassword);
+        dbName = QStringLiteral("%1").arg(AppRuntime::dbName);
+        dbOptions = QStringLiteral("%1").arg(AppRuntime::dbOptions);
         dbStartupQueries << AppRuntime::dbStartupQueries;
     }
     dbStartupQueries.removeFirst ();
     qDebug ("Opening a new database connection #%d...", myDbInstance);
-    QSqlDatabase sqldb (QSqlDatabase::addDatabase (dbDriver, QString("C%1").arg(myDbInstance)));
+    QSqlDatabase sqldb (QSqlDatabase::addDatabase (dbDriver, QStringLiteral("C%1").arg(myDbInstance)));
     if (sqldb.isValid()) {
         if (! dbHost.isEmpty ()) {
             sqldb.setHostName (dbHost);
@@ -59,20 +59,20 @@ QSqlDatabase DatabaseBridge::database () {
                 posQuery++;
                 QString queryString(dbStartupQueries.takeFirst());
                 qDebug ("Running startup query #%d against the database...", posQuery);
-                QSqlQuery query (sqldb.exec (queryString + ";"));
+                QSqlQuery query (sqldb.exec (queryString + QStringLiteral(";")));
                 if (DatabaseBridge::warnSqlError (query, "Unable to submit startup queries onto database connection")) {
                     query.clear ();
                     dbStartupQueries.prepend (queryString);
                     break;
                 } else {
                     QVariant field;
-                    QStringList values;
+                    QByteArrayList values;
                     int posField = 0;
                     while (query.next ()) {
                         for (field = query.value (posField); field.isValid(); field = query.value (++posField)) {
-                            values.append (field.toString());
+                            values.append (field.toByteArray());
                         }
-                        qDebug ("Startup query #%d returned the following value(s): ('%s')", posQuery, values.join("', '").toLatin1().constData());
+                        qDebug ("Startup query #%d returned the following value(s): ('%s')", posQuery, values.join("', '").constData());
                         posField = 0;
                         values.clear ();
                     }
@@ -190,7 +190,7 @@ bool DatabaseBridge::genericInsert (QSqlDatabase& database, const QByteArray& ta
 }
 
 QHash<QByteArray,QVariant> DatabaseBridge::genericSelect (QSqlDatabase& database, const QByteArray& table, const QHash<QByteArray,QVariant>& searchFields, const QByteArray& fieldList) {
-    return (DatabaseBridge::genericSelect (database, table, searchFields, fieldList.split(",")));
+    return (DatabaseBridge::genericSelect (database, table, searchFields, fieldList.split(',')));
 }
 
 QHash<QByteArray,QVariant> DatabaseBridge::genericSelect (QSqlDatabase& database, const QByteArray& table, const QHash<QByteArray,QVariant>& searchFields, const QByteArrayList& fields) {
@@ -215,7 +215,7 @@ QHash<QByteArray,QVariant> DatabaseBridge::genericSelect (QSqlDatabase& database
         }
         // SELECT %1 FROM %2 WHERE %3;
         QByteArray sqlinstr ("SELECT ");
-        sqlinstr += fields.join(", ") + " FROM " + table = " WHERE " + placeholders.join(" AND ") + ";";
+        sqlinstr += fields.join(", ") + " FROM " + table + " WHERE " + placeholders.join(" AND ") + ";";
         QSqlQuery query (database);
         if (query.prepare (QString::fromLocal8Bit (sqlinstr))) {
             for (pos = 0; pos < numFields; pos++) {
@@ -286,7 +286,7 @@ bool DatabaseBridge::genericUpdate (QSqlDatabase& database, const QByteArray& ta
             placeholdersUpdate.append (updateFieldsKeys[pos] + " = " + placeholderName);
         }
         // UPDATE %1 SET %2 WHERE %3;
-        QString sqlinstr("UPDATE ");
+        QByteArray sqlinstr("UPDATE ");
         sqlinstr += table + " SET " + placeholdersUpdate.join(", ") + " WHERE " + placeholdersSearch.join(" AND ") + ";";
         QSqlQuery query (database);
         if (query.prepare (QString::fromLocal8Bit (sqlinstr))) {

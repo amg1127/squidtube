@@ -38,13 +38,22 @@ unix {
     QMAKE_CXXFLAGS_RELEASE += -Werror
 }
 
+# What is the compiler? GCC? Clang? Neither?
+compilerSuffix4 = $$str_member($$join(QMAKE_CXX,,-,),-4,-1)
+compilerSuffix8 = $$str_member($$join(QMAKE_CXX,,-,),-8,-1)
+
 # Turn all warnings on
 CONFIG += warn_on
-QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion
+equals(compilerSuffix4,-g++):QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion
+equals(compilerSuffix8,-clang++):QMAKE_CXXFLAGS += -Weverything
 DEFINES += QT_DEPRECATED_WARNINGS
 
+# Abort compilation if there are more than 3 errors
+equals(compilerSuffix4,-g++):QMAKE_CXXFLAGS += -fmax-errors=3
+equals(compilerSuffix8,-clang++):QMAKE_CXXFLAGS += -ferror-limit=3
+
 # I want to handle character conversion explicitly
-DEFINES += QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII
+DEFINES += QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII QT_NO_CAST_FROM_BYTEARRAY
 
 
 ###########################

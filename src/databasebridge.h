@@ -17,7 +17,7 @@
 
 class DatabaseBridge {
 private:
-    const static QString placeholderPattern;
+    const static QByteArray placeholderPattern;
 public:
     static QSqlDatabase database ();
     static bool commitTransaction (QSqlDatabase& db, const QByteArray& msg = QByteArray());

@@ -339,18 +339,31 @@ function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $t
     }
     $line = trim ($line) . "\n";
     $lineLength = strlen ($line);
+    $retries = 0;
+    $maxtries = 100;
     for ($written = 0; $written < $lineLength; $written += $bytes) {
         $bytes = fwrite ($GLOBALS['projectSTDIN'], substr ($line, $written));
         if ($bytes === false) {
             break;
+        } else if ($bytes === 0) {
+            $retries++;
+            if ($retries < $maxtries) {
+                usleep (100000);
+            } else {
+                $bytes = false;
+                break;
+            }
+        } else {
+            $retries = 0;
         }
         fflush ($GLOBALS['projectSTDIN']);
     }
     if ($bytes !== false) {
         return (true);
     } else {
+        msg_warning ("Unable to send a request line to the program! Aborting...");
+        fclose ($GLOBALS['projectSTDIN']);
         $GLOBALS['exitCode'] = 1;
-        msg_warning ("Unable to send a request line to the program!");
         return (false);
     }
 }
@@ -387,6 +400,8 @@ function readLineFromDescriptor ($fd, $timeout) {
     }
     if ($line === false) {
         msg_warning ('Unable to read input!');
+        fclose ($GLOBALS['projectSTDIN']);
+        $GLOBALS['exitCode'] = 1;
     }
     return ($line);
 }
@@ -398,8 +413,8 @@ function stderrExpect ($regexp, $timeout = 30) {
             return (true);
         }
     }
-    $GLOBALS['exitCode'] = 1;
     msg_warning ("Pattern was not found on messages coming from STDERR: '" . $regexp . "'!");
+    $GLOBALS['exitCode'] = 1;
     return (false);
 }
 
@@ -417,8 +432,8 @@ function stdoutExpect ($what, $timeout = 30) {
             }
         }
     }
-    $GLOBALS['exitCode'] = 1;
     msg_warning ("STDOUT did not return an expected '" . $what . "' response: '" . $line . "'");
+    $GLOBALS['exitCode'] = 1;
     return (false);
 }
 

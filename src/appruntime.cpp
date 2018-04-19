@@ -4,23 +4,23 @@
 // Default application settings go below
 
 #ifdef QT_NO_DEBUG
-QString AppRuntime::loglevel("INFO");
+QString AppRuntime::loglevel(QStringLiteral("INFO"));
 #else
-QString AppRuntime::loglevel("DEBUG");
+QString AppRuntime::loglevel(QStringLiteral("DEBUG"));
 #endif
-QString AppRuntime::helpers("");
-QString AppRuntime::positiveTTL("2592000");
-QString AppRuntime::negativeTTL("600");
-QString AppRuntime::squidProtocol("3.4");
-QString AppRuntime::dbDriver("QSQLITE");
-QString AppRuntime::dbHost("");
-QString AppRuntime::dbPort("0");
-QString AppRuntime::dbUser("");
-QString AppRuntime::dbPassword("");
-QString AppRuntime::dbOptions("");
-QString AppRuntime::dbName(":memory:");
-QString AppRuntime::dbStartupQuery("");
-QString AppRuntime::dbTblPrefix("tblHelper_");
+QString AppRuntime::helpers(QStringLiteral(""));
+QString AppRuntime::positiveTTL(QStringLiteral("2592000"));
+QString AppRuntime::negativeTTL(QStringLiteral("600"));
+QString AppRuntime::squidProtocol(QStringLiteral("3.4"));
+QString AppRuntime::dbDriver(QStringLiteral("QSQLITE"));
+QString AppRuntime::dbHost(QStringLiteral(""));
+QString AppRuntime::dbPort(QStringLiteral("0"));
+QString AppRuntime::dbUser(QStringLiteral(""));
+QString AppRuntime::dbPassword(QStringLiteral(""));
+QString AppRuntime::dbOptions(QStringLiteral(""));
+QString AppRuntime::dbName(QStringLiteral(":memory:"));
+QString AppRuntime::dbStartupQuery(QStringLiteral(""));
+QString AppRuntime::dbTblPrefix(QStringLiteral("tblHelper_"));
 
 // Default application settings go above
 //////////////////////////////////////////////////////////////////
@@ -105,13 +105,13 @@ const int AppConstants::AppHelperTimerTimeout = 1000;
 const int AppConstants::AppHelperMaxWait = 30;
 
 // Path component where common libraries will be searched for
-const QString AppConstants::AppCommonSubDir("common");
+const QString AppConstants::AppCommonSubDir(QStringLiteral("common"));
 
 // Path component where helpers will be searched for
-const QString AppConstants::AppHelperSubDir("helpers");
+const QString AppConstants::AppHelperSubDir(QStringLiteral("helpers"));
 
 // File extension of common libraries and helpers
-const QString AppConstants::AppHelperExtension(".js");
+const QString AppConstants::AppHelperExtension(QStringLiteral(".js"));
 
 //////////////////////////////////////////////////////////////////
 

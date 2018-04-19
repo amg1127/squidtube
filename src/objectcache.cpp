@@ -3,10 +3,10 @@
 ObjectCache::~ObjectCache () {
 }
 
-ObjectCache::ObjectCache (const QString& helperName, ObjectCache* lowerCache) :
+ObjectCache::ObjectCache (const QByteArray& helperName, ObjectCache* lowerCache) :
     lowerCache (lowerCache),
     helperName (helperName),
-    cacheType (QStringLiteral("(unknown)")) {
+    cacheType ("(unknown)") {
 }
 
 /*
@@ -24,12 +24,12 @@ CacheStatus ObjectCache::read (const unsigned int requestId, const QString& clas
     CacheStatus returnValue = CacheMiss;
     QJsonDocument _data;
     qint64 _timestampCreated;
-    qDebug ("[%s#%u] Trying to search %s cache for information concerning (className='%s', id='%s')...", this->helperName.toLatin1().constData(), requestId, this->cacheType.toLatin1().constData(), className.toLatin1().constData(), id.toLatin1().constData());
+    qDebug ("[%s#%u] Trying to search %s cache for information concerning (className='%s', id='%s')...", this->helperName.constData(), requestId, this->cacheType.constData(), className.toLatin1().constData(), id.toLatin1().constData());
     bool lockStatus = this->lock (requestId);
     if (lockStatus) {
         cacheHit = this->unlockedRead (requestId, className, id, _data, _timestampCreated);
     } else {
-        qDebug ("[%s#%u] Error locking %s cache for information retrieval concerning (className='%s', id='%s')!", this->helperName.toLatin1().constData(), requestId, this->cacheType.toLatin1().constData(), className.toLatin1().constData(), id.toLatin1().constData());
+        qDebug ("[%s#%u] Error locking %s cache for information retrieval concerning (className='%s', id='%s')!", this->helperName.constData(), requestId, this->cacheType.constData(), className.toLatin1().constData(), id.toLatin1().constData());
     }
     if ((! cacheHit) && this->lowerCache != Q_NULLPTR) {
         returnValue = this->lowerCache->read (requestId, className, id, timestampNow, _data, _timestampCreated);
@@ -65,7 +65,7 @@ CacheStatus ObjectCache::read (const unsigned int requestId, const QString& clas
     }
     if (lockStatus) {
         if (! this->unlock (requestId)) {
-            qDebug ("[%s#%u] Error unlocking %s cache while retrieving information concerning (className='%s', id='%s')", this->helperName.toLatin1().constData(), requestId, this->cacheType.toLatin1().constData(), className.toLatin1().constData(), id.toLatin1().constData());
+            qDebug ("[%s#%u] Error unlocking %s cache while retrieving information concerning (className='%s', id='%s')", this->helperName.constData(), requestId, this->cacheType.constData(), className.toLatin1().constData(), id.toLatin1().constData());
         }
     }
     return (returnValue);
@@ -73,15 +73,15 @@ CacheStatus ObjectCache::read (const unsigned int requestId, const QString& clas
 
 bool ObjectCache::write (const unsigned int requestId, const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated) {
     bool returnValue = true;
-    qDebug ("[%s#%u] Trying to write into %s cache information concerning (className='%s', id='%s')...", this->helperName.toLatin1().constData(), requestId, this->cacheType.toLatin1().constData(), className.toLatin1().constData(), id.toLatin1().constData());
+    qDebug ("[%s#%u] Trying to write into %s cache information concerning (className='%s', id='%s')...", this->helperName.constData(), requestId, this->cacheType.constData(), className.toLatin1().constData(), id.toLatin1().constData());
     if (this->lock (requestId)) {
         returnValue = this->unlockedWrite (requestId, className, id, data, timestampCreated);
         if (! this->unlock (requestId)) {
-            qDebug ("[%s#%u] Error unlocking %s cache after storing information concerning (className='%s', id=%s')!", this->helperName.toLatin1().constData(), requestId, this->cacheType.toLatin1().constData(), className.toLatin1().constData(), id.toLatin1().constData());
+            qDebug ("[%s#%u] Error unlocking %s cache after storing information concerning (className='%s', id=%s')!", this->helperName.constData(), requestId, this->cacheType.constData(), className.toLatin1().constData(), id.toLatin1().constData());
             returnValue = false;
         }
     } else {
-        qDebug ("[%s#%u] Error locking %s cache to store information concerning (className='%s', id='%s'!", this->helperName.toLatin1().constData(), requestId, this->cacheType.toLatin1().constData(), className.toLatin1().constData(), id.toLatin1().constData());
+        qDebug ("[%s#%u] Error locking %s cache to store information concerning (className='%s', id='%s'!", this->helperName.constData(), requestId, this->cacheType.constData(), className.toLatin1().constData(), id.toLatin1().constData());
         returnValue = false;
     }
     if (this->lowerCache != Q_NULLPTR) {
@@ -122,11 +122,15 @@ CacheStatus ObjectCache::jsonDocumentIsFresh (const QJsonDocument& data, const q
 
 //////////////////////////////////////////////////////////////////
 
-ObjectCacheDatabase::ObjectCacheDatabase (const QString& helperName, const QString& dbTblPrefix) :
+ObjectCacheDatabase::ObjectCacheDatabase (const QByteArray& helperName, const QByteArray& dbTblPrefix) :
     ObjectCache (helperName, Q_NULLPTR) {
-    this->cacheType = QStringLiteral("database");
-    QString helperNameModified (helperName);
-    helperNameModified.replace (QRegExp(QStringLiteral("\\W")), QStringLiteral("_"));
+    this->cacheType = "database";
+    QByteArray helperNameModified (helperName);
+    for (QByteArray::iterator character = helperNameModified.begin(); character != helperNameModified.end(); character++) {
+        if (! QChar::isLetterOrNumber (*character)) {
+            (*character) = '_';
+        }
+    }
     this->dbTable = dbTblPrefix + helperNameModified;
 }
 
@@ -139,25 +143,26 @@ bool ObjectCacheDatabase::lock (const unsigned int requestId) {
     // an opened connection due to inactivity.
     for (int step = 0; step < 2; step++) {
         if (this->dbConnection.isOpen ()) {
-            if (this->dbConnection.tables().contains (this->dbTable, Qt::CaseInsensitive)) {
+            if (this->dbConnection.tables().contains (QString::fromLocal8Bit (this->dbTable), Qt::CaseInsensitive)) {
                 if (this->dbConnection.transaction ()) {
                     return (true);
                 } else {
-                    DatabaseBridge::warnSqlError (this->dbConnection.lastError(), QString(QStringLiteral("Unable to start a transaction on the table '%1'")).arg(this->dbTable));
+                    DatabaseBridge::warnSqlError (this->dbConnection.lastError(), QByteArray("[") + this->helperName + "#" + QByteArray::number (requestId) + "] Unable to start a transaction on the table '" + this->dbTable + "'");
                 }
             } else {
-                QSqlQuery query (this->dbConnection);
-                if (query.exec (QString(QStringLiteral("CREATE TABLE %1 ("
-                    "className        VARCHAR(48) NOT NULL, "
+                QByteArray sqlinstr ("CREATE TABLE ");
+                sqlinstr += this->dbTable + "("
+                    "className        VARCHAR(48)  NOT NULL, "
                     "id               VARCHAR(168) NOT NULL, "
-                    "data             TEXT             NULL, "
+                    "data             TEXT         NULL, "
                     "timestampCreated INTEGER      NOT NULL, "
-                    "PRIMARY KEY (className, id)"
-                    ");")).arg(this->dbTable))) {
+                    "PRIMARY          KEY          (className, id));";
+                QSqlQuery query (this->dbConnection);
+                if (query.exec (QString::fromLocal8Bit(sqlinstr))) {
                     step--;
                     continue;
                 } else {
-                    DatabaseBridge::warnSqlError (query, QString(QStringLiteral("[%1#%2] Unable to create table '%3' within the database")).arg(this->helperName, QString::number(requestId), this->dbTable));
+                    DatabaseBridge::warnSqlError (query, QByteArray("[") + this->helperName + "#" + QByteArray::number (requestId) + "] Unable to create table '" + this->dbTable + "' within the database");
                 }
                 query.clear ();
             }
@@ -178,7 +183,7 @@ bool ObjectCacheDatabase::unlockedRead (const unsigned int requestId, const QStr
     QHash<QByteArray,QVariant> searchFields;
     searchFields["className"] = className;
     searchFields["id"] = id;
-    QHash<QString,QVariant> result = DatabaseBridge::genericSelect (this->dbConnection, this->dbTable, searchFields, fields);
+    QHash<QByteArray,QVariant> result = DatabaseBridge::genericSelect (this->dbConnection, this->dbTable, searchFields, fields);
     if (! result.isEmpty ()) {
         bool ok;
         qint64 _timestampCreated (result.value("timestampCreated").toLongLong (&ok));
@@ -188,24 +193,24 @@ bool ObjectCacheDatabase::unlockedRead (const unsigned int requestId, const QStr
                 QJsonParseError jsonParseError;
                 _data = QJsonDocument::fromJson (result.value("data").toByteArray(), &jsonParseError);
                 if (jsonParseError.error != QJsonParseError::NoError) {
-                    qWarning ("[%s#%u] Data fetched from the database could not be parsed as JSON: (className='%s', id='%s', offset=%d, errorString='%s')", this->helperName.toLatin1().constData(), requestId, className.toLatin1().constData(), id.toLatin1().constData(), jsonParseError.offset, jsonParseError.errorString().toLatin1().constData());
+                    qWarning ("[%s#%u] Data fetched from the database could not be parsed as JSON: (className='%s', id='%s', offset=%d, errorString='%s')", this->helperName.constData(), requestId, className.toLatin1().constData(), id.toLatin1().constData(), jsonParseError.offset, jsonParseError.errorString().toLatin1().constData());
                 }
             }
             data = _data;
             timestampCreated = _timestampCreated;
             return (true);
         } else {
-            qWarning ("[%s#%u] Timestamp fetched from the database could not be parsed as integer: (className='%s', id='%s', value='%s')", this->helperName.toLatin1().constData(), requestId, className.toLatin1().constData(), id.toLatin1().constData(), result.value("timestampCreated").toByteArray().constData());
+            qWarning ("[%s#%u] Timestamp fetched from the database could not be parsed as integer: (className='%s', id='%s', value='%s')", this->helperName.constData(), requestId, className.toLatin1().constData(), id.toLatin1().constData(), result.value("timestampCreated").toByteArray().constData());
         }
     }
     return (false);
 }
 
 bool ObjectCacheDatabase::unlockedWrite (const unsigned int, const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated) {
-    QHash<QString,QVariant> searchFields;
+    QHash<QByteArray,QVariant> searchFields;
     searchFields["className"] = className;
     searchFields["id"] = id;
-    QHash<QString,QVariant> updateFields;
+    QHash<QByteArray,QVariant> updateFields;
     if (ObjectCache::jsonDocumentIsValid (data)) {
         updateFields["data"] = data.toJson (QJsonDocument::Compact);
     } else {
@@ -224,11 +229,11 @@ AppHelperObject* ObjectCacheMemory::moveObjectIdAhead (const QHash<QString,AppHe
     return (idObj);
 }
 
-ObjectCacheMemory::ObjectCacheMemory (const QString& helperName, ObjectCacheDatabase& databaseCache) :
+ObjectCacheMemory::ObjectCacheMemory (const QByteArray& helperName, ObjectCacheDatabase& databaseCache) :
     ObjectCache (helperName, &databaseCache) {
     this->cacheType = "memory";
     AppRuntime::helperMemoryCacheMutex.lock ();
-    int index = AppRuntime::helperNames.indexOf (helperName);
+    int index = AppRuntime::helperNames.indexOf (QString::fromLocal8Bit (helperName));
     if (index >= 0) {
         this->objectCache = AppRuntime::helperMemoryCache.at (index);
     } else {
@@ -243,7 +248,7 @@ ObjectCacheMemory::~ObjectCacheMemory () {
 bool ObjectCacheMemory::lock (const unsigned int requestId) {
     bool locked = this->objectCache->mutex.tryLock (AppConstants::AppHelperMutexTimeout);
     if (! locked) {
-        qWarning ("[%s#%u] Timeout reached while locking %s cache for exclusive access. Thread congestion?", this->helperName.toLatin1().constData(), requestId, this->cacheType.toLatin1().constData());
+        qWarning ("[%s#%u] Timeout reached while locking %s cache for exclusive access. Thread congestion?", this->helperName.constData(), requestId, this->cacheType.constData());
     }
     return (locked);
 }
@@ -293,7 +298,7 @@ bool ObjectCacheMemory::unlockedWrite (const unsigned int requestId, const QStri
                 removedIdObj->objectClass->ids.erase (removedIdObj->classPosition);
                 delete (removedIdObj);
             }
-            qDebug ("[%s#%u] %d entries were deleted from %s cache because the maximum number of entries (%d) had been reached.", this->helperName.toLatin1().constData(), requestId, i, this->cacheType.toLatin1().constData(), AppConstants::AppHelperCacheMaxSize);
+            qDebug ("[%s#%u] %d entries were deleted from %s cache because the maximum number of entries (%d) had been reached.", this->helperName.constData(), requestId, i, this->cacheType.constData(), AppConstants::AppHelperCacheMaxSize);
         }
     }
     idObj->data = data;

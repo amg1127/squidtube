@@ -77,8 +77,8 @@ private:
     void fireEvent (const QString& callback);
     void appendResponseBuffer ();
     inline bool isGetOrHeadRequest () {
-        return (! (this->requestMethod.compare("GET", Qt::CaseInsensitive) &&
-                   this->requestMethod.compare("HEAD", Qt::CaseInsensitive)));
+        return (! (this->requestMethod.compare(QStringLiteral("GET"), Qt::CaseInsensitive) &&
+                   this->requestMethod.compare(QStringLiteral("HEAD"), Qt::CaseInsensitive)));
     }
     // https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#3xx_Redirection
     inline bool isRedirectWithMethodChange () {
@@ -171,7 +171,7 @@ public:
     static QJSValue QByteArray2ArrayBuffer (QJSEngine& jsEngine, const QByteArray& value);
     static QByteArray ArrayBuffer2QByteArray (QJSEngine&, const QJSValue& value);
     static QRegExp RegExp2QRegExp (const QJSValue& jsValue);
-    static bool warnJsError (QJSEngine& jsEngine, const QJSValue& jsValue, const QString& msg = QString());
+    static bool warnJsError (QJSEngine& jsEngine, const QJSValue& jsValue, const QByteArray& msg = QByteArray());
     inline static bool valueIsEmpty (const QJSValue& value) {
         return (value.isUndefined() || value.isNull());
     }

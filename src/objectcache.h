@@ -25,14 +25,14 @@ private:
     ObjectCache* lowerCache;
 protected:
     ~ObjectCache ();
-    QString helperName;
-    QString cacheType;
+    QByteArray helperName;
+    QByteArray cacheType;
     virtual bool lock (const unsigned int requestId) = 0;
     virtual bool unlock (const unsigned int requestId) = 0;
     virtual bool unlockedRead (const unsigned int requestId, const QString& className, const QString& id, QJsonDocument& data, qint64& timestampCreated) = 0;
     virtual bool unlockedWrite (const unsigned int requestId, const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated) = 0;
 public:
-    ObjectCache (const QString& helperName, ObjectCache* lowerCache = Q_NULLPTR);
+    ObjectCache (const QByteArray& helperName, ObjectCache* lowerCache = Q_NULLPTR);
     virtual CacheStatus read (const unsigned int requestId, const QString& className, const QString& id, const qint64 timestampNow, QJsonDocument& data, qint64& timestampCreated);
     virtual bool write (const unsigned int requestId, const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated);
     static bool jsonDocumentIsValid (const QJsonDocument& data);
@@ -42,14 +42,14 @@ public:
 
 class ObjectCacheDatabase : public ObjectCache {
 private:
-    QString dbTable;
+    QByteArray dbTable;
     QSqlDatabase dbConnection;
     virtual bool lock (const unsigned int requestId);
     virtual bool unlock (const unsigned int);
     virtual bool unlockedRead (const unsigned int requestId, const QString& className, const QString& id, QJsonDocument& data, qint64& timestampCreated);
     virtual bool unlockedWrite (const unsigned int, const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated);
 public:
-    ObjectCacheDatabase (const QString& helperName, const QString& dbTblPrefix);
+    ObjectCacheDatabase (const QByteArray& helperName, const QByteArray& dbTblPrefix);
     virtual ~ObjectCacheDatabase ();
 };
 
@@ -62,7 +62,7 @@ private:
     virtual bool unlockedRead (const unsigned int, const QString& className, const QString& id, QJsonDocument& data, qint64& timestampCreated);
     virtual bool unlockedWrite (const unsigned int requestId, const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated);
 public:
-    ObjectCacheMemory (const QString& helperName, ObjectCacheDatabase& databaseCache);
+    ObjectCacheMemory (const QByteArray& helperName, ObjectCacheDatabase& databaseCache);
     virtual ~ObjectCacheMemory ();
 };
 
