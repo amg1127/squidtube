@@ -26,7 +26,7 @@ void JobWorker::squidResponseOut (QMap<unsigned int,AppJobRequest*>::iterator& r
     if (requestIdIterator != this->runningRequests.end ()) {
         unsigned int requestId (requestIdIterator.key ());
         this->runningRequests.erase (requestIdIterator);
-        emit writeAnswerLine (this->requestChannel, QString("[%1#%2] %3").arg(squidRequest->helper.name, QString::number(requestId), msg), false, isMatch);
+        emit writeAnswerLine (this->requestChannel, QStringLiteral("[%1#%2] %3").arg(squidRequest->helper.name, QString::number(requestId), msg), false, isMatch);
     } else {
         emit writeAnswerLine (this->requestChannel, msg, false, isMatch);
     }
@@ -40,14 +40,14 @@ void JobWorker::squidResponseOut (QMap<unsigned int,AppJobRequest*>::iterator& r
 void JobWorker::scriptResponseOut (QMap<unsigned int,AppJobRequest*>::iterator& requestIdIterator, AppJobRequestFromHelper *helperRequest, const QJSValue &returnValue) {
     unsigned int requestId (requestIdIterator.key ());
     this->runningRequests.erase (requestIdIterator);
-    JavascriptBridge::warnJsError ((*(this->runtimeEnvironment)), helperRequest->data.callback.call (QJSValueList() << returnValue), QString("[%1#%2] Uncaught exception received while calling the callback received as argument from a previous call to 'getPropertiesFromObjectCache();' (className='%3', id='%4')").arg(helperRequest->helper.name, QString::number(requestId), helperRequest->object.className, helperRequest->object.id));
+    JavascriptBridge::warnJsError ((*(this->runtimeEnvironment)), helperRequest->data.callback.call (QJSValueList() << returnValue), QByteArray("[") + helperRequest->helper.name.toLatin1() + "#" + QByteArray::number(requestId) + "] Uncaught exception received while calling the callback received as argument from a previous call to 'getPropertiesFromObjectCache();' (className='" + helperRequest->object.className.toLatin1() + "', id='" + helperRequest->object.id.toLatin1() + "')");
     delete (helperRequest);
 }
 
 void JobWorker::processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls) {
     if (helperInstance > 0 && helperInstance <= this->helperInstances.count() && appHelperSupportedUrls.isArray()) {
         AppHelperInfo* appHelperInfo (this->helperInstances[helperInstance - 1]);
-        int length = appHelperSupportedUrls.property("length").toInt();
+        int length = appHelperSupportedUrls.property(QStringLiteral("length")).toInt();
         if (length > 1) {
             qDebug ("[%s] Received %d patterns of supported URL's.", appHelperInfo->name.toLatin1().constData(), length);
         } else if (length == 1) {
@@ -95,8 +95,8 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
         }
         if (helperRequest != Q_NULLPTR || squidRequest != Q_NULLPTR) {
             if (appHelperObjectFromUrl.isObject ()) {
-                QJSValue className = appHelperObjectFromUrl.property("className");
-                QJSValue id = appHelperObjectFromUrl.property("id");
+                QJSValue className = appHelperObjectFromUrl.property(QStringLiteral("className"));
+                QJSValue id = appHelperObjectFromUrl.property(QStringLiteral("id"));
                 if (! (JavascriptBridge::valueIsEmpty (className) || JavascriptBridge::valueIsEmpty (id))) {
                     request->object.className = className.toString ();
                     request->object.id = id.toString ();
@@ -114,8 +114,8 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                         qFatal ("Unexpected code flow!");
                     }
                 }
-                request->object.className = jsonHelperObjectFromUrl.object().value("className").toString();
-                request->object.id = jsonHelperObjectFromUrl.object().value("id").toString();
+                request->object.className = jsonHelperObjectFromUrl.object().value(QStringLiteral("className")).toString();
+                request->object.id = jsonHelperObjectFromUrl.object().value(QStringLiteral("id")).toString();
             }
             if (request->object.className.isEmpty() || request->object.id.isEmpty ()) {
                 if (requestType == RequestFromHelper) {
@@ -154,7 +154,7 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                             squidRequest->data.criteria,
                             objectData
                         );
-                        this->squidResponseOut (requestIdIterator, squidRequest, QString("Cached data from the object with (className='%1', id='%2') %3 specified criteria").arg(request->object.className, request->object.id, ((matchResult) ? "matches" : "does not match")), matchResult);
+                        this->squidResponseOut (requestIdIterator, squidRequest, QStringLiteral("Cached data from the object with (className='%1', id='%2') %3 specified criteria").arg(request->object.className, request->object.id, ((matchResult) ? QStringLiteral("matches") : QStringLiteral("does not match"))), matchResult);
                     } else {
                         qFatal ("Unexpected code flow!");
                     }
@@ -265,7 +265,7 @@ void JobWorker::processPropertiesFromObject (unsigned int requestId, const QJSVa
                         squidRequest->data.criteria,
                         objectData
                     );
-                    this->squidResponseOut (requestIdIterator, squidRequest, QString("Retrieved data from the object with (className='%1', id='%2') %3 specified criteria").arg(request->object.className, request->object.id, ((matchResult) ? "matches" : "does not match")), matchResult);
+                    this->squidResponseOut (requestIdIterator, squidRequest, QStringLiteral("Retrieved data from the object with (className='%1', id='%2') %3 specified criteria").arg(request->object.className, request->object.id, ((matchResult) ? QStringLiteral("matches") : QStringLiteral("does not match"))), matchResult);
                 } else {
                     this->tryNextHelper (requestIdIterator);
                 }
@@ -442,19 +442,19 @@ bool JobWorker::processCriteria (
             static QList<QStringList> booleanOptions (
                 QList<QStringList> ()
                     << ( QStringList()
-                        << "n"
-                        << "no"
-                        << "0"
-                        << "false"
-                        << "$false"
-                        << "off"
+                        << QStringLiteral("n")
+                        << QStringLiteral("no")
+                        << QStringLiteral("0")
+                        << QStringLiteral("false")
+                        << QStringLiteral("$false")
+                        << QStringLiteral("off")
                     ) << ( QStringList()
-                        << "y"
-                        << "yes"
-                        << "1"
-                        << "true"
-                        << "$true"
-                        << "on"
+                        << QStringLiteral("y")
+                        << QStringLiteral("yes")
+                        << QStringLiteral("1")
+                        << QStringLiteral("true")
+                        << QStringLiteral("$true")
+                        << QStringLiteral("on")
                     )
             );
             int booleanOptionsPos = ((jsonValueInformation.toBool ()) ? 1 : 0);
@@ -577,8 +577,8 @@ JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
         AppHelperInfo* appHelperInfo = new AppHelperInfo;
         this->helperInstances.append (appHelperInfo);
         appHelperInfo->name = AppRuntime::helperNames.at(helperNamesPos);
-        appHelperInfo->databaseCache = new ObjectCacheDatabase (appHelperInfo->name.toLocal8Bit(), AppRuntime::dbTblPrefix);
-        appHelperInfo->memoryCache = new ObjectCacheMemory (appHelperInfo->name, (*(appHelperInfo->databaseCache)));
+        appHelperInfo->databaseCache = new ObjectCacheDatabase (appHelperInfo->name.toLocal8Bit(), AppRuntime::dbTblPrefix.toLocal8Bit());
+        appHelperInfo->memoryCache = new ObjectCacheMemory (appHelperInfo->name.toLocal8Bit(), (*(appHelperInfo->databaseCache)));
         appHelperInfo->entryPoint = javascriptBridge->makeEntryPoint (helperNamesPos);
         if (appHelperInfo->entryPoint.isCallable ()) {
             this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, this->helperInstances.count(), JavascriptMethod::getSupportedUrls);
@@ -601,18 +601,18 @@ JobWorker::~JobWorker () {
 }
 
 void JobWorker::valueReturnedFromJavascript (unsigned int context, const QString& method, const QJSValue& returnedValue) {
-    if (method == "getSupportedUrls") {
+    if (method == QStringLiteral("getSupportedUrls")) {
         this->processSupportedUrls (context, returnedValue);
-    } else if (method == "getObjectFromUrl") {
+    } else if (method == QStringLiteral("getObjectFromUrl")) {
         this->processObjectFromUrl (context, returnedValue);
-    } else if (method == "getPropertiesFromObject") {
+    } else if (method == QStringLiteral("getPropertiesFromObject")) {
         this->processPropertiesFromObject (context, returnedValue);
-    } else if (method == "getPropertiesFromObjectCache") {
-        QJSValue callback (returnedValue.property("callback"));
+    } else if (method == QStringLiteral("getPropertiesFromObjectCache")) {
+        QJSValue callback (returnedValue.property(QStringLiteral("callback")));
         if (callback.isCallable() && context < ((unsigned) this->helperInstances.count())) {
             AppJobRequestFromHelper* helperRequest = new AppJobRequestFromHelper ();
             helperRequest->data.callback = callback;
-            helperRequest->data.object = returnedValue.property("object");
+            helperRequest->data.object = returnedValue.property(QStringLiteral("object"));
             helperRequest->helper.id = context;
             helperRequest->helper.name = this->helperInstances[context]->name;
             this->incomingRequests.append (helperRequest);
@@ -674,7 +674,7 @@ void JobWorker::processIncomingRequest () {
                     this->startRetryTimer ();
                 } else {
                     QMap<unsigned int,AppJobRequest*>::iterator end(this->runningRequests.end());
-                    this->squidResponseOut (end, squidRequest, "Unable to find a helper that can handle the requested URL", false);
+                    this->squidResponseOut (end, squidRequest, QStringLiteral("Unable to find a helper that can handle the requested URL"), false);
                 }
             } else {
                 qFatal ("Unexpected code flow!");
