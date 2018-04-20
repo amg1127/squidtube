@@ -41,7 +41,7 @@ private:
     QJSEngine* jsEngine;
     QJSValue callback;
 public:
-    JavascriptTimer (QJSEngine& jsEngine, unsigned int timerId, bool repeat, int timeout, const QJSValue& callback);
+    JavascriptTimer (QJSEngine& _jsEngine, unsigned int _timerId, bool repeat, int timeout, const QJSValue& _callback);
 private slots:
     void timerTimeout ();
 signals:
@@ -105,7 +105,7 @@ public:
     static const short int status_HEADERS_RECEIVED;
     static const short int status_LOADING;
     static const short int status_DONE;
-    JavascriptNetworkRequest (QJSEngine& jsEngine, QObject *parent = Q_NULLPTR);
+    JavascriptNetworkRequest (QJSEngine& _jsEngine, QObject *_parent = Q_NULLPTR);
     ~JavascriptNetworkRequest ();
     void setTimerInterval (int msec);
     inline void setXMLHttpRequestObject (const QJSValue& object) {
@@ -117,7 +117,7 @@ public:
         this->getPrivateDataCallback2 = getPrivateData2;
         this->setPrivateDataCallback2 = setPrivateData2;
     }
-    void start (QNetworkAccessManager& networkManager, unsigned int networkRequestId);
+    void start (QNetworkAccessManager& networkManager, unsigned int _networkRequestId);
     void abort ();
 signals:
     void networkRequestFinished (unsigned int requestId);
@@ -141,21 +141,21 @@ private:
     static QJsonValue QJS2QJsonValue (const QJSValue& value);
     static QJSValue QJson2QJS (QJSEngine& jsEngine, const QJsonValue& value);
 public:
-    JavascriptBridge (QJSEngine& jsEngine, const QString& requestChannel, QObject* parent = Q_NULLPTR);
+    JavascriptBridge (QJSEngine& _jsEngine, const QString& _requestChannel, QObject* parent = Q_NULLPTR);
     ~JavascriptBridge ();
     bool invokeMethod (QJSValue& entryPoint, unsigned int context, int method, QJSValue args = QJSValue(QJSValue::UndefinedValue));
     bool invokeMethod (QJSValue& entryPoint, unsigned int context, const QString& method, QJSValue args = QJSValue(QJSValue::UndefinedValue));
     QJSValue makeEntryPoint (int index);
     // http://doc.qt.io/qt-5/qtqml-cppintegration-data.html#conversion-between-qt-and-javascript-types
-    Q_INVOKABLE void receiveValue (unsigned int transactionId, const QString& method, const QJSValue& returnedValue);
+    Q_INVOKABLE void receiveValue (unsigned int _transactionId, const QString& method, const QJSValue& returnedValue);
     Q_INVOKABLE bool require (const QJSValue& library);
     Q_INVOKABLE unsigned int setTimeout (const QJSValue& callback, const int interval);
     Q_INVOKABLE unsigned int setInterval (const QJSValue& callback, const int interval);
     Q_INVOKABLE void clearTimeout (unsigned int timerId);
     Q_INVOKABLE void clearInterval (unsigned int timerId);
     Q_INVOKABLE void xmlHttpRequest_send (const QJSValue& object, const QJSValue& getPrivateData1, const QJSValue& setPrivateData1, const QJSValue& getPrivateData2, const QJSValue& setPrivateData2);
-    Q_INVOKABLE void xmlHttpRequest_abort (const unsigned int networkRequestId);
-    Q_INVOKABLE void xmlHttpRequest_setTimeout (const unsigned int networkRequestId, const int msec);
+    Q_INVOKABLE void xmlHttpRequest_abort (const unsigned int _networkRequestId);
+    Q_INVOKABLE void xmlHttpRequest_setTimeout (const unsigned int _networkRequestId, const int msec);
     Q_INVOKABLE QString textDecode (const QJSValue& bytes, const QString& fallbackCharset);
     Q_INVOKABLE QJSValue textEncode (const QString& string, const QString& charset);
     Q_INVOKABLE void getPropertiesFromObjectCache (unsigned int context, const QJSValue& returnValue);
@@ -177,7 +177,7 @@ public:
     }
 private slots:
     void timerFinished (unsigned int timerId);
-    void networkRequestFinished (unsigned int networkRequestId);
+    void networkRequestFinished (unsigned int _networkRequestId);
 signals:
     void valueReturnedFromJavascript (unsigned int context, const QString& method, const QJSValue& returnedValue);
 };

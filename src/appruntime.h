@@ -176,7 +176,7 @@ public:
 
 class AppJobRequest {
 protected:
-    ~AppJobRequest ();
+    virtual ~AppJobRequest ();
 public:
     AppRequestObject object;
     AppRequestHelper helper;

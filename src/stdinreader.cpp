@@ -8,7 +8,7 @@ void StdinReader::run () {
     std::string stdinLine;
     while (! std::getline (std::cin, stdinLine).eof()) {
         // Expected format is [channel-ID] %URI property [-flag [-flag [...] ] ] criteria [criteria [criteria [...]]]
-        QString tokens (QString::fromLocal8Bit(stdinLine.data(), (int) stdinLine.size()).trimmed ());
+        QString tokens (QString::fromLocal8Bit(stdinLine.data(), static_cast<int> (stdinLine.size())).trimmed ());
         qInfo ("Received an ACL matching request: '%s'", tokens.toLatin1().constData());
         if (tokens.isEmpty ()) {
             emit writeAnswerLine (QStringLiteral(""), QStringLiteral("an empty request was received"), true, false);

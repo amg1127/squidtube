@@ -3,7 +3,7 @@
 const QByteArray DatabaseBridge::placeholderPattern(":val%1");
 
 QSqlDatabase DatabaseBridge::database () {
-    int myDbInstance;
+    unsigned int myDbInstance;
     QString dbDriver;
     QString dbHost;
     QString dbPort;
@@ -146,9 +146,9 @@ bool DatabaseBridge::warnSqlError (const QSqlError& err, const QByteArray& prefi
         }
         msg += err.nativeErrorCode().toLatin1() + ": " + err.text().toLatin1();
         if (et == QSqlError::StatementError)
-            qCritical (msg.constData());
+            qCritical ("%s", msg.constData());
         else
-            qWarning (msg.constData());
+            qWarning ("%s", msg.constData());
         return (true);
     } else {
         return (false);

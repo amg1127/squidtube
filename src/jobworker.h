@@ -5,6 +5,8 @@
 #include "javascriptbridge.h"
 #include "objectcache.h"
 
+#include <limits>
+
 #include <QJSEngine>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -54,12 +56,12 @@ private:
     }
     void scriptResponseOut (QMap<unsigned int,AppJobRequest*>::iterator& requestIdIterator, AppJobRequestFromHelper* helperRequest, const QJSValue& returnValue);
     void processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls);
-    void processObjectFromUrl (unsigned int requestId, const QJSValue& appHelperObjectFromUrl);
-    void processPropertiesFromObject (unsigned int requestId, const QJSValue& appHelperPropertiesFromObject);
+    void processObjectFromUrl (unsigned int _requestId, const QJSValue& appHelperObjectFromUrl);
+    void processPropertiesFromObject (unsigned int _requestId, const QJSValue& appHelperPropertiesFromObject);
     static const char* jsonType (const QJsonValue& jsonValue);
     static bool processCriteria (
         const QString& requestHelperName,
-        const unsigned int requestId,
+        const unsigned int _requestId,
         const int level,
         const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesIterator,
         const AppSquidMathMatchOperator& requestMathMatchOperator,
@@ -70,7 +72,7 @@ private:
         const QJsonDocument& jsonDocumentInformation);
     static bool processCriteria (
         const QString& requestHelperName,
-        const unsigned int requestId,
+        const unsigned int _requestId,
         const int level,
         const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesIterator,
         const AppSquidMathMatchOperator& requestMathMatchOperator,
@@ -80,7 +82,7 @@ private:
         const QJsonValue& jsonValueInformation);
     static bool regexMatches (const QRegExp& regularExpression, const QString& testString);
 public:
-    JobWorker (const QString& requestChannel, QObject* parent = Q_NULLPTR);
+    JobWorker (const QString& _requestChannel, QObject* parent = Q_NULLPTR);
     ~JobWorker();
 private slots:
     void valueReturnedFromJavascript (unsigned int context, const QString& method, const QJSValue& returnedValue);

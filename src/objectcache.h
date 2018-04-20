@@ -32,7 +32,7 @@ protected:
     virtual bool unlockedRead (const unsigned int requestId, const QString& className, const QString& id, QJsonDocument& data, qint64& timestampCreated) = 0;
     virtual bool unlockedWrite (const unsigned int requestId, const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated) = 0;
 public:
-    ObjectCache (const QByteArray& helperName, ObjectCache* lowerCache = Q_NULLPTR);
+    ObjectCache (const QByteArray& _helperName, ObjectCache* _lowerCache = Q_NULLPTR);
     virtual CacheStatus read (const unsigned int requestId, const QString& className, const QString& id, const qint64 timestampNow, QJsonDocument& data, qint64& timestampCreated);
     virtual bool write (const unsigned int requestId, const QString& className, const QString& id, const QJsonDocument& data, const qint64 timestampCreated);
     static bool jsonDocumentIsValid (const QJsonDocument& data);

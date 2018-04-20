@@ -143,7 +143,7 @@ void increaseMemoryLimit () {
     if (ret) {
         qWarning ("'getrlimit' call failed: %d: %s", errno, strerror(errno));
     } else {
-        rlp.rlim_cur = 3 << 30;
+        rlp.rlim_cur = 3u << 30;
         if (rlp.rlim_cur < rlp.rlim_max || rlp.rlim_max == RLIM_INFINITY) {
             ret = setrlimit (RLIMIT_AS, &rlp);
             if (ret) {
@@ -168,12 +168,12 @@ bool loadRuntimeVariables () {
     const QCommandLineOption versionOption = optionsParser.addVersionOption ();
     if (optionsParser.parse (arguments)) {
         if (optionsParser.isSet (helpOption)) {
-            optionsParser.showHelp (); return (false);
+            optionsParser.showHelp ();
         } else if (optionsParser.isSet (versionOption)) {
-            optionsParser.showVersion (); return (false);
+            optionsParser.showVersion ();
         } else if (! optionsParser.positionalArguments().isEmpty ()) {
             qCritical ("This program does not accept positional arguments!");
-            optionsParser.showHelp (1); return (false);
+            optionsParser.showHelp (1);
         } else if (optionsParser.isSet (QStringLiteral("main.loglevel"))) {
             // Apply loglevel option in advance if it is specified
             QString defaultLogLevel (AppRuntime::loglevel);
@@ -295,15 +295,15 @@ bool loadRuntimeVariables () {
     }
     if (optionsParser.parse (arguments)) {
         if (optionsParser.isSet (helpOption)) {
-            optionsParser.showHelp (); return (false);
+            optionsParser.showHelp ();
         } else if (optionsParser.isSet (versionOption)) {
-            optionsParser.showVersion (); return (false);
+            optionsParser.showVersion ();
         } else if (! optionsParser.positionalArguments().isEmpty ()) {
             qCritical ("This program does not accept positional arguments!");
-            optionsParser.showHelp (1); return (false);
+            optionsParser.showHelp (1);
         }
     } else {
-        optionsParser.showHelp (); return (false);
+        optionsParser.showHelp ();
     }
 
     QStringList foundOptionNames (optionsParser.optionNames ());

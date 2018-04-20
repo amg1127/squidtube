@@ -2,7 +2,7 @@
 
 void JobWorker::startRetryTimer () {
     if (this->rngdInitialized) {
-        this->retryTimer->start (AppConstants::AppHelperTimerTimeout + ((int) ((((double) qrand()) / ((double) RAND_MAX)) * ((double) AppConstants::AppHelperTimerTimeout))));
+        this->retryTimer->start (AppConstants::AppHelperTimerTimeout + (static_cast<int> (((static_cast<double> (qrand())) / (static_cast<double> (RAND_MAX))) * (static_cast<double> (AppConstants::AppHelperTimerTimeout)))));
     } else {
         this->retryTimer->start (AppConstants::AppHelperTimerTimeout);
     }
@@ -24,9 +24,9 @@ void JobWorker::tryNextHelper (QMap<unsigned int,AppJobRequest*>::iterator& requ
 
 void JobWorker::squidResponseOut (QMap<unsigned int,AppJobRequest*>::iterator& requestIdIterator, AppJobRequestFromSquid* squidRequest, const QString& msg, bool isMatch) {
     if (requestIdIterator != this->runningRequests.end ()) {
-        unsigned int requestId (requestIdIterator.key ());
+        unsigned int _requestId (requestIdIterator.key ());
         this->runningRequests.erase (requestIdIterator);
-        emit writeAnswerLine (this->requestChannel, QStringLiteral("[%1#%2] %3").arg(squidRequest->helper.name, QString::number(requestId), msg), false, isMatch);
+        emit writeAnswerLine (this->requestChannel, QStringLiteral("[%1#%2] %3").arg(squidRequest->helper.name, QString::number(_requestId), msg), false, isMatch);
     } else {
         emit writeAnswerLine (this->requestChannel, msg, false, isMatch);
     }
@@ -38,16 +38,16 @@ void JobWorker::squidResponseOut (QMap<unsigned int,AppJobRequest*>::iterator& r
 }
 
 void JobWorker::scriptResponseOut (QMap<unsigned int,AppJobRequest*>::iterator& requestIdIterator, AppJobRequestFromHelper *helperRequest, const QJSValue &returnValue) {
-    unsigned int requestId (requestIdIterator.key ());
+    unsigned int _requestId (requestIdIterator.key ());
     this->runningRequests.erase (requestIdIterator);
-    JavascriptBridge::warnJsError ((*(this->runtimeEnvironment)), helperRequest->data.callback.call (QJSValueList() << returnValue), QByteArray("[") + helperRequest->helper.name.toLatin1() + "#" + QByteArray::number(requestId) + "] Uncaught exception received while calling the callback received as argument from a previous call to 'getPropertiesFromObjectCache();' (className='" + helperRequest->object.className.toLatin1() + "', id='" + helperRequest->object.id.toLatin1() + "')");
+    JavascriptBridge::warnJsError ((*(this->runtimeEnvironment)), helperRequest->data.callback.call (QJSValueList() << returnValue), QByteArray("[") + helperRequest->helper.name.toLatin1() + "#" + QByteArray::number(_requestId) + "] Uncaught exception received while calling the callback received as argument from a previous call to 'getPropertiesFromObjectCache();' (className='" + helperRequest->object.className.toLatin1() + "', id='" + helperRequest->object.id.toLatin1() + "')");
     delete (helperRequest);
 }
 
 void JobWorker::processSupportedUrls (int helperInstance, const QJSValue& appHelperSupportedUrls) {
     if (helperInstance > 0 && helperInstance <= this->helperInstances.count() && appHelperSupportedUrls.isArray()) {
         AppHelperInfo* appHelperInfo (this->helperInstances[helperInstance - 1]);
-        int length = appHelperSupportedUrls.property(QStringLiteral("length")).toInt();
+        unsigned int length = appHelperSupportedUrls.property(QStringLiteral("length")).toUInt();
         if (length > 1) {
             qDebug ("[%s] Received %d patterns of supported URL's.", appHelperInfo->name.toLatin1().constData(), length);
         } else if (length == 1) {
@@ -56,7 +56,7 @@ void JobWorker::processSupportedUrls (int helperInstance, const QJSValue& appHel
             qWarning ("[%s] Helper declares no support for any URL pattern!", appHelperInfo->name.toLatin1().constData());
         }
         appHelperInfo->supportedURLs.clear ();
-        for (int i = 0; i < length; i++) {
+        for (unsigned int i = 0; i < length; i++) {
             QJSValue appHelperSupportedUrl (appHelperSupportedUrls.property (i));
             QRegExp regExpSupportedUrl;
             if (appHelperSupportedUrl.isString ()) {
@@ -79,8 +79,8 @@ void JobWorker::processSupportedUrls (int helperInstance, const QJSValue& appHel
     }
 }
 
-void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& appHelperObjectFromUrl) {
-    QMap<unsigned int,AppJobRequest*>::iterator requestIdIterator = this->runningRequests.find (requestId);
+void JobWorker::processObjectFromUrl (unsigned int _requestId, const QJSValue& appHelperObjectFromUrl) {
+    QMap<unsigned int,AppJobRequest*>::iterator requestIdIterator = this->runningRequests.find (_requestId);
     if (requestIdIterator != this->runningRequests.end()) {
         AppJobRequest* request = (*requestIdIterator);
         request->object.className.clear ();
@@ -107,9 +107,9 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                 QJsonDocument jsonHelperObjectFromUrl (QJsonDocument::fromJson (jsonString.toUtf8(), &jsonParseError));
                 if (jsonParseError.error != QJsonParseError::NoError) {
                     if (requestType == RequestFromHelper) {
-                        qInfo ("[%s#%u] Data requested by the helper could not be parsed as JSON: (rawData='%s', offset=%d, errorString='%s')", request->helper.name.toLatin1().constData(), requestId, jsonString.toLatin1().constData(), jsonParseError.offset, jsonParseError.errorString().toLatin1().constData());
+                        qInfo ("[%s#%u] Data requested by the helper could not be parsed as JSON: (rawData='%s', offset=%d, errorString='%s')", request->helper.name.toLatin1().constData(), _requestId, jsonString.toLatin1().constData(), jsonParseError.offset, jsonParseError.errorString().toLatin1().constData());
                     } else if (requestType == RequestFromSquid) {
-                        qInfo ("[%s#%u] Data returned by the helper could not be parsed as JSON: (URL='%s', rawData='%s', offset=%d, errorString='%s')", request->helper.name.toLatin1().constData(), requestId, squidRequest->data.url.toDisplayString(QUrl::PrettyDecoded | QUrl::RemoveUserInfo).toLatin1().constData(), jsonString.toLatin1().constData(), jsonParseError.offset, jsonParseError.errorString().toLatin1().constData());
+                        qInfo ("[%s#%u] Data returned by the helper could not be parsed as JSON: (URL='%s', rawData='%s', offset=%d, errorString='%s')", request->helper.name.toLatin1().constData(), _requestId, squidRequest->data.url.toDisplayString(QUrl::PrettyDecoded | QUrl::RemoveUserInfo).toLatin1().constData(), jsonString.toLatin1().constData(), jsonParseError.offset, jsonParseError.errorString().toLatin1().constData());
                     } else {
                         qFatal ("Unexpected code flow!");
                     }
@@ -128,23 +128,23 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
             } else {
                 AppHelperInfo* appHelperInfo (this->helperInstances[request->helper.id]);
                 if (requestType == RequestFromHelper) {
-                    qDebug ("[%s#%u] Helper is requesting information concerning (className='%s', id='%s')...", request->helper.name.toLatin1().constData(), requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData());
+                    qDebug ("[%s#%u] Helper is requesting information concerning (className='%s', id='%s')...", request->helper.name.toLatin1().constData(), _requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData());
                 } else if (requestType == RequestFromSquid) {
-                    qDebug ("[%s#%u] Searching for information concerning (className='%s', id='%s')...", request->helper.name.toLatin1().constData(), requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData());
+                    qDebug ("[%s#%u] Searching for information concerning (className='%s', id='%s')...", request->helper.name.toLatin1().constData(), _requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData());
                 } else {
                     qFatal ("Unexpected code flow!");
                 }
                 QJsonDocument objectData;
                 qint64 objectTimestamp;
-                CacheStatus cacheStatus = appHelperInfo->memoryCache->read (requestId, request->object.className, request->object.id, this->currentTimestamp, objectData, objectTimestamp);
+                CacheStatus cacheStatus = appHelperInfo->memoryCache->read (_requestId, request->object.className, request->object.id, this->currentTimestamp, objectData, objectTimestamp);
                 if (cacheStatus == CacheHitPositive) {
-                    qDebug ("[%s#%u] Information retrieved from the cache concerning (className='%s', id='%s') is fresh.", request->helper.name.toLatin1().constData(), requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData());
+                    qDebug ("[%s#%u] Information retrieved from the cache concerning (className='%s', id='%s') is fresh.", request->helper.name.toLatin1().constData(), _requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData());
                     if (requestType == RequestFromHelper) {
                         this->scriptResponseOut (requestIdIterator, helperRequest, JavascriptBridge::QJson2QJS ((*(this->runtimeEnvironment)), objectData));
                     } else if (requestType == RequestFromSquid) {
                         bool matchResult = this->processCriteria (
                             squidRequest->helper.name,
-                            requestId,
+                            _requestId,
                             squidRequest->data.properties.count(),
                             squidRequest->data.properties.constBegin(),
                             squidRequest->data.mathMatchOperator,
@@ -159,7 +159,7 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                         qFatal ("Unexpected code flow!");
                     }
                 } else if (cacheStatus == CacheHitNegative) {
-                    qInfo ("[%s#%u] Another thread or process tried to fetch information concerning the object with (className='%s', id='%s') recently and failed to do so.", request->helper.name.toLatin1().constData(), requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData());
+                    qInfo ("[%s#%u] Another thread or process tried to fetch information concerning the object with (className='%s', id='%s') recently and failed to do so.", request->helper.name.toLatin1().constData(), _requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData());
                     if (requestType == RequestFromHelper) {
                         this->scriptResponseOut (requestIdIterator, helperRequest, QJSValue::NullValue);
                     } else if (requestType == RequestFromSquid) {
@@ -168,7 +168,7 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                         qFatal ("Unexpected code flow!");
                     }
                 } else if (cacheStatus == CacheOnProgress) {
-                    qDebug ("[%s#%u] Another thread or process is currently fetching information concerning (className='%s', id='%s'). I will try to wait for it...", request->helper.name.toLatin1().constData(), requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData());
+                    qDebug ("[%s#%u] Another thread or process is currently fetching information concerning (className='%s', id='%s'). I will try to wait for it...", request->helper.name.toLatin1().constData(), _requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData());
                     if (requestType == RequestFromHelper) {
                         this->runningRequests.erase (requestIdIterator);
                         this->incomingRequests.prepend (request);
@@ -180,19 +180,19 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
                         qFatal ("Unexpected code flow!");
                     }
                 } else if (cacheStatus == CacheMiss) {
-                    qDebug ("[%s#%u] Information concerning (className='%s', id='%s') was not found in the cache. Invoking 'getPropertiesFromObject();'...", request->helper.name.toLatin1().constData(), requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData());
+                    qDebug ("[%s#%u] Information concerning (className='%s', id='%s') was not found in the cache. Invoking 'getPropertiesFromObject();'...", request->helper.name.toLatin1().constData(), _requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData());
                     // Note: remember the reminder saved into 'objectcache.cpp'...
                     QJsonDocument empty;
                     empty.setObject (QJsonObject ());
                     // Should a failure during a database write prevent me to request object information from a helper?
                     // In this moment, i guess it should not. So, errors from ObjectCache::write() are being ignored for now.
-                    appHelperInfo->memoryCache->write (requestId, request->object.className, request->object.id, empty, this->currentTimestamp);
+                    appHelperInfo->memoryCache->write (_requestId, request->object.className, request->object.id, empty, this->currentTimestamp);
                     QJSValue params = this->runtimeEnvironment->newArray (2);
                     params.setProperty (0, request->object.className);
                     params.setProperty (1, request->object.id);
-                    if (! this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, requestId, JavascriptMethod::getPropertiesFromObject, params)) {
+                    if (! this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, _requestId, JavascriptMethod::getPropertiesFromObject, params)) {
                         // Register a failure into the database, so the negative TTL can count.
-                        appHelperInfo->memoryCache->write (requestId, request->object.className, request->object.id, QJsonDocument(), this->currentTimestamp);
+                        appHelperInfo->memoryCache->write (_requestId, request->object.className, request->object.id, QJsonDocument(), this->currentTimestamp);
                         if (requestType == RequestFromHelper) {
                             this->scriptResponseOut (requestIdIterator, helperRequest, QJSValue::NullValue);
                         } else if (requestType == RequestFromSquid) {
@@ -209,12 +209,12 @@ void JobWorker::processObjectFromUrl (unsigned int requestId, const QJSValue& ap
             qFatal ("Invalid procedure call: 'AppJobRequest*' could not be downcasted to 'AppJobRequestFromHelper*' nor to 'AppJobRequestFromSquid*'!");
         }
     } else {
-        qWarning ("Invalid returned data: (requestId=%u, data='%s')", requestId, JavascriptBridge::QJS2QString(appHelperObjectFromUrl).toLatin1().constData());
+        qWarning ("Invalid returned data: (requestId=%u, data='%s')", _requestId, JavascriptBridge::QJS2QString(appHelperObjectFromUrl).toLatin1().constData());
     }
 }
 
-void JobWorker::processPropertiesFromObject (unsigned int requestId, const QJSValue& appHelperPropertiesFromObject) {
-    QMap<unsigned int,AppJobRequest*>::iterator requestIdIterator = this->runningRequests.find (requestId);
+void JobWorker::processPropertiesFromObject (unsigned int _requestId, const QJSValue& appHelperPropertiesFromObject) {
+    QMap<unsigned int,AppJobRequest*>::iterator requestIdIterator = this->runningRequests.find (_requestId);
     if (requestIdIterator != this->runningRequests.end()) {
         AppJobRequest* request = (*requestIdIterator);
         AppRequestType requestType (request->type());
@@ -234,16 +234,16 @@ void JobWorker::processPropertiesFromObject (unsigned int requestId, const QJSVa
                 QJsonParseError jsonParseError;
                 objectData = QJsonDocument::fromJson (appHelperPropertiesFromObject.toString().toUtf8());
                 if (jsonParseError.error != QJsonParseError::NoError) {
-                    qInfo ("[%s#%u] Data returned by the helper could not be parsed as JSON: (className='%s', id='%s', offset=%d, errorString=%s'!", request->helper.name.toLatin1().constData(), requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData(), jsonParseError.offset, jsonParseError.errorString().toLatin1().constData());
+                    qInfo ("[%s#%u] Data returned by the helper could not be parsed as JSON: (className='%s', id='%s', offset=%d, errorString=%s'!", request->helper.name.toLatin1().constData(), _requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData(), jsonParseError.offset, jsonParseError.errorString().toLatin1().constData());
                 }
             }
             bool validData = ObjectCache::jsonDocumentHasData (objectData);
             if (! validData) {
-                qWarning ("[%s#%u] Data returned by the helper is not valid: (className='%s', id='%s', rawData='%s')", request->helper.name.toLatin1().constData(), requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData(), objectData.toJson(QJsonDocument::Compact).constData());
+                qWarning ("[%s#%u] Data returned by the helper is not valid: (className='%s', id='%s', rawData='%s')", request->helper.name.toLatin1().constData(), _requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData(), objectData.toJson(QJsonDocument::Compact).constData());
                 objectData = QJsonDocument();
             }
-            if (! appHelperInfo->memoryCache->write (requestId, request->object.className, request->object.id, objectData, this->currentTimestamp)) {
-                qCritical ("[%s#%u] Failed to save object information for (className='%s', id='%s', rawData='%s')!", request->helper.name.toLatin1().constData(), requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData(), objectData.toJson (QJsonDocument::Compact).constData());
+            if (! appHelperInfo->memoryCache->write (_requestId, request->object.className, request->object.id, objectData, this->currentTimestamp)) {
+                qCritical ("[%s#%u] Failed to save object information for (className='%s', id='%s', rawData='%s')!", request->helper.name.toLatin1().constData(), _requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData(), objectData.toJson (QJsonDocument::Compact).constData());
             }
             if (requestType == RequestFromHelper) {
                 if (validData) {
@@ -255,7 +255,7 @@ void JobWorker::processPropertiesFromObject (unsigned int requestId, const QJSVa
                 if (validData) {
                     bool matchResult = this->processCriteria (
                         squidRequest->helper.name,
-                        requestId,
+                        _requestId,
                         squidRequest->data.properties.count(),
                         squidRequest->data.properties.constBegin(),
                         squidRequest->data.mathMatchOperator,
@@ -276,7 +276,7 @@ void JobWorker::processPropertiesFromObject (unsigned int requestId, const QJSVa
             qFatal ("Invalid procedure call: 'AppJobRequest*' could not be downcasted to 'AppJobRequestFromHelper*' nor to 'AppJobRequestFromSquid*'!");
         }
     } else {
-        qWarning ("Invalid returned data: (requestId=%u, data='%s')", requestId, JavascriptBridge::QJS2QString(appHelperPropertiesFromObject).toLatin1().constData());
+        qWarning ("Invalid returned data: (requestId=%u, data='%s')", _requestId, JavascriptBridge::QJS2QString(appHelperPropertiesFromObject).toLatin1().constData());
     }
 }
 
@@ -303,7 +303,7 @@ const char* JobWorker::jsonType (const QJsonValue& jsonValue) {
 
 bool JobWorker::processCriteria (
     const QString& requestHelperName,
-    const unsigned int requestId,
+    const unsigned int _requestId,
     const int level,
     const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesIterator,
     const AppSquidMathMatchOperator& requestMathMatchOperator,
@@ -316,7 +316,7 @@ bool JobWorker::processCriteria (
     if (jsonDocumentInformation.isObject ()) {
         answer = JobWorker::processCriteria (
             requestHelperName,
-            requestId,
+            _requestId,
             level,
             requestPropertiesIterator,
             requestMathMatchOperator,
@@ -328,7 +328,7 @@ bool JobWorker::processCriteria (
     } else if (jsonDocumentInformation.isArray ()) {
         answer = JobWorker::processCriteria (
             requestHelperName,
-            requestId,
+            _requestId,
             level,
             requestPropertiesIterator,
             requestMathMatchOperator,
@@ -338,7 +338,7 @@ bool JobWorker::processCriteria (
             jsonDocumentInformation.array()
         );
     } else {
-        qInfo ("[%s#%u] Unexpected JSON format while parsing '%s'.", requestHelperName.toLatin1().constData(), requestId, requestPropertiesIterator->componentName.toLatin1().constData());
+        qInfo ("[%s#%u] Unexpected JSON format while parsing '%s'.", requestHelperName.toLatin1().constData(), _requestId, requestPropertiesIterator->componentName.toLatin1().constData());
         answer = false;
     }
     if (requestInvertMatch) {
@@ -350,7 +350,7 @@ bool JobWorker::processCriteria (
 
 bool JobWorker::processCriteria (
     const QString& requestHelperName,
-    const unsigned int requestId,
+    const unsigned int _requestId,
     const int level,
     const QLinkedList<AppSquidPropertyMatch>::const_iterator& requestPropertiesIterator,
     const AppSquidMathMatchOperator& requestMathMatchOperator,
@@ -364,7 +364,7 @@ bool JobWorker::processCriteria (
             if (jsonValueInformation.isObject ()) {
                 return (JobWorker::processCriteria (
                     requestHelperName,
-                    requestId,
+                    _requestId,
                     level - 1,
                     requestPropertiesIterator + 1,
                     requestMathMatchOperator,
@@ -374,7 +374,7 @@ bool JobWorker::processCriteria (
                     jsonValueInformation.toObject().value(requestPropertiesItem.componentName)
                 ));
             } else {
-                qInfo ("[%s#%u] Unexpected JSON type '%s' while parsing '%s'. A '%s' was expected.", requestHelperName.toLatin1().constData(), requestId, JobWorker::jsonType(jsonValueInformation), requestPropertiesItem.componentName.toLatin1().constData(), JobWorker::jsonType(QJsonValue::Object));
+                qInfo ("[%s#%u] Unexpected JSON type '%s' while parsing '%s'. A '%s' was expected.", requestHelperName.toLatin1().constData(), _requestId, JobWorker::jsonType(jsonValueInformation), requestPropertiesItem.componentName.toLatin1().constData(), JobWorker::jsonType(QJsonValue::Object));
             }
         } else if (requestPropertiesItem.matchType == MatchArray) {
             if (jsonValueInformation.isArray ()) {
@@ -405,7 +405,7 @@ bool JobWorker::processCriteria (
                     for (intervalItem = intervalStart; intervalItem <= intervalEnd; intervalItem++) {
                         if (JobWorker::processCriteria (
                             requestHelperName,
-                            requestId,
+                            _requestId,
                             level - 1,
                             requestPropertiesIterator + 1,
                             requestMathMatchOperator,
@@ -431,7 +431,7 @@ bool JobWorker::processCriteria (
                     qFatal ("Unexpected code flow!");
                 }
             } else {
-                qInfo ("[%s#%u] Unexpected JSON type '%s' while parsing '%s'. A '%s' was expected.", requestHelperName.toLatin1().constData(), requestId, JobWorker::jsonType(jsonValueInformation), requestPropertiesItem.componentName.toLatin1().constData(), JobWorker::jsonType(QJsonValue::Array));
+                qInfo ("[%s#%u] Unexpected JSON type '%s' while parsing '%s'. A '%s' was expected.", requestHelperName.toLatin1().constData(), _requestId, JobWorker::jsonType(jsonValueInformation), requestPropertiesItem.componentName.toLatin1().constData(), JobWorker::jsonType(QJsonValue::Array));
             }
         } else {
             qFatal ("Unexpected code flow!");
@@ -467,13 +467,13 @@ bool JobWorker::processCriteria (
                         matched = (! matched);
                         break;
                     } else if (! booleanOptions[1 - booleanOptionsPos].contains ((*requestCriteriaIterator), Qt::CaseInsensitive)) {
-                        qWarning ("[%s#%u] Unable to evaluate '%s' as a boolean value.", requestHelperName.toLatin1().constData(), requestId, requestCriteriaIterator->toLatin1().constData());
+                        qWarning ("[%s#%u] Unable to evaluate '%s' as a boolean value.", requestHelperName.toLatin1().constData(), _requestId, requestCriteriaIterator->toLatin1().constData());
                         return (false);
                     }
                 }
                 return (matched);
             } else {
-                qInfo ("[%s#%u] Unable to apply selected comparison operator on a boolean value.", requestHelperName.toLatin1().constData(), requestId);
+                qInfo ("[%s#%u] Unable to apply selected comparison operator on a boolean value.", requestHelperName.toLatin1().constData(), _requestId);
             }
         } else if (jsonValueInformation.isDouble ()) {
             if (requestMathMatchOperator == OperatorLessThan ||
@@ -484,25 +484,28 @@ bool JobWorker::processCriteria (
                 requestMathMatchOperator == OperatorGreaterThan) {
                 double doubleValue = jsonValueInformation.toDouble ();
                 double doubleComparison;
+                double compareResult;
                 bool conversionOk;
                 for (QStringList::const_iterator requestCriteriaIterator = requestCriteria.constBegin(); requestCriteriaIterator != requestCriteria.constEnd(); requestCriteriaIterator++) {
                     doubleComparison = requestCriteriaIterator->toDouble (&conversionOk);
                     if (conversionOk) {
-                        if ((requestMathMatchOperator == OperatorLessThan && doubleValue < doubleComparison) ||
-                            (requestMathMatchOperator == OperatorLessThanOrEquals && doubleValue <= doubleComparison) ||
-                            (requestMathMatchOperator == OperatorEquals && doubleValue == doubleComparison) ||
-                            (requestMathMatchOperator == OperatorNotEquals && doubleValue != doubleComparison) ||
-                            (requestMathMatchOperator == OperatorGreaterThanOrEquals && doubleValue >= doubleComparison) ||
-                            (requestMathMatchOperator == OperatorGreaterThan && doubleValue > doubleComparison)) {
+                        compareResult = doubleValue - doubleComparison;
+                        // https://stackoverflow.com/q/39108471/7184009
+                        if ((requestMathMatchOperator == OperatorLessThan            && (compareResult <= -(std::numeric_limits<double>::epsilon()))) ||
+                            (requestMathMatchOperator == OperatorLessThanOrEquals    && (compareResult <   (std::numeric_limits<double>::epsilon()))) ||
+                            (requestMathMatchOperator == OperatorEquals              && (compareResult <   (std::numeric_limits<double>::epsilon()) && compareResult > -(std::numeric_limits<double>::epsilon()))) ||
+                            (requestMathMatchOperator == OperatorNotEquals           && (compareResult <= -(std::numeric_limits<double>::epsilon()) || compareResult >= (std::numeric_limits<double>::epsilon()))) ||
+                            (requestMathMatchOperator == OperatorGreaterThanOrEquals && (compareResult >  -(std::numeric_limits<double>::epsilon()))) ||
+                            (requestMathMatchOperator == OperatorGreaterThan         && (compareResult >=  (std::numeric_limits<double>::epsilon())))) {
                             return (true);
                         }
                     } else {
-                        qWarning ("[%s#%u] Unable to evaluate '%s' as a numeric value.", requestHelperName.toLatin1().constData(), requestId, requestCriteriaIterator->toLatin1().constData());
+                        qWarning ("[%s#%u] Unable to evaluate '%s' as a numeric value.", requestHelperName.toLatin1().constData(), _requestId, requestCriteriaIterator->toLatin1().constData());
                         return (false);
                     }
                 }
             } else {
-                qInfo ("[%s#%u] Unable to apply selected comparison operator on a numeric value!", requestHelperName.toLatin1().constData(), requestId);
+                qInfo ("[%s#%u] Unable to apply selected comparison operator on a numeric value!", requestHelperName.toLatin1().constData(), _requestId);
             }
         } else if (jsonValueInformation.isString ()) {
             if (requestMathMatchOperator == OperatorString ||
@@ -522,7 +525,7 @@ bool JobWorker::processCriteria (
                                 return (true);
                             }
                         } else {
-                            qWarning ("[%s#%u] Expression specification '%s' could not be parsed: '%s'", requestHelperName.toLatin1().constData(), requestId, requestCriteriaIterator->toLatin1().constData(), regexComparison.errorString().toLatin1().constData());
+                            qWarning ("[%s#%u] Expression specification '%s' could not be parsed: '%s'", requestHelperName.toLatin1().constData(), _requestId, requestCriteriaIterator->toLatin1().constData(), regexComparison.errorString().toLatin1().constData());
                             return (false);
                         }
                     } else {
@@ -538,10 +541,10 @@ bool JobWorker::processCriteria (
                     }
                 }
             } else {
-                qInfo ("[%s#%u] Unable to apply selected comparison operator on a string value!", requestHelperName.toLatin1().constData(), requestId);
+                qInfo ("[%s#%u] Unable to apply selected comparison operator on a string value!", requestHelperName.toLatin1().constData(), _requestId);
             }
         } else {
-            qInfo ("[%s#%u] Unexpected JSON type '%s' while evaluating the leaf.", requestHelperName.toLatin1().constData(), requestId, JobWorker::jsonType(jsonValueInformation));
+            qInfo ("[%s#%u] Unexpected JSON type '%s' while evaluating the leaf.", requestHelperName.toLatin1().constData(), _requestId, JobWorker::jsonType(jsonValueInformation));
         }
     }
     return (false);
@@ -559,11 +562,11 @@ bool JobWorker::regexMatches (const QRegExp& regularExpression, const QString& t
     }
 }
 
-JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
+JobWorker::JobWorker (const QString& _requestChannel, QObject* parent) :
     QObject (parent),
     finishRequested (false),
     rngdInitialized (false),
-    requestChannel (requestChannel),
+    requestChannel (_requestChannel),
     runtimeEnvironment (new QJSEngine (this)),
     javascriptBridge (new JavascriptBridge ((*runtimeEnvironment), requestChannel, this)),
     requestId (1),
@@ -581,7 +584,7 @@ JobWorker::JobWorker (const QString& requestChannel, QObject* parent) :
         appHelperInfo->memoryCache = new ObjectCacheMemory (appHelperInfo->name.toLocal8Bit(), (*(appHelperInfo->databaseCache)));
         appHelperInfo->entryPoint = javascriptBridge->makeEntryPoint (helperNamesPos);
         if (appHelperInfo->entryPoint.isCallable ()) {
-            this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, this->helperInstances.count(), JavascriptMethod::getSupportedUrls);
+            this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, static_cast<unsigned> (this->helperInstances.count()), JavascriptMethod::getSupportedUrls);
         }
     }
 }
@@ -602,19 +605,19 @@ JobWorker::~JobWorker () {
 
 void JobWorker::valueReturnedFromJavascript (unsigned int context, const QString& method, const QJSValue& returnedValue) {
     if (method == QStringLiteral("getSupportedUrls")) {
-        this->processSupportedUrls (context, returnedValue);
+        this->processSupportedUrls (static_cast<signed> (context), returnedValue);
     } else if (method == QStringLiteral("getObjectFromUrl")) {
         this->processObjectFromUrl (context, returnedValue);
     } else if (method == QStringLiteral("getPropertiesFromObject")) {
         this->processPropertiesFromObject (context, returnedValue);
     } else if (method == QStringLiteral("getPropertiesFromObjectCache")) {
         QJSValue callback (returnedValue.property(QStringLiteral("callback")));
-        if (callback.isCallable() && context < ((unsigned) this->helperInstances.count())) {
+        if (callback.isCallable() && context < (static_cast<unsigned> (this->helperInstances.count()))) {
             AppJobRequestFromHelper* helperRequest = new AppJobRequestFromHelper ();
             helperRequest->data.callback = callback;
             helperRequest->data.object = returnedValue.property(QStringLiteral("object"));
-            helperRequest->helper.id = context;
-            helperRequest->helper.name = this->helperInstances[context]->name;
+            helperRequest->helper.id = static_cast<signed> (context);
+            helperRequest->helper.name = this->helperInstances[static_cast<signed> (context)]->name;
             this->incomingRequests.append (helperRequest);
             this->processIncomingRequest ();
         }
@@ -680,14 +683,14 @@ void JobWorker::processIncomingRequest () {
                 qFatal ("Unexpected code flow!");
             }
         } else {
-            unsigned int requestId (this->requestId);
+            unsigned int _requestId (this->requestId);
             this->requestId += 2;
-            QMap<unsigned int,AppJobRequest*>::iterator requestIdIterator (this->runningRequests.insert (requestId, request));
+            QMap<unsigned int,AppJobRequest*>::iterator requestIdIterator (this->runningRequests.insert (_requestId, request));
             if (requestType == RequestFromHelper) {
-                this->processObjectFromUrl (requestId, helperRequest->data.object);
+                this->processObjectFromUrl (_requestId, helperRequest->data.object);
             } else if (requestType == RequestFromSquid) {
-                qDebug ("[%s#%u] Invoking 'getObjectFromUrl();'...", appHelperInfo->name.toLatin1().constData(), requestId);
-                if (! this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, requestId, JavascriptMethod::getObjectFromUrl, urlString)) {
+                qDebug ("[%s#%u] Invoking 'getObjectFromUrl();'...", appHelperInfo->name.toLatin1().constData(), _requestId);
+                if (! this->javascriptBridge->invokeMethod (appHelperInfo->entryPoint, _requestId, JavascriptMethod::getObjectFromUrl, urlString)) {
                     this->tryNextHelper (requestIdIterator);
                 }
             } else {
@@ -702,13 +705,13 @@ void JobWorker::processIncomingRequest () {
 void JobWorker::setCurrentTimestamp () {
     // I need to update this->currentTimestamp manually if the JobWorker stops receiving jobs from JobDispatcher
     // probably because of an EOF at STDIN or an absence of requests from Squid.
-    qint64 currentTimestamp (AppRuntime::currentDateTime().toMSecsSinceEpoch());
+    qint64 _currentTimestamp (AppRuntime::currentDateTime().toMSecsSinceEpoch());
     if (! this->rngdInitialized) {
-        qsrand ((uint) currentTimestamp);
+        qsrand (static_cast <uint> (_currentTimestamp));
         QThread::msleep (1);
         this->rngdInitialized = true;
     }
-    this->currentTimestamp = (currentTimestamp / 1000);
+    this->currentTimestamp = (_currentTimestamp / 1000);
 }
 
 void JobWorker::squidRequestIn (AppJobRequestFromSquid* request, const qint64 timestampNow) {

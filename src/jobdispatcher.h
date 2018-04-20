@@ -29,7 +29,7 @@ private slots:
     void squidRequest (const int requestChannelNumber, const QString& requestChannel, const QUrl& requestUrl, const QStringList& requestData);
     void setCurrentTimestamp ();
 public:
-    JobDispatcher (QObject *parent = 0);
+    JobDispatcher (QObject *parent = Q_NULLPTR);
     ~JobDispatcher ();
     void start (QThread::Priority priority = QThread::InheritPriority);
 signals:

@@ -13,7 +13,7 @@
 class StdinReader : public QThread {
     Q_OBJECT
 public:
-    StdinReader (QObject *parent = 0);
+    StdinReader (QObject *parent = Q_NULLPTR);
 protected:
     void run ();
 signals:

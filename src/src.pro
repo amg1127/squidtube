@@ -39,22 +39,24 @@ unix {
 }
 
 # What is the compiler? GCC? Clang? Neither?
-compilerSuffix4 = $$str_member($$join(QMAKE_CXX,,-,),-4,-1)
-compilerSuffix8 = $$str_member($$join(QMAKE_CXX,,-,),-8,-1)
+compilerIsGcc = $$find(QMAKE_CXX,(|.*-)g\+\+)
+compilerIsClang = $$find(QMAKE_CXX,(|.*-)clang\+\+)
 
 # Turn all warnings on
 CONFIG += warn_on
-equals(compilerSuffix4,-g++):QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion
-equals(compilerSuffix8,-clang++):QMAKE_CXXFLAGS += -Weverything
+QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion
+#count(compilerIsClang,1):QMAKE_CXXFLAGS += -Weverything -Wno-c++98-compat -Wno-exit-time-destructors -Wno-global-constructors -Wno-covered-switch-default -Wno-padded -Wno-switch-enum -Wno-redundant-parens
 DEFINES += QT_DEPRECATED_WARNINGS
 
 # Abort compilation if there are more than 3 errors
-equals(compilerSuffix4,-g++):QMAKE_CXXFLAGS += -fmax-errors=3
-equals(compilerSuffix8,-clang++):QMAKE_CXXFLAGS += -ferror-limit=3
+#count(compilerIsGcc,1):QMAKE_CXXFLAGS += -fmax-errors=3
+#count(compilerIsClang,1):QMAKE_CXXFLAGS += -ferror-limit=3
 
 # I want to handle character conversion explicitly
 DEFINES += QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII QT_NO_CAST_FROM_BYTEARRAY
 
+# Defines the C++ standard
+QMAKE_CXXFLAGS += -std=c++11
 
 ###########################
 # Make project variables available inside the C++ code

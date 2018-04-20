@@ -11,12 +11,12 @@ public:
     QString configDescription;
     QRegExp configSyntax;
     QString* configValue;
-    inline AppConfigValidSetting (const QString configSection, const QString configName, const QString configDescription, const QRegExp configSyntax, QString& configValue) :
-        configSection(configSection),
-        configName(configName),
-        configDescription(configDescription),
-        configSyntax(configSyntax),
-        configValue(&configValue) { }
+    inline AppConfigValidSetting (const QString _configSection, const QString _configName, const QString _configDescription, const QRegExp _configSyntax, QString& _configValue) :
+        configSection(_configSection),
+        configName(_configName),
+        configDescription(_configDescription),
+        configSyntax(_configSyntax),
+        configValue(&_configValue) { }
 };
 
 class AppConfig

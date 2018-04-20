@@ -3,9 +3,9 @@
 ObjectCache::~ObjectCache () {
 }
 
-ObjectCache::ObjectCache (const QByteArray& helperName, ObjectCache* lowerCache) :
-    lowerCache (lowerCache),
-    helperName (helperName),
+ObjectCache::ObjectCache (const QByteArray& _helperName, ObjectCache* _lowerCache) :
+    lowerCache (_lowerCache),
+    helperName (_helperName),
     cacheType ("(unknown)") {
 }
 
@@ -23,7 +23,7 @@ CacheStatus ObjectCache::read (const unsigned int requestId, const QString& clas
     bool fromLower = false;
     CacheStatus returnValue = CacheMiss;
     QJsonDocument _data;
-    qint64 _timestampCreated;
+    qint64 _timestampCreated = 0;
     qDebug ("[%s#%u] Trying to search %s cache for information concerning (className='%s', id='%s')...", this->helperName.constData(), requestId, this->cacheType.constData(), className.toLatin1().constData(), id.toLatin1().constData());
     bool lockStatus = this->lock (requestId);
     if (lockStatus) {
@@ -127,7 +127,7 @@ ObjectCacheDatabase::ObjectCacheDatabase (const QByteArray& helperName, const QB
     this->cacheType = "database";
     QByteArray helperNameModified (helperName);
     for (QByteArray::iterator character = helperNameModified.begin(); character != helperNameModified.end(); character++) {
-        if (! QChar::isLetterOrNumber (*character)) {
+        if (! QChar::isLetterOrNumber (static_cast<uint> (*character))) {
             (*character) = '_';
         }
     }
