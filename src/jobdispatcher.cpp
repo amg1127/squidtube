@@ -206,9 +206,27 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
             QObject::connect (carrier, &JobCarrier::finished, this, &JobDispatcher::jobWorkerFinished);
             this->jobCarriers[requestChannelNumber] = carrier;
             this->numJobCarriers++;
-            carrier->start ();
+            int tentative = 5;
+            for (;tentative > 0; tentative--) {
+                if (carrier->start ()) {
+                    break;
+                }
+                qWarning ("JobWorker thread did not start!");
+                QThread::sleep (1);
+            }
+            if (! tentative) {
+                qCritical ("Unable to initialize JobCarrier object correctly!");
+                this->jobCarriers[requestChannelNumber] = Q_NULLPTR;
+                this->numJobCarriers--;
+                delete (carrier);
+                carrier = Q_NULLPTR;
+            }
         }
-        carrier->squidRequestIn (request, this->currentTimestamp);
+        if (carrier != Q_NULLPTR) {
+            carrier->squidRequestIn (request, this->currentTimestamp);
+        } else {
+            this->writeAnswerLine (requestChannel, QStringLiteral("Handler for channel #%1 is not available").arg(requestChannel), true, false);
+        }
     } else {
         qFatal ("Invalid procedure call: either 'requestChannelNumber' is a negative number, 'requestUrl' is invalid or 'requestData' is empty!");
     }
@@ -238,13 +256,14 @@ JobDispatcher::~JobDispatcher () {
     }
 }
 
-void JobDispatcher::start (QThread::Priority priority) {
+bool JobDispatcher::start (QThread::Priority priority) {
     if (this->started) {
         qFatal ("Invalid procedure call: this method must be called only once!");
     } else {
         this->setCurrentTimestamp ();
         this->clockTimer->start ();
         this->stdinReader.start (priority);
-        this->started = true;
+        this->started = this->stdinReader.isRunning();
+        return (this->started);
     }
 }

@@ -17,16 +17,9 @@
 #include <QNetworkProxyFactory>
 #include <QSettings>
 
-#ifdef Q_OS_LINUX
-#include <cstring>
-#include <errno.h>
-#include <sys/resource.h>
-#endif
-
 void messageHandlerFunction (QtMsgType, const QMessageLogContext&, const QString&);
 bool loadRuntimeVariables ();
 void unloadRuntimeVariables ();
-void increaseMemoryLimit ();
 
 int main(int argc, char *argv[]) {
     qInstallMessageHandler (messageHandlerFunction);
@@ -49,7 +42,6 @@ int main(int argc, char *argv[]) {
     int returnValue = 1;
 
     if (loadRuntimeVariables ()) {
-        increaseMemoryLimit ();
 
         // Initialize networking environment
         QNetworkProxyFactory::setUseSystemConfiguration (true);
@@ -57,10 +49,20 @@ int main(int argc, char *argv[]) {
         // Initialize the dispatcher object
         JobDispatcher jobDispatcher;
         QObject::connect (&jobDispatcher, &JobDispatcher::finished, &app, &QCoreApplication::quit, Qt::QueuedConnection);
-        jobDispatcher.start ();
-
-        qDebug ("Startup finished. Entering main loop... (appVer=%s, qtBuild=%s, qtRun=%s)", APP_project_version, QT_VERSION_STR, qVersion());
-        returnValue = app.exec ();
+        int tentative = 5;
+        for (; tentative > 0; tentative--) {
+            if (jobDispatcher.start ()) {
+                break;
+            }
+            qWarning ("StdinReader thread did not start!");
+            QThread::sleep (1);
+        }
+        if (tentative) {
+            qDebug ("Startup finished. Entering main loop... (appVer=%s, qtBuild=%s, qtRun=%s)", APP_project_version, QT_VERSION_STR, qVersion());
+            returnValue = app.exec ();
+        } else {
+            qCritical ("Unable to initialize JobDispatcher object correctly. The program can not work without it!");
+        }
     }
 
     qDebug ("Performing final cleaning and finishing program...");
@@ -96,7 +98,7 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
         QByteArray msgLineContext ("");
         QString dateTimeFormat (QStringLiteral("yyyy-MM-dd'T'HH:mm:sst"));
 #else
-        QByteArray threadId (QByteArray::number ((qulonglong) QThread::currentThreadId(), 16));
+        QByteArray threadId (QByteArray::number (reinterpret_cast<qulonglong> (QThread::currentThreadId()), 16));
         for (int length = threadId.length(); length < 16; length++) {
             threadId.prepend ('0');
         }
@@ -132,26 +134,6 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
     if (type == QtFatalMsg) {
         abort ();
     }
-}
-
-void increaseMemoryLimit () {
-#ifdef Q_OS_LINUX
-    // Tries to use the maximum memory allowed by the administrator
-    qDebug ("Increasing memory limit...");
-    struct rlimit rlp;
-    int ret = getrlimit(RLIMIT_AS, &rlp);
-    if (ret) {
-        qWarning ("'getrlimit' call failed: %d: %s", errno, strerror(errno));
-    } else {
-        rlp.rlim_cur = 3u << 30;
-        if (rlp.rlim_cur < rlp.rlim_max || rlp.rlim_max == RLIM_INFINITY) {
-            ret = setrlimit (RLIMIT_AS, &rlp);
-            if (ret) {
-                qWarning ("'setrlimit' call failed: %d: %s", errno, strerror(errno));
-            }
-        }
-    }
-#endif
 }
 
 bool loadRuntimeVariables () {

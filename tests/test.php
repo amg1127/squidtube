@@ -106,11 +106,15 @@ function cli_sapi () {
     $GLOBALS['exitCode'] = 1;
     // Server address
     $GLOBALS['serverAddress'] = null;
+    // Server process descriptor
+    $GLOBALS['serverProcess'] = null;
     // Process and file descriptors for communication with the program
-    $GLOBALS['projectProc'] = null;
+    $GLOBALS['projectProcess'] = null;
     $GLOBALS['projectSTDIN'] = null;
     $GLOBALS['projectSTDOUT'] = null;
     $GLOBALS['projectSTDERR'] = null;
+    // A file descriptor for a file that will store the data that will be sent through STDIN
+    $GLOBALS['STDINclone'] = null;
 
     // This is used by stdoutExpect() function
     define ('STDOUT_EXPECT_MATCH', 'MATCH');
@@ -125,10 +129,8 @@ function cli_sapi () {
     }
 
     // Try to launch a local web server using PHP's builtin one
-    $serverProcess = null;
-
     if ((int) ini_get ('allow_url_fopen')) {
-        for ($launchTry = 1; (! $serverProcess) && $launchTry <= 5; $launchTry++) {
+        for ($launchTry = 1; (! $GLOBALS['serverProcess']) && $launchTry <= 5; $launchTry++) {
             $serverPort = rand (1024, 65535);
             msg_log ("[" . $launchTry . "] Trying to launch a local web server at TCP port " . $serverPort . "...");
             $GLOBALS['serverAddress'] = "localhost:" . $serverPort;
@@ -141,16 +143,16 @@ function cli_sapi () {
                 fclose ($pipes[0]);
                 msg_log ("Server seems to be running now.");
                 $GLOBALS['serverAddress'] = "http://" . $GLOBALS['serverAddress'];
-                for ($connectTry = 1; (! $serverProcess) && $connectTry <= 10; $connectTry++) {
+                for ($connectTry = 1; (! $GLOBALS['serverProcess']) && $connectTry <= 10; $connectTry++) {
                     msg_log ("[" . $connectTry . "] Trying to establish a HTTP connection...");
                     usleep (500000);
                     $random_answer = __FILE__ . "_" . rand ();
                     $data = file_get_contents ($GLOBALS['serverAddress'] . "/ping_test/?mirror=" . rawurlencode ($random_answer));
                     if (trim ($data) == $random_answer) {
-                        $serverProcess = $serverProcessTentative;
+                        $GLOBALS['serverProcess'] = $serverProcessTentative;
                     }
                 }
-                if (! $serverProcess) {
+                if (! $GLOBALS['serverProcess']) {
                     shutdownProcess ($serverProcessTentative, "Server did not send the expected answer.");
                 }
             }
@@ -159,23 +161,29 @@ function cli_sapi () {
         msg_warning ("'allow_url_fopen' is disabled!");
     }
 
-    if (! $serverProcess) {
+    if (! $GLOBALS['serverProcess']) {
         msg_fatal ("Unable to launch a local web server!");
     }
 
     $projectLogFile = __DIR__ . "/" . basename (__FILE__, '.php') . ".log";
     if (file_put_contents ($projectLogFile, '') !== 0) {
-        shutdownProcess ($serverProcess);
+        shutdownProcess ($GLOBALS['serverProcess']);
         msg_fatal ("Unable to create log file '" . $projectLogFile . "'!");
     }
 
-    $GLOBALS['projectProc'] = proc_open (escapeshellarg(__DIR__ . "/../" . $projectName) . " --main.loglevel=DEBUG --config " . escapeshellarg (__DIR__ . "/test_config.conf"), array (
+    $databaseFile = __DIR__ . "/test.sqlite";
+    foreach (array ('', '-wal', '-shm') as $suffix) {
+        if (file_exists ($databaseFile . $suffix) || is_link ($databaseFile . $suffix)) {
+            unlink ($databaseFile . $suffix);
+        }
+    }
+    $GLOBALS['projectProcess'] = proc_open (escapeshellarg(__DIR__ . "/../" . $projectName) . " --main.loglevel=DEBUG --config " . escapeshellarg (__DIR__ . "/test_config.conf") . " --db.name " . escapeshellarg ($databaseFile), array (
         0 => array ("pipe", "r"),
         1 => array ("pipe", "w"),
         2 => array ("file", $projectLogFile, "w")
     ), $pipes, __DIR__);
-    if (! $GLOBALS['projectProc']) {
-        shutdownProcess ($serverProcess);
+    if (! $GLOBALS['projectProcess']) {
+        shutdownProcess ($GLOBALS['serverProcess']);
         unlink ($projectLogFile);
         msg_fatal ("Unable to launch the project executable!");
     }
@@ -186,10 +194,10 @@ function cli_sapi () {
     if (! $GLOBALS['projectSTDERR']) {
         fclose ($GLOBALS['projectSTDIN']);
         if (waitGracefulFinish () === false) {
-            shutdownProcess ($GLOBALS['projectProc']);
+            shutdownProcess ($GLOBALS['projectProcess']);
         }
         unlink ($projectLogFile);
-        shutdownProcess ($serverProcess);
+        shutdownProcess ($GLOBALS['serverProcess']);
         msg_fatal ("Unable to open log file '" . $projectLogFile . "' for reading!");
     }
 
@@ -205,12 +213,39 @@ function cli_sapi () {
         fclose ($GLOBALS['projectSTDIN']);
         fclose ($GLOBALS['projectSTDERR']);
         if (waitGracefulFinish () === false) {
-            shutdownProcess ($GLOBALS['projectProc']);
+            shutdownProcess ($GLOBALS['projectProcess']);
         }
-        shutdownProcess ($serverProcess);
+        shutdownProcess ($GLOBALS['serverProcess']);
         unlink ($projectLogFile);
         msg_fatal ("Tests can not run without setting communication file descriptors to nonblocking mode!");
     }
+    $GLOBALS['STDINclone'] = fopen (__DIR__ . "/test.in", "wt");
+    if (! $GLOBALS['STDINclone']) {
+        msg_warning ("Unable to open file 'test.in' for writing!");
+    }
+
+    register_shutdown_function (function () {
+        if (! empty ($GLOBALS['STDINclone'])) {
+            fclose ($GLOBALS['STDINclone']);
+        }
+        fclose ($GLOBALS['projectSTDIN']);
+        if (stderrExpect ('INFO:\\s*StdinReader\\s+thread\\s+finished\\.')) {
+            stderrExpect ('DEBUG:\\s*Performing\\s+final\\s+cleaning\\s+and\\s+finishing\\s+program\\.\\.\\.');
+        }
+        $finishStatus = waitGracefulFinish ();
+        if ($finishStatus !== 0) {
+            $GLOBALS['exitCode'] = 1;
+            if ($finishStatus === false) {
+                msg_warning ("Project executable is still running!");
+                shutdownProcess ($GLOBALS['projectProcess']);
+            } else if ($finishStatus !== 0) {
+                msg_warning ("Project executable ended with return code #" . $finishStatus . ".");
+            }
+        }
+        shutdownProcess ($GLOBALS['serverProcess'], "Tests finished.");
+        msg_log ("Test program exited with status code #" . $GLOBALS['exitCode'] . ".");
+        exit ($GLOBALS['exitCode']);
+    });
 
     // Wait program startup
     if (stderrExpect ('INFO:\\s*StdinReader\\s+thread\\s+started\\.')) {
@@ -228,42 +263,25 @@ function cli_sapi () {
             closedir ($testDir);
         }
         sort ($testFiles);
+        $pendingTests = count ($testFiles);
         foreach ($testFiles as $testFile) {
             $procStatus = getProcessExitCode ();
             if ($procStatus !== false) {
                 msg_warning ("Project executable ended unexpectedly with code #" . $procStatus . "! Did it crash?");
-                $GLOBALS['exitCode'] = 1;
                 break;
             }
             $testName = basename ($testFile, '.php');
             msg_log ("  + Running test '" . $testName . "'...");
-            if (includeWithScopeProtection ($testFile)) {
-                $GLOBALS['exitCode'] = 0;
-            } else {
+            if (! includeWithScopeProtection ($testFile)) {
                 msg_warning ("Test '" . $testName . "' did not run successfully!");
-                $GLOBALS['exitCode'] = 1;
                 break;
             }
+            $pendingTests--;
+        }
+        if ((! $pendingTests) && count ($testFiles)) {
+            $GLOBALS['exitCode'] = 0;
         }
     }
-
-    fclose ($GLOBALS['projectSTDIN']);
-    if (stderrExpect ('INFO:\\s*StdinReader\\s+thread\\s+finished\\.')) {
-        stderrExpect ('DEBUG:\\s*Performing\\s+final\\s+cleaning\\s+and\\s+finishing\\s+program\\.\\.\\.');
-    }
-    $finishStatus = waitGracefulFinish ();
-    if ($finishStatus !== 0) {
-        $GLOBALS['exitCode'] = 1;
-        if ($finishStatus === false) {
-            msg_warning ("Project executable is still running!");
-            shutdownProcess ($GLOBALS['projectProc']);
-        } else if ($finishStatus !== 0) {
-            msg_warning ("Project executable ended with return code #" . $finishStatus . ".");
-        }
-    }
-    shutdownProcess ($serverProcess, "Tests finished.");
-    msg_log ("Test program exited with status code #" . $GLOBALS['exitCode'] . ".");
-    exit ($GLOBALS['exitCode']);
 }
 
 function msg_log ($msg) {
@@ -297,10 +315,12 @@ function shutdownProcess ($proc, $msg = '') {
 }
 
 function getProcessExitCode () {
-    $procStatus = proc_get_status ($GLOBALS['projectProc']);
-    if ($procStatus) {
-        if (! $procStatus['running']) {
-            return ($procStatus['exitcode']);
+    if (! empty ($GLOBALS['projectProcess'])) {
+        $procStatus = proc_get_status ($GLOBALS['projectProcess']);
+        if ($procStatus) {
+            if (! $procStatus['running']) {
+                return ($procStatus['exitcode']);
+            }
         }
     }
     return (false);
@@ -335,7 +355,7 @@ function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $t
     $line = ((int) $channel) . " " . $GLOBALS['serverAddress'] . $urlPath . "?" . implode ("", array_map (function ($item) {
         return (rawurlencode ("expect[]") . "=" . rawurlencode ($item) . "&");
     }, $expect)) . $optionsData . "mirror=" . $mirror . " " . rawurlencode ($testProperty) . " " .
-    implode (" ", array_map ('rawurlencode', preg_split ('/\\s/', $testFlags, -1, PREG_SPLIT_NO_EMPTY))) . " ";
+    implode (" ", array_map ('rawurlencode', preg_split ('/\\s/', $testFlags, -1, PREG_SPLIT_NO_EMPTY))) . " -- ";
     if (is_array ($testCriteria)) {
         $line .= implode (" ", array_map ('rawurlencode', $testCriteria));
     } else {
@@ -343,26 +363,28 @@ function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $t
     }
     $line = trim ($line) . "\n";
     $lineLength = strlen ($line);
-    $retries = 0;
-    $maxtries = 100;
-    for ($written = 0; $written < $lineLength; $written += $bytes) {
-        $bytes = fwrite ($GLOBALS['projectSTDIN'], substr ($line, $written));
-        if ($bytes === false) {
-            break;
-        } else if ($bytes === 0) {
-            $retries++;
-            if ($retries < $maxtries) {
-                usleep (100000);
-            } else {
-                $bytes = false;
+    foreach (array ($GLOBALS['STDINclone'], $GLOBALS['projectSTDIN']) as $outFd) {
+        $retries = 0;
+        $maxtries = 100;
+        for ($written = 0; $written < $lineLength; $written += $bytes) {
+            $bytes = fwrite ($outFd, substr ($line, $written));
+            if ($bytes === false) {
                 break;
+            } else if ($bytes === 0) {
+                $retries++;
+                if ($retries < $maxtries) {
+                    usleep (100000);
+                } else {
+                    $bytes = false;
+                    break;
+                }
+            } else {
+                $retries = 0;
             }
-        } else {
-            $retries = 0;
         }
-        fflush ($GLOBALS['projectSTDIN']);
     }
     if ($bytes !== false) {
+        fflush ($GLOBALS['projectSTDIN']);
         return (true);
     } else {
         msg_warning ("Unable to send a request line to the program! Aborting...");
@@ -423,20 +445,25 @@ function stderrExpect ($regexp, $timeout = 30) {
 }
 
 function stdoutExpect ($what, $timeout = 30) {
+    $decodedAnswer = "";
     if (($line = readLineFromDescriptor ($GLOBALS['projectSTDOUT'], $timeout)) !== false) {
         $line = trim ($line);
         if (preg_match ('/^\\s*(|(\\d+)\\s+)(OK|ERR|BH)\\s+message=(\\S+)\\s+log=\\S+\\s*$/', $line, $matches)) {
-            $matches[4] = urldecode ($matches[4]);
-            if ($what == STDOUT_EXPECT_MATCH && $matches[3] == "OK" && preg_match ('/^\\[[^\\]]+#\\d+\\]\\s+(Cached|Retrieved)\\s+data\\s+from\\s+.*\\)\\s+matches\\s+specified\\s+criteria\\.?$/', $matches[4])) {
+            $decodedAnswer = urldecode ($matches[4]);
+            if ($what == STDOUT_EXPECT_MATCH && $matches[3] == "OK" && preg_match ('/^\\[[^\\]]+#\\d+\\]\\s+(Cached|Retrieved)\\s+data\\s+from\\s+.*\\)\\s+matches\\s+specified\\s+criteria\\.?$/', $decodedAnswer)) {
                 return ($matches[1]);
-            } else if ($what == STDOUT_EXPECT_NOMATCH && $matches[3] == "ERR" && preg_match ('/^\\[[^\\]]+#\\d+\\]\\s+(Cached|Retrieved)\\s+data\\s+from\\s+.*\\)\\s+does\\s+not\\s+match\\s+specified\\s+criteria\\.?$/', $matches[4])) {
+            } else if ($what == STDOUT_EXPECT_NOMATCH && $matches[3] == "ERR" && preg_match ('/^\\[[^\\]]+#\\d+\\]\\s+(Cached|Retrieved)\\s+data\\s+from\\s+.*\\)\\s+does\\s+not\\s+match\\s+specified\\s+criteria\\.?$/', $decodedAnswer)) {
                 return ($matches[1]);
-            } else if ($what == STDOUT_EXPECT_NOHELPER && $matches[3] == "ERR" && preg_match ('/^Unable\\s+to\\s+find\\s+a\\s+helper\\s+/', $matches[4])) {
+            } else if ($what == STDOUT_EXPECT_NOHELPER && $matches[3] == "ERR" && preg_match ('/^Unable\\s+to\\s+find\\s+a\\s+helper\\s+/', $decodedAnswer)) {
                 return ($matches[1]);
             }
         }
     }
-    msg_warning ("STDOUT did not return an expected '" . $what . "' response: '" . $line . "'");
+    if ($decodedAnswer) {
+        msg_warning ("STDOUT did not return an expected '" . $what . "' response: '" . $line . "' ('" . $decodedAnswer . "')");
+    } else {
+        msg_warning ("STDOUT did not return an expected '" . $what . "' response: '" . $line . "'");
+    }
     $GLOBALS['exitCode'] = 1;
     return (false);
 }
@@ -458,6 +485,5 @@ function stdoutExpectNoHelper ($timeout = 30) {
 }
 
 function includeWithScopeProtection ($file) {
-    $includeResult = ((include ($file)));
-    return ($includeResult);
+    return ((include ($file)));
 }

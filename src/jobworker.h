@@ -5,8 +5,6 @@
 #include "javascriptbridge.h"
 #include "objectcache.h"
 
-#include <limits>
-
 #include <QJSEngine>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -108,7 +106,7 @@ public:
     inline JobWorker* worker () {
         return (this->workerObj);
     }
-    void start (QThread::Priority priority = QThread::InheritPriority);
+    bool start (QThread::Priority priority = QThread::InheritPriority);
     inline bool wait (unsigned long time = ULONG_MAX) {
         return (this->threadObj->wait (time));
     }

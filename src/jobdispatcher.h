@@ -31,7 +31,7 @@ private slots:
 public:
     JobDispatcher (QObject *parent = Q_NULLPTR);
     ~JobDispatcher ();
-    void start (QThread::Priority priority = QThread::InheritPriority);
+    bool start (QThread::Priority priority = QThread::InheritPriority);
 signals:
     void finishWorkers ();
     void finished ();

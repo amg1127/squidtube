@@ -193,7 +193,7 @@ bool ObjectCacheDatabase::unlockedRead (const unsigned int requestId, const QStr
                 QJsonParseError jsonParseError;
                 _data = QJsonDocument::fromJson (result.value("data").toByteArray(), &jsonParseError);
                 if (jsonParseError.error != QJsonParseError::NoError) {
-                    qWarning ("[%s#%u] Data fetched from the database could not be parsed as JSON: (className='%s', id='%s', offset=%d, errorString='%s')", this->helperName.constData(), requestId, className.toLatin1().constData(), id.toLatin1().constData(), jsonParseError.offset, jsonParseError.errorString().toLatin1().constData());
+                    qWarning ("[%s#%u] Data fetched from the database could not be parsed as JSON: (className='%s', id='%s', offset=%d, error=%d, errorString='%s')", this->helperName.constData(), requestId, className.toLatin1().constData(), id.toLatin1().constData(), jsonParseError.offset, jsonParseError.error, jsonParseError.errorString().toLatin1().constData());
                 }
             }
             data = _data;

@@ -131,12 +131,12 @@ public:
 
 enum AppSquidMathMatchOperator {
     OperatorString = 1,
-    OperatorLessThan = 1,
-    OperatorLessThanOrEquals = 2,
-    OperatorEquals = 3,
-    OperatorNotEquals = 4,
-    OperatorGreaterThanOrEquals = 5,
-    OperatorGreaterThan = 6
+    OperatorLessThan = 2,
+    OperatorLessThanOrEquals = 3,
+    OperatorEquals = 4,
+    OperatorNotEquals = 5,
+    OperatorGreaterThanOrEquals = 6,
+    OperatorGreaterThan = 7
 };
 
 enum AppRequestType {

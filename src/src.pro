@@ -45,7 +45,7 @@ compilerIsClang = $$find(QMAKE_CXX,(|.*-)clang\+\+)
 # Turn all warnings on
 CONFIG += warn_on
 QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion
-#count(compilerIsClang,1):QMAKE_CXXFLAGS += -Weverything -Wno-c++98-compat -Wno-exit-time-destructors -Wno-global-constructors -Wno-covered-switch-default -Wno-padded -Wno-switch-enum -Wno-redundant-parens
+!isEmpty(compilerIsClang):!isEmpty(CLANG_WARN_EVERYTHING):QMAKE_CXXFLAGS += -Weverything -Wno-c++98-compat -Wno-exit-time-destructors -Wno-global-constructors -Wno-covered-switch-default -Wno-padded -Wno-switch-enum -Wno-redundant-parens
 DEFINES += QT_DEPRECATED_WARNINGS
 
 # Abort compilation if there are more than 3 errors
@@ -56,7 +56,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 DEFINES += QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII QT_NO_CAST_FROM_BYTEARRAY
 
 # Defines the C++ standard
-QMAKE_CXXFLAGS += -std=c++11
+QMAKE_CXXFLAGS += -std=c++11 -pedantic
 
 ###########################
 # Make project variables available inside the C++ code

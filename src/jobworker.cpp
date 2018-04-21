@@ -107,9 +107,9 @@ void JobWorker::processObjectFromUrl (unsigned int _requestId, const QJSValue& a
                 QJsonDocument jsonHelperObjectFromUrl (QJsonDocument::fromJson (jsonString.toUtf8(), &jsonParseError));
                 if (jsonParseError.error != QJsonParseError::NoError) {
                     if (requestType == RequestFromHelper) {
-                        qInfo ("[%s#%u] Data requested by the helper could not be parsed as JSON: (rawData='%s', offset=%d, errorString='%s')", request->helper.name.toLatin1().constData(), _requestId, jsonString.toLatin1().constData(), jsonParseError.offset, jsonParseError.errorString().toLatin1().constData());
+                        qInfo ("[%s#%u] Data requested by the helper could not be parsed as JSON: (rawData='%s', offset=%d, error=%d, errorString='%s')", request->helper.name.toLatin1().constData(), _requestId, jsonString.toLatin1().constData(), jsonParseError.offset, jsonParseError.error, jsonParseError.errorString().toLatin1().constData());
                     } else if (requestType == RequestFromSquid) {
-                        qInfo ("[%s#%u] Data returned by the helper could not be parsed as JSON: (URL='%s', rawData='%s', offset=%d, errorString='%s')", request->helper.name.toLatin1().constData(), _requestId, squidRequest->data.url.toDisplayString(QUrl::PrettyDecoded | QUrl::RemoveUserInfo).toLatin1().constData(), jsonString.toLatin1().constData(), jsonParseError.offset, jsonParseError.errorString().toLatin1().constData());
+                        qInfo ("[%s#%u] Data returned by the helper could not be parsed as JSON: (URL='%s', rawData='%s', offset=%d, error=%d, errorString='%s')", request->helper.name.toLatin1().constData(), _requestId, squidRequest->data.url.toDisplayString(QUrl::PrettyDecoded | QUrl::RemoveUserInfo).toLatin1().constData(), jsonString.toLatin1().constData(), jsonParseError.offset, jsonParseError.error, jsonParseError.errorString().toLatin1().constData());
                     } else {
                         qFatal ("Unexpected code flow!");
                     }
@@ -232,9 +232,9 @@ void JobWorker::processPropertiesFromObject (unsigned int _requestId, const QJSV
                 objectData = JavascriptBridge::QJS2QJsonDocument (appHelperPropertiesFromObject);
             } else if (appHelperPropertiesFromObject.isString ()) {
                 QJsonParseError jsonParseError;
-                objectData = QJsonDocument::fromJson (appHelperPropertiesFromObject.toString().toUtf8());
+                objectData = QJsonDocument::fromJson (appHelperPropertiesFromObject.toString().toUtf8(), &jsonParseError);
                 if (jsonParseError.error != QJsonParseError::NoError) {
-                    qInfo ("[%s#%u] Data returned by the helper could not be parsed as JSON: (className='%s', id='%s', offset=%d, errorString=%s'!", request->helper.name.toLatin1().constData(), _requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData(), jsonParseError.offset, jsonParseError.errorString().toLatin1().constData());
+                    qInfo ("[%s#%u] Data returned by the helper could not be parsed as JSON: (className='%s', id='%s', offset=%d, error=%d, errorString='%s'!", request->helper.name.toLatin1().constData(), _requestId, request->object.className.toLatin1().constData(), request->object.id.toLatin1().constData(), jsonParseError.offset, jsonParseError.error, jsonParseError.errorString().toLatin1().constData());
                 }
             }
             bool validData = ObjectCache::jsonDocumentHasData (objectData);
@@ -484,19 +484,17 @@ bool JobWorker::processCriteria (
                 requestMathMatchOperator == OperatorGreaterThan) {
                 double doubleValue = jsonValueInformation.toDouble ();
                 double doubleComparison;
-                double compareResult;
                 bool conversionOk;
                 for (QStringList::const_iterator requestCriteriaIterator = requestCriteria.constBegin(); requestCriteriaIterator != requestCriteria.constEnd(); requestCriteriaIterator++) {
                     doubleComparison = requestCriteriaIterator->toDouble (&conversionOk);
                     if (conversionOk) {
-                        compareResult = doubleValue - doubleComparison;
-                        // https://stackoverflow.com/q/39108471/7184009
-                        if ((requestMathMatchOperator == OperatorLessThan            && (compareResult <= -(std::numeric_limits<double>::epsilon()))) ||
-                            (requestMathMatchOperator == OperatorLessThanOrEquals    && (compareResult <   (std::numeric_limits<double>::epsilon()))) ||
-                            (requestMathMatchOperator == OperatorEquals              && (compareResult <   (std::numeric_limits<double>::epsilon()) && compareResult > -(std::numeric_limits<double>::epsilon()))) ||
-                            (requestMathMatchOperator == OperatorNotEquals           && (compareResult <= -(std::numeric_limits<double>::epsilon()) || compareResult >= (std::numeric_limits<double>::epsilon()))) ||
-                            (requestMathMatchOperator == OperatorGreaterThanOrEquals && (compareResult >  -(std::numeric_limits<double>::epsilon()))) ||
-                            (requestMathMatchOperator == OperatorGreaterThan         && (compareResult >=  (std::numeric_limits<double>::epsilon())))) {
+                        static const quint64 acceptableError = (1u << 8);
+                        if ((requestMathMatchOperator == OperatorLessThan            && ( doubleValue < doubleComparison)) ||
+                            (requestMathMatchOperator == OperatorLessThanOrEquals    && ((doubleValue < doubleComparison)  || qFloatDistance (doubleValue, doubleComparison) < acceptableError)) ||
+                            (requestMathMatchOperator == OperatorEquals              && (qFloatDistance (doubleValue, doubleComparison) <  acceptableError)) ||
+                            (requestMathMatchOperator == OperatorNotEquals           && (qFloatDistance (doubleValue, doubleComparison) >= acceptableError)) ||
+                            (requestMathMatchOperator == OperatorGreaterThanOrEquals && ((doubleValue > doubleComparison)  || qFloatDistance (doubleValue, doubleComparison) < acceptableError)) ||
+                            (requestMathMatchOperator == OperatorGreaterThan         && ( doubleValue > doubleComparison))) {
                             return (true);
                         }
                     } else {
@@ -760,12 +758,13 @@ JobCarrier::~JobCarrier () {
     delete (this->threadObj);
 }
 
-void JobCarrier::start (QThread::Priority priority) {
+bool JobCarrier::start (QThread::Priority priority) {
     if (this->started) {
         qFatal ("Invalid procedure call: this method must be called only once!");
     } else {
         this->threadObj->start (priority);
-        this->started = true;
+        this->started = this->threadObj->isRunning ();
+        return (this->started);
     }
 }
 
