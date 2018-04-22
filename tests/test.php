@@ -208,7 +208,7 @@ function cli_sapi () {
         stream_set_blocking ($fd, false);
         stream_set_read_buffer ($fd, 0);
     }
-    
+
     $projectInFile = __DIR__ . "/" . basename (__FILE__, '.php') . ".stdin";
     removeFile ($projectInFile);
     $GLOBALS['STDINclone'] = fopen ($projectInFile, "wt");
@@ -221,7 +221,7 @@ function cli_sapi () {
     if (! $GLOBALS['STDOUTclone']) {
         msg_warning ("Unable to open file '" . basename ($projectOutFile) . "' for writing!");
     }
-    
+
     register_shutdown_function (function () {
         closeFileDescriptor ($GLOBALS['projectSTDIN']);
         closeFileDescriptor ($GLOBALS['STDINclone']);
@@ -253,7 +253,7 @@ function cli_sapi () {
         $testDir = opendir ($testDirPath);
         if ($testDir) {
             while (($testFile = readdir ($testDir)) !== false) {
-                if (preg_match ('/[a-zA-Z0-9_-]+\\.php/i', $testFile)) {
+                if (preg_match ('/^[a-zA-Z0-9_-]+\\.php$/i', $testFile)) {
                     array_push ($testFiles, $testDirPath . "/" . $testFile);
                 }
             }
@@ -269,12 +269,13 @@ function cli_sapi () {
             }
             $testName = basename ($testFile, '.php');
             msg_log ("  + Running test '" . $testName . "'...");
-            if (! includeWithScopeProtection ($testFile)) {
-                msg_warning ("Test '" . $testName . "' did not run successfully!");
-                break;
-            }
+            $includeAnswer = includeWithScopeProtection ($testFile);
             if ($GLOBALS['diffInputOutput']) {
                 msg_warning ("Test '" . $testName . "' imbalanced input/output relationship: #" . $GLOBALS['diffInputOutput']);
+            }
+            if (! $includeAnswer) {
+                msg_warning ("Test '" . $testName . "' did not run successfully!");
+                break;
             }
             $pendingTests--;
         }
@@ -414,45 +415,44 @@ function writeDataToFileDescriptor ($data, $outFd) {
 }
 
 function readLineFromDescriptor ($fd, $timeout = 30) {
-    $line = false;
-    $fdArray = array ($fd);
-    $writeFds = null;
-    $exceptFds = null;
     set_time_limit ($timeout + 30);
-    if (! empty ($fd)) {
-        $selectStatus = stream_select ($fdArray, $writeFds, $exceptFds, $timeout);
-        if ($selectStatus || $selectStatus === false) {
-            $line = stream_get_line ($fd, 32768, "\n");
-            if ($line === false) {
-                // It will perform a busy waiting as fallback if something goes wrong...
-                $start = $prev = time ();
-                do {
-                    usleep (10000);
-                    if (($line = stream_get_line ($fd, 32768, "\n")) !== false) {
-                        break;
-                    }
-                    $procStatus = getProcessExitCode ();
-                    if ($procStatus !== false) {
-                        msg_warning ("Project executable ended unexpectedly with code #" . $procStatus . "! Did it crash?");
-                        $GLOBALS['exitCode'] = 1;
-                        break;
-                    }
-                    $now = time();
-                    if ($prev < $now) {
-                        msg_warning ('Input is not ready yet. Waiting...');
-                        $prev = $now;
-                    }
-                } while (($now - $start) < $timeout);
+    $buffer = "";
+    $start = $prev = time ();
+    while (1) {
+        while (($character = stream_get_line ($fd, 1, "\n")) !== false) {
+            if ($character === "") {
+                return ($buffer);
+            } else {
+                $buffer .= $character;
             }
         }
-        if ($line === false) {
-            msg_warning ('Unable to read input!');
-            closeFileDescriptor ($GLOBALS['projectSTDIN']);
-            closeFileDescriptor ($GLOBALS['STDINclone']);
-            $GLOBALS['exitCode'] = 1;
+        usleep (10000);
+        $now = time();
+        if (($prev + 4) < $now) {
+            $procStatus = getProcessExitCode ();
+            if ($procStatus !== false) {
+                msg_warning ("Project executable ended unexpectedly with code #" . $procStatus . "! Did it crash?");
+                break;
+            }
+            if (($now - $start) >= $timeout) {
+                break;
+            }
+            msg_warning ('Input is not ready yet. Waiting...');
+            $prev = $now;
+        }
+        $readFds = array ($fd);
+        $writeFds = null;
+        $exceptFds = null;
+        $selectStatus = stream_select ($readFds, $writeFds, $exceptFds, $timeout);
+        if ($selectStatus === 0) {
+            continue;
         }
     }
-    return ($line);
+    msg_warning ('Unable to read input!');
+    closeFileDescriptor ($GLOBALS['projectSTDIN']);
+    closeFileDescriptor ($GLOBALS['STDINclone']);
+    $GLOBALS['exitCode'] = 1;
+    return (false);
 }
 
 function closeFileDescriptor (&$fd) {
