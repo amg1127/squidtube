@@ -1,5 +1,6 @@
 QT -= gui
 QT += core network qml sql
+win32:CONFIG += console
 
 include(../project-defs.pri)
 

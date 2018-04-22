@@ -115,6 +115,8 @@ function cli_sapi () {
     $GLOBALS['projectSTDERR'] = null;
     // A file descriptor for a file that will store the data that will be sent through STDIN
     $GLOBALS['STDINclone'] = null;
+    // A file descriptor for a file that will store the data that will be received through STDOUT
+    $GLOBALS['STDOUTclone'] = null;
 
     // This is used by stdoutExpect() function
     define ('STDOUT_EXPECT_MATCH', 'MATCH');
@@ -138,7 +140,7 @@ function cli_sapi () {
                 0 => array ("pipe", "r"),
                 1 => STDOUT,
                 2 => STDERR
-            ), $pipes, __DIR__);
+            ), $pipes, __DIR__, null, array ("bypass_shell" => true));
             if ($serverProcessTentative) {
                 fclose ($pipes[0]);
                 msg_log ("Server seems to be running now.");
@@ -166,22 +168,21 @@ function cli_sapi () {
     }
 
     $projectLogFile = __DIR__ . "/" . basename (__FILE__, '.php') . ".log";
+    removeFile ($projectLogFile);
     if (file_put_contents ($projectLogFile, '') !== 0) {
         shutdownProcess ($GLOBALS['serverProcess']);
         msg_fatal ("Unable to create log file '" . $projectLogFile . "'!");
     }
 
-    $databaseFile = __DIR__ . "/test.sqlite";
+    $databaseFile = __DIR__ . "/" . basename (__FILE__, '.php') . ".sqlite";
     foreach (array ('', '-wal', '-shm') as $suffix) {
-        if (file_exists ($databaseFile . $suffix) || is_link ($databaseFile . $suffix)) {
-            unlink ($databaseFile . $suffix);
-        }
+        removeFile ($databaseFile . $suffix);
     }
     $GLOBALS['projectProcess'] = proc_open (escapeshellarg(__DIR__ . "/../" . $projectName) . " --main.loglevel=DEBUG --config " . escapeshellarg (__DIR__ . "/test_config.conf") . " --db.name " . escapeshellarg ($databaseFile), array (
-        0 => array ("pipe", "r"),
-        1 => array ("pipe", "w"),
-        2 => array ("file", $projectLogFile, "w")
-    ), $pipes, __DIR__);
+        0 => array ("pipe", "rb"),
+        1 => array ("pipe", "wt"),
+        2 => array ("file", $projectLogFile, "wt")
+    ), $pipes, __DIR__, null, array ("bypass_shell" => true));
     if (! $GLOBALS['projectProcess']) {
         shutdownProcess ($GLOBALS['serverProcess']);
         unlink ($projectLogFile);
@@ -200,35 +201,28 @@ function cli_sapi () {
         shutdownProcess ($GLOBALS['serverProcess']);
         msg_fatal ("Unable to open log file '" . $projectLogFile . "' for reading!");
     }
-
-    $unblocked = true;
     foreach (array ($GLOBALS['projectSTDOUT'], $GLOBALS['projectSTDERR']) as $fd) {
-        if (! stream_set_blocking ($fd, false)) {
-            $unblocked = false;
-        }
+        stream_set_blocking ($fd, false);
         stream_set_read_buffer ($fd, 0);
     }
-    if (! $unblocked) {
-        msg_warning ("Unable to set nonblocking mode for file descriptors!");
-        fclose ($GLOBALS['projectSTDIN']);
-        fclose ($GLOBALS['projectSTDERR']);
-        if (waitGracefulFinish () === false) {
-            shutdownProcess ($GLOBALS['projectProcess']);
-        }
-        shutdownProcess ($GLOBALS['serverProcess']);
-        unlink ($projectLogFile);
-        msg_fatal ("Tests can not run without setting communication file descriptors to nonblocking mode!");
-    }
-    $GLOBALS['STDINclone'] = fopen (__DIR__ . "/test.in", "wt");
+    
+    $projectInFile = __DIR__ . "/" . basename (__FILE__, '.php') . ".stdin";
+    removeFile ($projectInFile);
+    $GLOBALS['STDINclone'] = fopen ($projectInFile, "wt");
     if (! $GLOBALS['STDINclone']) {
-        msg_warning ("Unable to open file 'test.in' for writing!");
+        msg_warning ("Unable to open file '" . basename ($projectInFile) . "' for writing!");
     }
-
+    $projectOutFile = __DIR__ . "/" . basename (__FILE__, '.php') . ".stdout";
+    removeFile ($projectOutFile);
+    $GLOBALS['STDOUTclone'] = fopen ($projectOutFile, "wt");
+    if (! $GLOBALS['STDOUTclone']) {
+        msg_warning ("Unable to open file '" . basename ($projectOutFile) . "' for writing!");
+    }
+    
     register_shutdown_function (function () {
-        if (! empty ($GLOBALS['STDINclone'])) {
-            fclose ($GLOBALS['STDINclone']);
-        }
-        fclose ($GLOBALS['projectSTDIN']);
+        closeFileDescriptor ($GLOBALS['projectSTDIN']);
+        closeFileDescriptor ($GLOBALS['STDINclone']);
+        closeFileDescriptor ($GLOBALS['STDOUTclone']);
         if (stderrExpect ('INFO:\\s*StdinReader\\s+thread\\s+finished\\.')) {
             stderrExpect ('DEBUG:\\s*Performing\\s+final\\s+cleaning\\s+and\\s+finishing\\s+program\\.\\.\\.');
         }
@@ -267,7 +261,7 @@ function cli_sapi () {
         foreach ($testFiles as $testFile) {
             $procStatus = getProcessExitCode ();
             if ($procStatus !== false) {
-                msg_warning ("Project executable ended unexpectedly with code #" . $procStatus . "! Did it crash?");
+                msg_warning ("Project executable finished unexpectedly with code #" . $procStatus . "! Did it crash?");
                 break;
             }
             $testName = basename ($testFile, '.php');
@@ -295,6 +289,13 @@ function msg_fatal ($msg) {
 
 function msg_warning ($msg) {
     msg_log (" ---- " . $msg . " ----");
+}
+
+function removeFile ($path) {
+    clearstatcache ();
+    if (file_exists ($path) || is_link ($path)) {
+        unlink ($path);
+    }
 }
 
 function shutdownProcess ($proc, $msg = '') {
@@ -362,79 +363,98 @@ function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $t
         $line .= rawurlencode ($testCriteria);
     }
     $line = trim ($line) . "\n";
-    $lineLength = strlen ($line);
-    foreach (array ($GLOBALS['STDINclone'], $GLOBALS['projectSTDIN']) as $outFd) {
-        $retries = 0;
-        $maxtries = 100;
-        for ($written = 0; $written < $lineLength; $written += $bytes) {
-            $bytes = fwrite ($outFd, substr ($line, $written));
-            if ($bytes === false) {
-                break;
-            } else if ($bytes === 0) {
-                $retries++;
-                if ($retries < $maxtries) {
-                    usleep (100000);
-                } else {
-                    $bytes = false;
-                    break;
-                }
-            } else {
-                $retries = 0;
-            }
-        }
-    }
-    if ($bytes !== false) {
+    if (writeDataToFileDescriptor ($line, $GLOBALS['projectSTDIN'])) {
+        writeDataToFileDescriptor ($line, $GLOBALS['STDINclone']);
         fflush ($GLOBALS['projectSTDIN']);
         return (true);
     } else {
         msg_warning ("Unable to send a request line to the program! Aborting...");
-        fclose ($GLOBALS['projectSTDIN']);
+        closeFileDescriptor ($GLOBALS['projectSTDIN']);
+        writeDataToFileDescriptor ($line, $GLOBALS['STDINclone']);
+        closeFileDescriptor ($GLOBALS['STDINclone']);
         $GLOBALS['exitCode'] = 1;
         return (false);
     }
 }
 
-function readLineFromDescriptor ($fd, $timeout) {
+function writeDataToFileDescriptor ($data, $outFd) {
+    if ($outFd) {
+        $dataLength = strlen ($data);
+        $retries = 0;
+        $maxtries = 100;
+        for ($written = 0; $written < $dataLength; $written += $bytes) {
+            $bytes = fwrite ($outFd, substr ($data, $written));
+            if ($bytes === false) {
+                return (false);
+            } else if ($bytes === 0) {
+                $retries++;
+                if ($retries < $maxtries) {
+                    usleep (100000);
+                } else {
+                    return (false);
+                }
+            } else {
+                $retries = 0;
+            }
+        }
+        return (true);
+    } else {
+        return (false);
+    }
+}
+
+function readLineFromDescriptor ($fd, $timeout = 30) {
     $line = false;
     $fdArray = array ($fd);
     $writeFds = null;
     $exceptFds = null;
-    $selectStatus = stream_select ($fdArray, $writeFds, $exceptFds, $timeout);
-    if ($selectStatus || $selectStatus === false) {
-        $line = stream_get_line ($fd, 32768, "\n");
-        if ($line === false) {
-            // It will perform a busy waiting as fallback if something goes wrong...
-            $start = $prev = time ();
-            do {
-                usleep (10000);
-                if (($line = stream_get_line ($fd, 32768, "\n")) !== false) {
-                    break;
-                }
-                $procStatus = getProcessExitCode ();
-                if ($procStatus !== false) {
-                    msg_warning ("Project executable ended unexpectedly with code #" . $procStatus . "! Did it crash?");
-                    $GLOBALS['exitCode'] = 1;
-                    break;
-                }
-                $now = time();
-                if ($prev < $now) {
-                    msg_warning ('Input is not ready yet. Waiting...');
-                    $prev = $now;
-                }
-            } while (($now - $start) < $timeout);
+    set_time_limit ($timeout + 30);
+    if (! empty ($fd)) {
+        $selectStatus = stream_select ($fdArray, $writeFds, $exceptFds, $timeout);
+        if ($selectStatus || $selectStatus === false) {
+            $line = stream_get_line ($fd, 32768, "\n");
+            if ($line === false) {
+                // It will perform a busy waiting as fallback if something goes wrong...
+                $start = $prev = time ();
+                do {
+                    usleep (10000);
+                    if (($line = stream_get_line ($fd, 32768, "\n")) !== false) {
+                        break;
+                    }
+                    $procStatus = getProcessExitCode ();
+                    if ($procStatus !== false) {
+                        msg_warning ("Project executable ended unexpectedly with code #" . $procStatus . "! Did it crash?");
+                        $GLOBALS['exitCode'] = 1;
+                        break;
+                    }
+                    $now = time();
+                    if ($prev < $now) {
+                        msg_warning ('Input is not ready yet. Waiting...');
+                        $prev = $now;
+                    }
+                } while (($now - $start) < $timeout);
+            }
         }
-    }
-    if ($line === false) {
-        msg_warning ('Unable to read input!');
-        fclose ($GLOBALS['projectSTDIN']);
-        $GLOBALS['exitCode'] = 1;
+        if ($line === false) {
+            msg_warning ('Unable to read input!');
+            closeFileDescriptor ($GLOBALS['projectSTDIN']);
+            closeFileDescriptor ($GLOBALS['STDINclone']);
+            $GLOBALS['exitCode'] = 1;
+        }
     }
     return ($line);
 }
 
+function closeFileDescriptor (&$fd) {
+    if (! empty ($fd)) {
+        fclose ($fd);
+        $fd = null;
+    }
+}
+
 function stderrExpect ($regexp, $timeout = 30) {
     while (($line = readLineFromDescriptor ($GLOBALS['projectSTDERR'], $timeout)) !== false) {
-        $line = trim (preg_replace ('/^\\s*\\[\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(|\\.\\d+)(Z|UTC|[+-]\\d+(|:\\d+))\\]\\s+(|0[xX][a-fA-F0-9]+\\s+)(\\w+\\s*:\\s)/', '\\5', $line));
+        $line = trim (preg_replace ('/^\\s*\\[\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(|\\.\\d+)[^\\]]*\\]\\s+(|0[xX][a-fA-F0-9]+\\s+)(\\w+\\s*:\\s)/', '\\3', $line));
         if (preg_match ('/^' . $regexp . '/', $line)) {
             return (true);
         }
@@ -448,6 +468,7 @@ function stdoutExpect ($what, $timeout = 30) {
     $decodedAnswer = "";
     if (($line = readLineFromDescriptor ($GLOBALS['projectSTDOUT'], $timeout)) !== false) {
         $line = trim ($line);
+        writeDataToFileDescriptor ($line . "\n", $GLOBALS['STDOUTclone']);
         if (preg_match ('/^\\s*(|(\\d+)\\s+)(OK|ERR|BH)\\s+message=(\\S+)\\s+log=\\S+\\s*$/', $line, $matches)) {
             $decodedAnswer = urldecode ($matches[4]);
             if ($what == STDOUT_EXPECT_MATCH && $matches[3] == "OK" && preg_match ('/^\\[[^\\]]+#\\d+\\]\\s+(Cached|Retrieved)\\s+data\\s+from\\s+.*\\)\\s+matches\\s+specified\\s+criteria\\.?$/', $decodedAnswer)) {
