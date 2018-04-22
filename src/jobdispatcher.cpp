@@ -187,10 +187,14 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
                 request->data.criteria.prepend (requestFlag);
                 break;
             }
-            if (numericMatch > 1) {
-                this->writeAnswerLine (requestChannel, QStringLiteral("More than one comparison operator is not allowed"), true, false);
-                return;
-            }
+        }
+        if (numericMatch > 1) {
+            this->writeAnswerLine (requestChannel, QStringLiteral("More than one comparison operator is not allowed"), true, false);
+            return;
+        }
+        if (numericMatch && stringMatch) {
+            this->writeAnswerLine (requestChannel, QStringLiteral("Invalid combination of string and numeric matching flags"), true, false);
+            return;
         }
         // Now, send the request to a worker
         // Create if it does not exists yet

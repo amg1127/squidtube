@@ -5,7 +5,7 @@ if (simpleglobalvariable != "simple value") {
 var counter = 0;
 
 function getSupportedUrls (returnValue) {
-    returnValue (["*"]);
+    returnValue ([/^http:\/\/localhost(|:\d+)\//]);
 }
 
 function getObjectFromUrl (returnValue, url) {

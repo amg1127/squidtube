@@ -21,14 +21,30 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
     $answer = ($answer && stdoutExpectMatch ());
 
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
+    $answer = ($answer && stdoutExpectNoMatch ());
+
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
     $answer = ($answer && stdoutExpectNoMatch ());
+
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
+    $answer = ($answer && stdoutExpectMatch ());
 
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$i]));
     $answer = ($answer && stdoutExpectMatch ());
 
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$i]));
+    $answer = ($answer && stdoutExpectNoMatch ());
+
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$i]));
     $answer = ($answer && stdoutExpectNoMatch ());
+
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$i]));
+    $answer = ($answer && stdoutExpectMatch ());
+    
+    if ($channel > 50) {
+        $channel = 0;
+    }
 }
 
 ##################################################################
@@ -40,14 +56,30 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
     $answer = ($answer && stdoutExpectNoMatch ());
 
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
+    $answer = ($answer && stdoutExpectMatch ());
+
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
     $answer = ($answer && stdoutExpectMatch ());
+
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
+    $answer = ($answer && stdoutExpectNoMatch ());
 
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$i]));
     $answer = ($answer && stdoutExpectNoMatch ());
 
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$i]));
+    $answer = ($answer && stdoutExpectMatch ());
+
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$i]));
     $answer = ($answer && stdoutExpectMatch ());
+
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$i]));
+    $answer = ($answer && stdoutExpectNoMatch ());
+    
+    if ($channel > 50) {
+        $channel = 0;
+    }
 }
 
 ##################################################################
@@ -61,8 +93,18 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', $ops[$step++ % $opsLength], $st1 = $st1 * 2));
     $answer = ($answer && stdoutExpectNoMatch ());
 
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', "! " . $ops[$step++ % $opsLength], $st1 = $st1 * 2));
+    $answer = ($answer && stdoutExpectMatch ());
+
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', $ops[$step++ % $opsLength], $nd2 = $nd2 * 2));
     $answer = ($answer && stdoutExpectNoMatch ());
+    
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], $nd2 = $nd2 * 2));
+    $answer = ($answer && stdoutExpectMatch ());
+    
+    if ($channel > 50) {
+        $channel = 0;
+    }
 }
 
 $st1 = $jsonData['numberSets']['setOne'][$numbersCount-1];
@@ -71,14 +113,30 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.<>', $ops[$step++ % $opsLength], $st1 = $st1 * 2));
     $answer = ($answer && stdoutExpectMatch ());
 
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.<>', "! " . $ops[$step++ % $opsLength], $st1 = $st1 * 2));
+    $answer = ($answer && stdoutExpectNoMatch ());
+
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.<>', $ops[$step++ % $opsLength], $nd2 = $nd2 * 2));
     $answer = ($answer && stdoutExpectMatch ());
+
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.<>', "! " . $ops[$step++ % $opsLength], $nd2 = $nd2 * 2));
+    $answer = ($answer && stdoutExpectNoMatch ());
+    
+    if ($channel > 50) {
+        $channel = 0;
+    }
 }
 $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$numbersCount / 2]));
 $answer = ($answer && stdoutExpectMatch ());
 
+$answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$numbersCount / 2]));
+$answer = ($answer && stdoutExpectNoMatch ());
+
 $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$numbersCount / 2]));
 $answer = ($answer && stdoutExpectMatch ());
+
+$answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$numbersCount / 2]));
+$answer = ($answer && stdoutExpectNoMatch ());
 
 ##################################################################
 msg_log ("  +---+ Testing greater-than relationship...");
@@ -91,8 +149,18 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', $ops[$step++ % $opsLength], $st1 = $st1 * 2));
     $answer = ($answer && stdoutExpectNoMatch ());
 
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', "! " . $ops[$step++ % $opsLength], $st1 = $st1 * 2));
+    $answer = ($answer && stdoutExpectMatch ());
+
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', $ops[$step++ % $opsLength], $nd2 = $nd2 * 2));
     $answer = ($answer && stdoutExpectNoMatch ());
+
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], $nd2 = $nd2 * 2));
+    $answer = ($answer && stdoutExpectMatch ());
+    
+    if ($channel > 50) {
+        $channel = 0;
+    }
 }
 
 $st1 = $jsonData['numberSets']['setOne'][0];
@@ -101,14 +169,30 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.<>', $ops[$step++ % $opsLength], $st1 = $st1 * 2));
     $answer = ($answer && stdoutExpectMatch ());
 
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.<>', "! " . $ops[$step++ % $opsLength], $st1 = $st1 * 2));
+    $answer = ($answer && stdoutExpectNoMatch ());
+
     $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.<>', $ops[$step++ % $opsLength], $nd2 = $nd2 * 2));
     $answer = ($answer && stdoutExpectMatch ());
+
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.<>', "! " . $ops[$step++ % $opsLength], $nd2 = $nd2 * 2));
+    $answer = ($answer && stdoutExpectNoMatch ());
+    
+    if ($channel > 50) {
+        $channel = 0;
+    }
 }
 $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$numbersCount / 2]));
 $answer = ($answer && stdoutExpectMatch ());
 
+$answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$numbersCount / 2]));
+$answer = ($answer && stdoutExpectNoMatch ());
+
 $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$numbersCount / 2]));
 $answer = ($answer && stdoutExpectMatch ());
+
+$answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$numbersCount / 2]));
+$answer = ($answer && stdoutExpectNoMatch ());
 
 ##################################################################
 msg_log ("  +---+ Testing less-than-or-equals relationship...");
@@ -126,6 +210,22 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
         $answer = ($answer && stdoutExpectMatch ());
         $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', $ops[$step++ % $opsLength], 0.5 * ($jsonData['numberSets']['setTwo'][$i] + $jsonData['numberSets']['setTwo'][$i+1])));
         $answer = ($answer && stdoutExpectMatch ());
+    }
+
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
+    $answer = ($answer && stdoutExpectNoMatch ());
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$i]));
+    $answer = ($answer && stdoutExpectNoMatch ());
+
+    if (($i+1) < $numbersCount) {
+        $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', "! " . $ops[$step++ % $opsLength], 0.5 * ($jsonData['numberSets']['setOne'][$i] + $jsonData['numberSets']['setOne'][$i+1])));
+        $answer = ($answer && stdoutExpectNoMatch ());
+        $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], 0.5 * ($jsonData['numberSets']['setTwo'][$i] + $jsonData['numberSets']['setTwo'][$i+1])));
+        $answer = ($answer && stdoutExpectNoMatch ());
+    }
+    
+    if ($channel > 50) {
+        $channel = 0;
     }
 }
 
@@ -146,6 +246,22 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
         $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', $ops[$step++ % $opsLength], 0.5 * ($jsonData['numberSets']['setTwo'][$i] + $jsonData['numberSets']['setTwo'][$i+1])));
         $answer = ($answer && stdoutExpectMatch ());
     }
+
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
+    $answer = ($answer && stdoutExpectNoMatch ());
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$i]));
+    $answer = ($answer && stdoutExpectNoMatch ());
+
+    if (($i+1) < $numbersCount) {
+        $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', "! " . $ops[$step++ % $opsLength], 0.5 * ($jsonData['numberSets']['setOne'][$i] + $jsonData['numberSets']['setOne'][$i+1])));
+        $answer = ($answer && stdoutExpectNoMatch ());
+        $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], 0.5 * ($jsonData['numberSets']['setTwo'][$i] + $jsonData['numberSets']['setTwo'][$i+1])));
+        $answer = ($answer && stdoutExpectNoMatch ());
+    }
+    
+    if ($channel > 50) {
+        $channel = 0;
+    }
 }
 
 ##################################################################
@@ -162,6 +278,17 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stderrExpect ('(INFO|DEBUG):\\s*\\[\\w+#\\d+\\]\\s*Unable\\s+to\\s+apply\\s+selected\\s+comparison\\s+operator\\s+'));
     $answer = ($answer && stdoutExpectNoMatch ());
 
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setOne.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
+    $answer = ($answer && stderrExpect ('(INFO|DEBUG):\\s*\\[\\w+#\\d+\\]\\s*Unable\\s+to\\s+apply\\s+selected\\s+comparison\\s+operator\\s+'));
+    $answer = ($answer && stdoutExpectMatch ());
+
+    $answer = ($answer && stdinSend ($channel++, '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$i]));
+    $answer = ($answer && stderrExpect ('(INFO|DEBUG):\\s*\\[\\w+#\\d+\\]\\s*Unable\\s+to\\s+apply\\s+selected\\s+comparison\\s+operator\\s+'));
+    $answer = ($answer && stdoutExpectMatch ());
+    
+    if ($channel > 50) {
+        $channel = 0;
+    }
 }
 
 ##################################################################

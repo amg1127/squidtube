@@ -117,11 +117,14 @@ function cli_sapi () {
     $GLOBALS['STDINclone'] = null;
     // A file descriptor for a file that will store the data that will be received through STDOUT
     $GLOBALS['STDOUTclone'] = null;
+    // It must be zero at the end of each test
+    $GLOBALS['diffInputOutput'] = 0;
 
     // This is used by stdoutExpect() function
     define ('STDOUT_EXPECT_MATCH', 'MATCH');
     define ('STDOUT_EXPECT_NOMATCH', 'NOMATCH');
     define ('STDOUT_EXPECT_NOHELPER', 'NOHELPER');
+    define ('STDOUT_EXPECT_ERROR', 'BH');
 
     // The project name is expected to be supplied by "qmake"...
     if (empty ($GLOBALS['argv'][1])) {
@@ -270,6 +273,9 @@ function cli_sapi () {
                 msg_warning ("Test '" . $testName . "' did not run successfully!");
                 break;
             }
+            if ($GLOBALS['diffInputOutput']) {
+                msg_warning ("Test '" . $testName . "' imbalanced input/output relationship: #" . $GLOBALS['diffInputOutput']);
+            }
             $pendingTests--;
         }
         if ((! $pendingTests) && count ($testFiles)) {
@@ -362,10 +368,14 @@ function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $t
     } else {
         $line .= rawurlencode ($testCriteria);
     }
-    $line = trim ($line) . "\n";
-    if (writeDataToFileDescriptor ($line, $GLOBALS['projectSTDIN'])) {
-        writeDataToFileDescriptor ($line, $GLOBALS['STDINclone']);
+    return (stdinSendRaw (trim ($line)));
+}
+
+function stdinSendRaw ($line) {
+    if (writeDataToFileDescriptor ($line . "\n", $GLOBALS['projectSTDIN'])) {
+        writeDataToFileDescriptor ($line . "\n", $GLOBALS['STDINclone']);
         fflush ($GLOBALS['projectSTDIN']);
+        $GLOBALS['diffInputOutput']++;
         return (true);
     } else {
         msg_warning ("Unable to send a request line to the program! Aborting...");
@@ -467,15 +477,18 @@ function stderrExpect ($regexp, $timeout = 30) {
 function stdoutExpect ($what, $timeout = 30) {
     $decodedAnswer = "";
     if (($line = readLineFromDescriptor ($GLOBALS['projectSTDOUT'], $timeout)) !== false) {
+        $GLOBALS['diffInputOutput']--;
         $line = trim ($line);
         writeDataToFileDescriptor ($line . "\n", $GLOBALS['STDOUTclone']);
-        if (preg_match ('/^\\s*(|(\\d+)\\s+)(OK|ERR|BH)\\s+message=(\\S+)\\s+log=\\S+\\s*$/', $line, $matches)) {
+        if (preg_match ('/^\\s*(|(-?\\d+)\\s+)(OK|ERR|BH)\\s+message=(\\S+)\\s+log=\\S+\\s*$/', $line, $matches)) {
             $decodedAnswer = urldecode ($matches[4]);
             if ($what == STDOUT_EXPECT_MATCH && $matches[3] == "OK" && preg_match ('/^\\[[^\\]]+#\\d+\\]\\s+(Cached|Retrieved)\\s+data\\s+from\\s+.*\\)\\s+matches\\s+specified\\s+criteria\\.?$/', $decodedAnswer)) {
                 return ($matches[1]);
             } else if ($what == STDOUT_EXPECT_NOMATCH && $matches[3] == "ERR" && preg_match ('/^\\[[^\\]]+#\\d+\\]\\s+(Cached|Retrieved)\\s+data\\s+from\\s+.*\\)\\s+does\\s+not\\s+match\\s+specified\\s+criteria\\.?$/', $decodedAnswer)) {
                 return ($matches[1]);
             } else if ($what == STDOUT_EXPECT_NOHELPER && $matches[3] == "ERR" && preg_match ('/^Unable\\s+to\\s+find\\s+a\\s+helper\\s+/', $decodedAnswer)) {
+                return ($matches[1]);
+            } else if ($what == STDOUT_EXPECT_ERROR && $matches[3] == "BH") {
                 return ($matches[1]);
             }
         }
@@ -494,15 +507,18 @@ function stderrExpectAnswer ($timeout = 30) {
 }
 
 function stdoutExpectMatch ($timeout = 30) {
-    return (stdoutExpect (STDOUT_EXPECT_MATCH, $timeout) && stderrExpectAnswer ($timeout));
+    return (stdoutExpect (STDOUT_EXPECT_MATCH, $timeout) !== false && stderrExpectAnswer ($timeout));
 }
 
 function stdoutExpectNoMatch ($timeout = 30) {
-    return (stdoutExpect (STDOUT_EXPECT_NOMATCH, $timeout) && stderrExpectAnswer ($timeout));
+    return (stdoutExpect (STDOUT_EXPECT_NOMATCH, $timeout) !== false && stderrExpectAnswer ($timeout));
 }
 
 function stdoutExpectNoHelper ($timeout = 30) {
-    return (stdoutExpect (STDOUT_EXPECT_NOHELPER, $timeout) && stderrExpectAnswer ($timeout));
+    return (stdoutExpect (STDOUT_EXPECT_NOHELPER, $timeout) !== false && stderrExpectAnswer ($timeout));
+}
+function stdoutExpectError ($timeout = 30) {
+    return (stdoutExpect (STDOUT_EXPECT_ERROR, $timeout) !== false && stderrExpect ('WARNING:\\s*An\\s+internal\\s+error\\s+occurred\\s+while\\s+processing\\s+the\\s+request(|\\s+from\\s+channel\\s+#-?\\d+)\\s*:\\s+', $timeout));
 }
 
 function includeWithScopeProtection ($file) {
