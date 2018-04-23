@@ -125,6 +125,7 @@ function cli_sapi () {
     define ('STDOUT_EXPECT_NOMATCH', 'NOMATCH');
     define ('STDOUT_EXPECT_NOHELPER', 'NOHELPER');
     define ('STDOUT_EXPECT_ERROR', 'BH');
+    define ('EXPECT_DEFAULT_TIMEOUT', 30);
 
     // The project name is expected to be supplied by "qmake"...
     if (empty ($GLOBALS['argv'][1])) {
@@ -259,7 +260,7 @@ function cli_sapi () {
             }
             closedir ($testDir);
         }
-        sort ($testFiles);
+        shuffle ($testFiles);
         $pendingTests = count ($testFiles);
         foreach ($testFiles as $testFile) {
             $procStatus = getProcessExitCode ();
@@ -414,7 +415,10 @@ function writeDataToFileDescriptor ($data, $outFd) {
     }
 }
 
-function readLineFromDescriptor ($fd, $timeout = 30) {
+function readLineFromDescriptor ($fd, $timeout = null) {
+    if (empty ($timeout)) {
+        $timeout = EXPECT_DEFAULT_TIMEOUT;
+    }
     set_time_limit ($timeout + 30);
     $buffer = "";
     $start = $prev = time ();
@@ -462,7 +466,10 @@ function closeFileDescriptor (&$fd) {
     }
 }
 
-function stderrExpect ($regexp, $timeout = 30) {
+function stderrExpect ($regexp, $timeout = null) {
+    if (empty ($timeout)) {
+        $timeout = EXPECT_DEFAULT_TIMEOUT;
+    }
     while (($line = readLineFromDescriptor ($GLOBALS['projectSTDERR'], $timeout)) !== false) {
         $line = trim (preg_replace ('/^\\s*\\[\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(|\\.\\d+)[^\\]]*\\]\\s+(|0[xX][a-fA-F0-9]+\\s+)(\\w+\\s*:\\s)/', '\\3', $line));
         if (preg_match ('/^' . $regexp . '/', $line)) {
@@ -474,7 +481,10 @@ function stderrExpect ($regexp, $timeout = 30) {
     return (false);
 }
 
-function stdoutExpect ($what, $timeout = 30) {
+function stdoutExpect ($what, $timeout = null) {
+    if (empty ($timeout)) {
+        $timeout = EXPECT_DEFAULT_TIMEOUT;
+    }
     $decodedAnswer = "";
     if (($line = readLineFromDescriptor ($GLOBALS['projectSTDOUT'], $timeout)) !== false) {
         $GLOBALS['diffInputOutput']--;
@@ -502,25 +512,51 @@ function stdoutExpect ($what, $timeout = 30) {
     return (false);
 }
 
-function stderrExpectAnswer ($timeout = 30) {
+function stderrExpectInvalidOperator ($timeout = null) {
+    if (empty ($timeout)) {
+        $timeout = EXPECT_DEFAULT_TIMEOUT;
+    }
+    return (stderrExpect ('(INFO|DEBUG):\\s*\\[\\w+#\\d+\\]\\s*Unable\\s+to\\s+apply\\s+selected\\s+comparison\\s+operator\\s+', $timeout));
+}
+
+function stderrExpectAnswer ($timeout = null) {
+    if (empty ($timeout)) {
+        $timeout = EXPECT_DEFAULT_TIMEOUT;
+    }
     return (stderrExpect('INFO:\\s*Channel\\s+#\\d*\\s+answered\\s*:\\s+', $timeout));
 }
 
-function stdoutExpectMatch ($timeout = 30) {
+function stdoutExpectMatch ($timeout = null) {
+    if (empty ($timeout)) {
+        $timeout = EXPECT_DEFAULT_TIMEOUT;
+    }
     return (stdoutExpect (STDOUT_EXPECT_MATCH, $timeout) !== false && stderrExpectAnswer ($timeout));
 }
 
-function stdoutExpectNoMatch ($timeout = 30) {
+function stdoutExpectNoMatch ($timeout = null) {
+    if (empty ($timeout)) {
+        $timeout = EXPECT_DEFAULT_TIMEOUT;
+    }
     return (stdoutExpect (STDOUT_EXPECT_NOMATCH, $timeout) !== false && stderrExpectAnswer ($timeout));
 }
 
-function stdoutExpectNoHelper ($timeout = 30) {
+function stdoutExpectNoHelper ($timeout = null) {
+    if (empty ($timeout)) {
+        $timeout = EXPECT_DEFAULT_TIMEOUT;
+    }
     return (stdoutExpect (STDOUT_EXPECT_NOHELPER, $timeout) !== false && stderrExpectAnswer ($timeout));
 }
-function stdoutExpectError ($timeout = 30) {
+function stdoutExpectError ($timeout = null) {
+    if (empty ($timeout)) {
+        $timeout = EXPECT_DEFAULT_TIMEOUT;
+    }
     return (stdoutExpect (STDOUT_EXPECT_ERROR, $timeout) !== false && stderrExpect ('WARNING:\\s*An\\s+internal\\s+error\\s+occurred\\s+while\\s+processing\\s+the\\s+request(|\\s+from\\s+channel\\s+#-?\\d+)\\s*:\\s+', $timeout));
 }
 
 function includeWithScopeProtection ($file) {
     return ((include ($file)));
+}
+
+function randomChannel () {
+    return (rand (0, 60));
 }

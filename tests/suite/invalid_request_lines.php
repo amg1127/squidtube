@@ -1,6 +1,5 @@
 <?php
 
-$channel = 0;
 $answer = true;
 
 msg_log ("  +---+ An empty line");
@@ -34,9 +33,9 @@ $answer = ($answer && stdinSendRaw ($GLOBALS['serverAddress'] . "/?mirror=" . ra
 $answer = ($answer && stdoutExpectError ());
 
 msg_log ("  +---+ Lines with an invalid comparison flag");
-$answer = ($answer && stdinSend ($channel++, '/', array("foo" => "bar"), 'property', '-#-', 'criteria'));
+$answer = ($answer && stdinSend (randomChannel (), '/', array("foo" => "bar"), 'property', '-#-', 'criteria'));
 $answer = ($answer && stdoutExpectError ());
-$answer = ($answer && stdinSend ($channel++, '/', array("foo" => "bar"), 'property', '-', 'criteria'));
+$answer = ($answer && stdinSend (randomChannel (), '/', array("foo" => "bar"), 'property', '-', 'criteria'));
 $answer = ($answer && stdoutExpectError ());
 
 ##################################################################
@@ -47,21 +46,17 @@ $stringFlags = array ("-f", "--fixed", "-w", "--wildcard", "-i", "--ignorecase")
 msg_log ("  +---+ Lines that mix numeric and string comparision flags");
 foreach ($numericFlags as $numericFlag) {
     foreach ($stringFlags as $stringFlag) {
-        $answer = ($answer && stdinSend ($channel++, '/', array("foo" => "bar"), 'property', $numericFlag . " " . $stringFlag, 'criteria'));
+        $answer = ($answer && stdinSend (randomChannel (), '/', array("foo" => "bar"), 'property', $numericFlag . " " . $stringFlag, 'criteria'));
         $answer = ($answer && stdoutExpectError ());
 
-        $answer = ($answer && stdinSend ($channel++, '/', array("foo" => "bar"), 'property', $numericFlag . " " . $stringFlag, 'criteria'));
+        $answer = ($answer && stdinSend (randomChannel (), '/', array("foo" => "bar"), 'property', $numericFlag . " " . $stringFlag, 'criteria'));
         $answer = ($answer && stdoutExpectError ());
 
-        $answer = ($answer && stdinSend ($channel++, '/', array("foo" => "bar"), 'property', "! " . $stringFlag . " " . $numericFlag, 'criteria'));
+        $answer = ($answer && stdinSend (randomChannel (), '/', array("foo" => "bar"), 'property', "! " . $stringFlag . " " . $numericFlag, 'criteria'));
         $answer = ($answer && stdoutExpectError ());
 
-        $answer = ($answer && stdinSend ($channel++, '/', array("foo" => "bar"), 'property', "! " . $stringFlag . " " . $numericFlag, 'criteria'));
+        $answer = ($answer && stdinSend (randomChannel (), '/', array("foo" => "bar"), 'property', "! " . $stringFlag . " " . $numericFlag, 'criteria'));
         $answer = ($answer && stdoutExpectError ());
-    
-        if ($channel > 50) {
-            $channel = 0;
-        }
     }
 }
 
@@ -70,14 +65,10 @@ foreach (array ('', '! ') as $negateFlag) {
     foreach (array ('', '-i ', '--ignorecase ') as $caseFlag) {
         foreach (array ('-f ', '--fixed ') as $fixedFlag) {
             foreach (array ('-w ', '--wildcard ') as $wildcardFlag) {
-                $answer = ($answer && stdinSend ($channel++, '/', array("foo" => "bar"), 'property', $negateFlag . $caseFlag . $fixedFlag . $wildcardFlag, 'criteria'));
+                $answer = ($answer && stdinSend (randomChannel (), '/', array("foo" => "bar"), 'property', $negateFlag . $caseFlag . $fixedFlag . $wildcardFlag, 'criteria'));
                 $answer = ($answer && stdoutExpectError ());
-                $answer = ($answer && stdinSend ($channel++, '/', array("foo" => "bar"), 'property', $negateFlag . $caseFlag . $wildcardFlag . $fixedFlag, 'criteria'));
+                $answer = ($answer && stdinSend (randomChannel (), '/', array("foo" => "bar"), 'property', $negateFlag . $caseFlag . $wildcardFlag . $fixedFlag, 'criteria'));
                 $answer = ($answer && stdoutExpectError ());
-    
-                if ($channel > 50) {
-                    $channel = 0;
-                }
             }
         }
     }
@@ -87,12 +78,8 @@ msg_log ("  +---+ Line with more than one numeric operator");
 foreach (array ('', '! ') as $negateFlag) {
     foreach ($numericFlags as $numericFlagA) {
         foreach ($numericFlags as $numericFlagB) {
-            $answer = ($answer && stdinSend ($channel++, '/', array("foo" => "bar"), 'property', $negateFlag . $numericFlagA . " " . $numericFlagB, 'criteria'));
+            $answer = ($answer && stdinSend (randomChannel (), '/', array("foo" => "bar"), 'property', $negateFlag . $numericFlagA . " " . $numericFlagB, 'criteria'));
             $answer = ($answer && stdoutExpectError ());
-    
-            if ($channel > 50) {
-                $channel = 0;
-            }
         }
     }
 }
