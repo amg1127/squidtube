@@ -12,10 +12,19 @@ $answer = ($numbersCount && $numbersCount == count($jsonData['numberSets']['setT
 sort ($jsonData['numberSets']['setOne']);
 sort ($jsonData['numberSets']['setTwo']);
 
+$mixCaseFlags = function ($param) {
+    $answer = array ();
+    foreach ($param as $i) {
+        array_push ($answer, $i, '-i ' . $i, $i . ' -i', '--ignorecase ' . $i, $i . ' --ignorecase');
+    }
+    return ($answer);
+};
+
 ##################################################################
 msg_log ("  +---+ Testing equality...");
 
-$ops = array ('=', '==', '-eq'); $opsLength = count ($ops);
+$ops = $mixCaseFlags (array ('=', '==', '-eq'));
+$opsLength = count ($ops);
 for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
     $answer = ($answer && stdoutExpectMatch ());
@@ -42,10 +51,24 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdoutExpectMatch ());
 }
 
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne']));
+$answer = ($answer && stdoutExpectMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne']));
+$answer = ($answer && stdoutExpectNoMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo']));
+$answer = ($answer && stdoutExpectMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo']));
+$answer = ($answer && stdoutExpectNoMatch ());
+
+
 ##################################################################
 msg_log ("  +---+ Testing inequality...");
 
-$ops = array ('<>', '!=', '-ne'); $opsLength = count ($ops);
+$ops = $mixCaseFlags (array ('<>', '!=', '-ne'));
+$opsLength = count ($ops);
 for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
     $answer = ($answer && stdoutExpectNoMatch ());
@@ -75,7 +98,8 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
 ##################################################################
 msg_log ("  +---+ Testing less-than relationship...");
 
-$ops = array ('<', '-lt'); $opsLength = count ($ops);
+$ops = $mixCaseFlags (array ('<', '-lt'));
+$opsLength = count ($ops);
 $st1 = $jsonData['numberSets']['setOne'][0];
 $nd2 = $jsonData['numberSets']['setTwo'][0];
 for ($i = 0; $answer && $i < $numbersCount; $i++) {
@@ -107,6 +131,7 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.<>', "! " . $ops[$step++ % $opsLength], $nd2 = $nd2 * 2));
     $answer = ($answer && stdoutExpectNoMatch ());
 }
+
 $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$numbersCount / 2]));
 $answer = ($answer && stdoutExpectMatch ());
 
@@ -118,11 +143,25 @@ $answer = ($answer && stdoutExpectMatch ());
 
 $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$numbersCount / 2]));
 $answer = ($answer && stdoutExpectNoMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne']));
+$answer = ($answer && stdoutExpectNoMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne']));
+$answer = ($answer && stdoutExpectMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo']));
+$answer = ($answer && stdoutExpectNoMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo']));
+$answer = ($answer && stdoutExpectMatch ());
+
 
 ##################################################################
 msg_log ("  +---+ Testing greater-than relationship...");
 
-$ops = array ('>', '-gt'); $opsLength = count ($ops);
+$ops = $mixCaseFlags (array ('>', '-gt'));
+$opsLength = count ($ops);
 $st1 = $jsonData['numberSets']['setOne'][$numbersCount-1];
 $nd2 = $jsonData['numberSets']['setTwo'][$numbersCount-1];
 for ($i = 0; $answer && $i < $numbersCount; $i++) {
@@ -154,6 +193,7 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.<>', "! " . $ops[$step++ % $opsLength], $nd2 = $nd2 * 2));
     $answer = ($answer && stdoutExpectNoMatch ());
 }
+
 $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$numbersCount / 2]));
 $answer = ($answer && stdoutExpectMatch ());
 
@@ -166,10 +206,24 @@ $answer = ($answer && stdoutExpectMatch ());
 $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.[]', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo'][$numbersCount / 2]));
 $answer = ($answer && stdoutExpectNoMatch ());
 
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne']));
+$answer = ($answer && stdoutExpectNoMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne']));
+$answer = ($answer && stdoutExpectMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo']));
+$answer = ($answer && stdoutExpectNoMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo']));
+$answer = ($answer && stdoutExpectMatch ());
+
+
 ##################################################################
 msg_log ("  +---+ Testing less-than-or-equals relationship...");
 
-$ops = array ('<=', '-le'); $opsLength = count ($ops);
+$ops = $mixCaseFlags (array ('<=', '-le'));
+$opsLength = count ($ops);
 for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
     $answer = ($answer && stdoutExpectMatch ());
@@ -195,11 +249,25 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
         $answer = ($answer && stdoutExpectNoMatch ());
     }
 }
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne']));
+$answer = ($answer && stdoutExpectMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne']));
+$answer = ($answer && stdoutExpectNoMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo']));
+$answer = ($answer && stdoutExpectMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo']));
+$answer = ($answer && stdoutExpectNoMatch ());
+
 
 ##################################################################
 msg_log ("  +---+ Testing greater-than-or-equals relationship...");
 
-$ops = array ('>=', '-ge'); $opsLength = count ($ops);
+$ops = $mixCaseFlags (array ('>=', '-ge'));
+$opsLength = count ($ops);
 for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
     $answer = ($answer && stdoutExpectMatch ());
@@ -226,10 +294,23 @@ for ($i = 0; $answer && $i < $numbersCount; $i++) {
     }
 }
 
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne']));
+$answer = ($answer && stdoutExpectMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne']));
+$answer = ($answer && stdoutExpectNoMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.<>', $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo']));
+$answer = ($answer && stdoutExpectMatch ());
+
+$answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setTwo.<>', "! " . $ops[$step++ % $opsLength], $jsonData['numberSets']['setTwo']));
+$answer = ($answer && stdoutExpectNoMatch ());
+
+
 ##################################################################
 msg_log ("  +---+ Testing string comparison...");
 
-$ops = array ('', '-w', '-f', '-i'); $opsLength = count ($ops);
+$ops = array ('', '-w', '-f', '--wildcard', '--fixed'); $opsLength = count ($ops);
 for ($i = 0; $answer && $i < $numbersCount; $i++) {
     $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'numberSets.setOne.[]', $ops[$step++ % $opsLength], $jsonData['numberSets']['setOne'][$i]));
     $answer = ($answer && stderrExpectInvalidOperator() && stdoutExpectNoMatch ());

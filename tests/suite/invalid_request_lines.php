@@ -41,7 +41,7 @@ $answer = ($answer && stdoutExpectError ());
 ##################################################################
 
 $numericFlags = array ("<", "-lt", "<=", "-le", "=", "==", "-eq", "<>", "!=", "-ne", ">", "-gt", ">=", "-ge");
-$stringFlags = array ("-f", "--fixed", "-w", "--wildcard", "-i", "--ignorecase");
+$stringFlags = array ("-f", "--fixed", "-w", "--wildcard");
 
 msg_log ("  +---+ Lines that mix numeric and string comparision flags");
 foreach ($numericFlags as $numericFlag) {

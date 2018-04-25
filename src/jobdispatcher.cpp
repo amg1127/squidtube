@@ -80,7 +80,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
                 propertyMatch.matchType = MatchObject;
                 propertyMatch.componentName = propertyCapturedItems.value (2);
                 if (propertyMatch.componentName.isEmpty ()) {
-                    propertyMatch.componentName = QUrl::fromPercentEncoding(propertyCapturedItems.value(3).toUtf8());
+                    propertyMatch.componentName = QUrl::fromPercentEncoding(propertyCapturedItems.value(3).toLocal8Bit());
                 }
                 request->data.properties.append (propertyMatch);
             } else if (arrayPropertyMatch.exactMatch (*token)) {
@@ -170,7 +170,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
                 } else if (requestFlag == QStringLiteral("-i") || requestFlag == QStringLiteral("--ignorecase")) {
                     if (request->data.caseSensitivity == Qt::CaseSensitive) {
                         request->data.caseSensitivity = Qt::CaseInsensitive;
-                        stringMatch++;
+                        // stringMatch++; // Commented because a mix with numeric comparison operators is acceptable
                     } else {
                         this->writeAnswerLine (requestChannel, QStringLiteral("ACL specifies incompatible string matching flags"), true, false);
                         return;

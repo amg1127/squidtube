@@ -457,21 +457,22 @@ bool JobWorker::processCriteria (
                         << QStringLiteral("on")
                     )
             );
-            int booleanOptionsPos = ((jsonValueInformation.toBool ()) ? 1 : 0);
             if (requestMathMatchOperator == OperatorString ||
                 requestMathMatchOperator == OperatorEquals ||
                 requestMathMatchOperator == OperatorNotEquals) {
-                bool matched = (requestMathMatchOperator == OperatorNotEquals);
+                int booleanOptionsPos = ((jsonValueInformation.toBool ()) ? 1 : 0);
+                if (requestMathMatchOperator == OperatorNotEquals) {
+                    booleanOptionsPos = 1 - booleanOptionsPos;
+                }
                 for (QStringList::const_iterator requestCriteriaIterator = requestCriteria.constBegin(); requestCriteriaIterator != requestCriteria.constEnd(); requestCriteriaIterator++) {
                     if (booleanOptions[booleanOptionsPos].contains ((*requestCriteriaIterator), Qt::CaseInsensitive)) {
-                        matched = (! matched);
-                        break;
+                        return (true);
                     } else if (! booleanOptions[1 - booleanOptionsPos].contains ((*requestCriteriaIterator), Qt::CaseInsensitive)) {
                         qWarning ("[%s#%u] Unable to evaluate '%s' as a boolean value.", requestHelperName.toLatin1().constData(), _requestId, requestCriteriaIterator->toLatin1().constData());
-                        return (false);
+                        break;
                     }
                 }
-                return (matched);
+                return (false);
             } else {
                 qInfo ("[%s#%u] Unable to apply selected comparison operator on a boolean value.", requestHelperName.toLatin1().constData(), _requestId);
             }
