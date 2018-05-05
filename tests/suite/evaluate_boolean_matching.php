@@ -25,78 +25,42 @@ $answer = true;
 msg_log ("  +---+ Testing valid operators...");
 
 foreach ($jsonData as $evalString => $evalBoolean) {
-    foreach (array ('', '! ') as $negateFlag) {
-        foreach (array ('', ' -i ', ' --ignorecase ') as $caseFlag) {
-            foreach ($validOperators as $type => $operators) {
-                foreach ($operators as $operator) {
-                    foreach ($jsonData as $criteriaString => $criteriaBoolean) {
-                        foreach ($expressions[$criteriaString] as $pos => $expression) {
-                            $expect = $evalBoolean;
-                            if ($negateFlag != '') {
-                                $expect = (! $expect);
-                            }
-                            if ($type != "equal") {
-                                $expect = (! $expect);
-                            }
-                            if (! $criteriaBoolean) {
-                                $expect = (! $expect);
-                            }
-                            $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, $evalString, $negateFlag . $operator . $caseFlag, $expression));
-                            if ($expect) {
-                                $answer = ($answer && stdoutExpectMatch ());
-                            } else {
-                                $answer = ($answer && stdoutExpectNoMatch ());
-                            }
-                            $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, $evalString, $negateFlag . $caseFlag . $operator, $expression));
-                            if ($expect) {
-                                $answer = ($answer && stdoutExpectMatch ());
-                            } else {
-                                $answer = ($answer && stdoutExpectNoMatch ());
-                            }
-                            $otherExpression = $expressions[$opposite[$criteriaString]][$pos];
-                            $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, $evalString, $negateFlag . $operator . $caseFlag, array ($expression, $otherExpression)));
-                            if ($negateFlag != '') {
-                                $answer = ($answer && stdoutExpectNoMatch ());
-                            } else {
-                                $answer = ($answer && stdoutExpectMatch ());
-                            }
-                            $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, $evalString, $negateFlag . $caseFlag . $operator, array ($expression, $otherExpression)));
-                            if ($negateFlag != '') {
-                                $answer = ($answer && stdoutExpectNoMatch ());
-                            } else {
-                                $answer = ($answer && stdoutExpectMatch ());
-                            }
+    foreach (array ('', ' -i ', ' --ignorecase ') as $caseFlag) {
+        foreach ($validOperators as $type => $operators) {
+            foreach ($operators as $operator) {
+                foreach ($jsonData as $criteriaString => $criteriaBoolean) {
+                    foreach ($expressions[$criteriaString] as $pos => $expression) {
+                        $expect = $evalBoolean;
+                        if ($type != "equal") {
+                            $expect = (! $expect);
                         }
+                        if (! $criteriaBoolean) {
+                            $expect = (! $expect);
+                        }
+                        if ($expect) {
+                            $expect = STDOUT_EXPECT_MATCH;
+                        } else {
+                            $expect = STDOUT_EXPECT_NOMATCH;
+                        }
+                        $answer = $answer && matchingTest (randomChannel (), '/', $jsonData, $evalString, $operator . $caseFlag, $expression, array (), $expect);
+                        $otherExpression = $expressions[$opposite[$criteriaString]][$pos];
+                        $answer = $answer && matchingTest (randomChannel (), '/', $jsonData, $evalString, $operator . $caseFlag, array ($expression, $otherExpression), array (), STDOUT_EXPECT_MATCH);
                     }
                 }
             }
         }
     }
+
 }
 
 ##################################################################
 msg_log ("  +---+ Testing invalid operators...");
 foreach ($jsonData as $evalString => $evalBoolean) {
-    foreach (array ('', '! ') as $negateFlag) {
-        foreach (array ('', ' -i ', ' --ignorecase ') as $caseFlag) {
-            foreach ($invalidOperators as $operator) {
-                foreach ($jsonData as $criteriaString => $criteriaBoolean) {
-                    foreach ($expressions[$criteriaString] as $expression) {
-                        $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, $evalString, $negateFlag . $operator . $caseFlag, $expression));
-                        $answer = ($answer && stderrExpectInvalidOperator());
-                        if ($negateFlag != '') {
-                            $answer = ($answer && stdoutExpectMatch ());
-                        } else {
-                            $answer = ($answer && stdoutExpectNoMatch ());
-                        }
-                        $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, $evalString, $negateFlag . $caseFlag . $operator, $expression));
-                        $answer = ($answer && stderrExpectInvalidOperator());
-                        if ($negateFlag != '') {
-                            $answer = ($answer && stdoutExpectMatch ());
-                        } else {
-                            $answer = ($answer && stdoutExpectNoMatch ());
-                        }
-                    }
+    foreach (array ('', ' -i ', ' --ignorecase ') as $caseFlag) {
+        foreach ($invalidOperators as $operator) {
+            foreach ($jsonData as $criteriaString => $criteriaBoolean) {
+                foreach ($expressions[$criteriaString] as $expression) {
+                    $answer = $answer && matchingTest (randomChannel (), '/', $jsonData, $evalString, $operator . $caseFlag, $expression, array (), STDOUT_EXPECT_NOMATCH);
                 }
             }
         }

@@ -163,9 +163,10 @@ function GenericJsonResolver (returnValue, className, id, getPropertiesFromObjec
             var _step = step++;
             if (isPropertyOrPosition (property)) {
                 successHandlers.push (function () {
+                    var index;
                     if ((typeof property) == "number") {
                         if (isArray (data)) {
-                            var index = verifyInterval (data, property, false);
+                            index = verifyInterval (data, property, false);
                             if (index !== null) {
                                 if (data[index]) {
                                     data = data[index];
@@ -175,7 +176,7 @@ function GenericJsonResolver (returnValue, className, id, getPropertiesFromObjec
                             }
                         } else if (isObject (data)) {
                             var propertyKeys = Object.keys (data);
-                            var index = verifyInterval (propertyKeys, property, false);
+                            index = verifyInterval (propertyKeys, property, false);
                             if (index !== null) {
                                 if (data[propertyKeys[index]]) {
                                     data = data[propertyKeys[index]];

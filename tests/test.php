@@ -346,7 +346,55 @@ function waitGracefulFinish () {
     return (false);
 }
 
-function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options = array ()) {
+function swapValues (&$a, &$b) {
+    $temp = $a;
+    $a = $b;
+    $b = $temp;
+}
+
+function matchingTest ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options = array (), $expectedResult = null, $timeout = null) {
+    // https://en.wikipedia.org/wiki/Heap%27s_algorithm
+    $heap_A = preg_split ('/\\s/', $testFlags, -1, PREG_SPLIT_NO_EMPTY);
+    $heap_n = count ($heap_A);
+    $heap_c = array_fill (0, $heap_n, 0);
+    $invertedResult = null;
+    if ($expectedResult === STDOUT_EXPECT_MATCH) {
+        $invertedResult = STDOUT_EXPECT_NOMATCH;
+    } else if ($expectedResult === STDOUT_EXPECT_NOMATCH) {
+        $invertedResult = STDOUT_EXPECT_MATCH;
+    }
+    if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options, $expectedResult, $timeout) === false) {
+        return (false);
+    }
+    if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, '! ' . $testFlags, $testCriteria, $options, $invertedResult, $timeout) === false) {
+        return (false);
+    }
+    $heap_i = 0;
+    while ($heap_i < $heap_n) {
+        if ($heap_c[$heap_i] < $heap_i) {
+            if ($heap_i & 1) {
+                swapValues ($heap_A[$heap_c[$heap_i]], $heap_A[$heap_i]);
+            } else {
+                swapValues ($heap_A[0], $heap_A[$heap_i]);
+            }
+            $testFlags = implode (' ', $heap_A);
+            if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options, $expectedResult, $timeout) === false) {
+                return (false);
+            }
+            if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, '! ' . $testFlags, $testCriteria, $options, $invertedResult, $timeout) === false) {
+                return (false);
+            }
+            $heap_c[$heap_i] += 1;
+            $heap_i = 0;
+        } else {
+            $heap_c[$heap_i] = 0;
+            $heap_i += 1;
+        }
+    }
+    return (true);
+}
+
+function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options = array (), $expectedResult = null, $timeout = null) {
     $mirror = rawurlencode (json_encode ($jsonData));
     $expect = array ();
     if (! empty ($options['expect'])) {
@@ -370,7 +418,21 @@ function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $t
     } else {
         $line .= rawurlencode ($testCriteria);
     }
-    return (stdinSendRaw (trim ($line)));
+    if (! stdinSendRaw (trim ($line))) {
+        return (false);
+    }
+    if ($expectedResult !== null) {
+        $answer = stdoutExpect ($expectedResult, $timeout);
+        if ($answer === false) {
+            return (false);
+        } else if (stderrExpectAnswer ($timeout)) {
+            return ($answer);
+        } else {
+            return (false);
+        }
+    } else {
+        return (true);
+    }
 }
 
 function stdinSendRaw ($line) {
@@ -512,32 +574,11 @@ function stdoutExpect ($what, $timeout = null) {
     return (false);
 }
 
-function stderrExpectInvalidOperator ($timeout = null) {
-    if (empty ($timeout)) {
-        $timeout = EXPECT_DEFAULT_TIMEOUT;
-    }
-    return (stderrExpect ('(INFO|DEBUG):\\s*\\[\\w+#\\d+\\]\\s*Unable\\s+to\\s+apply\\s+selected\\s+comparison\\s+operator\\s+', $timeout));
-}
-
 function stderrExpectAnswer ($timeout = null) {
     if (empty ($timeout)) {
         $timeout = EXPECT_DEFAULT_TIMEOUT;
     }
     return (stderrExpect('INFO:\\s*Channel\\s+#\\d*\\s+answered\\s*:\\s+', $timeout));
-}
-
-function stdoutExpectMatch ($timeout = null) {
-    if (empty ($timeout)) {
-        $timeout = EXPECT_DEFAULT_TIMEOUT;
-    }
-    return (stdoutExpect (STDOUT_EXPECT_MATCH, $timeout) !== false && stderrExpectAnswer ($timeout));
-}
-
-function stdoutExpectNoMatch ($timeout = null) {
-    if (empty ($timeout)) {
-        $timeout = EXPECT_DEFAULT_TIMEOUT;
-    }
-    return (stdoutExpect (STDOUT_EXPECT_NOMATCH, $timeout) !== false && stderrExpectAnswer ($timeout));
 }
 
 function stdoutExpectNoHelper ($timeout = null) {

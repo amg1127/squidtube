@@ -14,3 +14,5 @@ DISTFILES += \
     test_config.conf \
     helpers/test_xhr.js \
     suite/*.php
+
+QMAKE_CLEAN += test.stdin test.stdout test.log test.sqlite  test.sqlite-shm  test.sqlite-wal

@@ -141,7 +141,7 @@ bool loadRuntimeVariables () {
     qDebug ("Parsing command line options...");
     QStringList arguments(QCoreApplication::arguments());
     QCommandLineParser optionsParser;
-    optionsParser.setApplicationDescription (QStringLiteral("An external Squid ACL class helper that provides control over access to videos (through my own helpers)."));
+    optionsParser.setApplicationDescription (QStringLiteral("An external Squid ACL class helper that provides control over access to videos (through own helpers).\nSee more information at: " APP_project_url));
     optionsParser.addOption (QCommandLineOption (QStringLiteral("config"), QStringLiteral("Path of the program configuration file."), QStringLiteral("config"), QStringLiteral(APP_install_etc_dir "/" APP_project_name ".conf")));
     for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
         optionsParser.addOption (QCommandLineOption (i->configSection + QStringLiteral(".") + i->configName, i->configDescription, i->configName, *(i->configValue)));

@@ -46,7 +46,15 @@ compilerIsClang = $$find(QMAKE_CXX,(|.*-)clang\+\+)
 # Turn all warnings on
 CONFIG += warn_on
 QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion
-!isEmpty(compilerIsClang):!isEmpty(CLANG_WARN_EVERYTHING):QMAKE_CXXFLAGS += -Weverything -Wno-c++98-compat -Wno-exit-time-destructors -Wno-global-constructors -Wno-covered-switch-default -Wno-padded -Wno-switch-enum -Wno-redundant-parens
+!isEmpty(compilerIsClang):!isEmpty(CLANG_WARN_EVERYTHING) {
+    QMAKE_CXXFLAGS += -Weverything \
+        -Wno-c++98-compat \
+        -Wno-exit-time-destructors \
+        -Wno-global-constructors \
+        -Wno-covered-switch-default \
+        -Wno-padded -Wno-switch-enum \
+        -Wno-redundant-parens
+}
 DEFINES += QT_DEPRECATED_WARNINGS
 
 # Abort compilation if there are more than 3 errors
@@ -64,6 +72,7 @@ QMAKE_CXXFLAGS += -std=c++11 -pedantic
 DEFINES += APP_project_name=\"\\\"$${project_name}\\\"\" \
     APP_project_version=\"\\\"$${project_version}\\\"\" \
     APP_owner_name=\"\\\"$${owner_name}\\\"\" \
+    APP_project_url=\"\\\"$${project_url}\\\"\" \
     APP_install_bin_dir=\"\\\"$${install_bin_dir}\\\"\" \
     APP_install_etc_dir=\"\\\"$${install_etc_dir}\\\"\" \
     APP_install_share_dir=\"\\\"$${install_share_dir}\\\"\"

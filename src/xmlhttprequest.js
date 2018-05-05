@@ -1,7 +1,8 @@
-// I have to reimplement XMLHttpRequest because of QTBUG-67337 ...
+// I had to reimplement XMLHttpRequest because of QTBUG-67337 ...
 // https://xhr.spec.whatwg.org/
 // http://tobyho.com/2010/11/22/javascript-constructors-and/
 
+// @disable-check M127
 (function (sendCallback, abortCallback, setTimeoutCallback, validStatusCodes) {
 
     function DOMException (message, name) {
@@ -61,6 +62,7 @@
         var parametersCaptures = null;
         var contentTypeStringWithComma = "," + contentTypeString;
         var lastMatchedIndex = 0;
+        // @disable-check M19
         while (contentTypeCaptures = contentTypeParser.exec (contentTypeStringWithComma)) {
             lastMatchedIndex = contentTypeParser.lastIndex;
             returnValue["mimeType"] = contentTypeCaptures[1];
@@ -68,7 +70,9 @@
             returnValue["quotedCharset"] = null;
             if (contentTypeCaptures[2]) {
                 parametersParser.lastIndex = 0;
+                // @disable-check M19
                 while (parametersCaptures = parametersParser.exec (contentTypeCaptures[2])) {
+                    // @disable-check M126
                     if (parametersCaptures[1].toLowerCase() == "charset") {
                         if (parametersCaptures[4]) {
                             returnValue["quotedCharset"] = parametersCaptures[4];
@@ -192,8 +196,10 @@
         }
 
         var isXMLMimeType = function (mimeType) {
+            // @disable-check M126
             if (mimeType == "text/xml" || mimeType == "application/xml") {
                 return (true);
+                // @disable-check M126
             } else if (mimeType.substring (mimeType.length - 4, mimeType.length) == "+xml") {
                 return (true);
             } else {
@@ -204,9 +210,11 @@
         var getBlobResponse = function () {
             var finalMimeType = getFinalMimeType ();
             if (XMLHttpRequestPrivate["responseBlob"]) {
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["responseBlob"].size == XMLHttpRequestPrivate["responseBuffer"].byteLength) {
                     var currentMimeType = parseContentType (XMLHttpRequestPrivate["responseBlob"].type);
                     if (currentMimeType) {
+                        // @disable-check M126
                         if (currentMimeType["mimeType"] == finalMimeType["mimeType"] && currentMimeType["charset"] == finalMimeType["charset"]) {
                             return (XMLHttpRequestPrivate["responseBlob"]);
                         }
@@ -258,6 +266,7 @@
         var xmlHeaderParser = /^<\?xml(|.*(\s+encoding=['"]?([^'"\?\s>]+)['"]?(|\s+.*)))\?>/m;
         var getTextResponse = function () {
             if (XMLHttpRequestPrivate["responseText"] && XMLHttpRequestPrivate["responseTextLength"]) {
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["responseTextLength"] == XMLHttpRequestPrivate["responseBuffer"].byteLength) {
                     return (XMLHttpRequestPrivate["responseText"]);
                 }
@@ -283,6 +292,7 @@
                             bomMaskPattern = bomMaskPatterns[bomMaskPatternsPos];
                             bomMaskPatternLength = bomMaskPattern.length;
                             for (bomMaskPatternPos = 0; bomMaskPatternPos < bomMaskPatternLength && bomMaskPatternPos < bufferLen; bomMaskPatternPos++) {
+                                // @disable-check M126
                                 if (bomMaskPattern[bomMaskPatternPos] != buffer[bomMaskPatternPos]) {
                                     break;
                                 }
@@ -311,6 +321,7 @@
                 if (! charset) {
                     charset = 'utf-8';
                 }
+                // @disable-check M126
                 if (charset.toLowerCase() == 'utf7-empty') {
                     data = "";
                 } else {
@@ -326,6 +337,7 @@
 
         var getJsonResponse = function () {
             if (XMLHttpRequestPrivate["responseJson"] && XMLHttpRequestPrivate["responseJsonLength"]) {
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["responseJsonLength"] == XMLHttpRequestPrivate["responseBuffer"].byteLength) {
                     return (XMLHttpRequestPrivate["responseJson"]);
                 }
@@ -349,6 +361,7 @@
             if (XMLHttpRequestPrivate["requestId"]) {
                 abortCallback (XMLHttpRequestPrivate["requestId"]);
             }
+            // @disable-check M126
             if (XMLHttpRequestPrivate["state"] == status_DONE) {
                 XMLHttpRequestPrivate["state"] = status_UNSENT;
                 XMLHttpRequestPrivate["responseObject"]["type"] = "failure";
@@ -418,10 +431,13 @@
                     throw new DOMException ("Invalid XMLHttpRequest method '" + method + "'!", "SyntaxError");
                 }
                 var methodUpper = method.toUpperCase();
+                // @disable-check M126
                 if (methodUpper == 'CONNECT' || methodUpper == 'TRACE' || methodUpper == 'TRACK') {
                     throw new DOMException ("Forbidden XMLHttpRequest method '" + method + "'!", "SecurityError");
                 }
+                // @disable-check M126
                 if (methodUpper == 'DELETE' || methodUpper == 'GET' || methodUpper == 'HEAD' ||
+                    // @disable-check M126
                     methodUpper == 'OPTIONS' || methodUpper == 'POST' || methodUpper == 'PUT') {
                     method = methodUpper;
                 }
@@ -449,6 +465,7 @@
                 XMLHttpRequestPrivate["responseBlob"] = null;
                 XMLHttpRequestPrivate["responseText"] = null;
                 XMLHttpRequestPrivate["responseJson"] = null;
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["state"] != status_OPENED) {
                     XMLHttpRequestPrivate["state"] = status_OPENED;
                     if (this.onreadystatechange) {
@@ -457,6 +474,7 @@
                 }
             })},
             "setRequestHeader"     : { "value": (function (name, value) {
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["state"] != status_OPENED) {
                     throw new DOMException ("XMLHttpRequest state is " + XMLHttpRequestPrivate["state"], "InvalidStateError");
                 }
@@ -470,11 +488,13 @@
                 var nameLower = name.toLowerCase ();
                 var headerPos;
                 for (headerPos = 0; headerPos < forbiddenHeaderNamesLength; headerPos++) {
+                    // @disable-check M126
                     if (forbiddenHeaderNames[headerPos].toLowerCase() == nameLower) {
                         return;
                     }
                 }
                 for (headerPos = 0; headerPos < forbiddenHeaderPrefixesLength; headerPos++) {
+                    // @disable-check M126
                     if (forbiddenHeaderPrefixes[headerPos].toLowerCase() == nameLower.substring(0, forbiddenHeaderPrefixes[headerPos].length)) {
                         return;
                     }
@@ -499,6 +519,7 @@
             "withCredentials"      : { "get": (function () {
                 return (XMLHttpRequestPrivate["withCredentialsFlag"]);
             }), "set": (function (value) {
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["state"] != status_UNSENT && XMLHttpRequestPrivate["state"] != status_OPENED) {
                     throw new DOMException ("XMLHttpRequest state is " + XMLHttpRequestPrivate["state"], "InvalidStateError");
                 }
@@ -509,12 +530,14 @@
             })},
             "upload"               : { "value": (new XMLHttpRequestUpload ()) },
             "send"                 : { "value": (function (body) {
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["state"] != status_OPENED) {
                     throw new DOMException ("XMLHttpRequest state is " + XMLHttpRequestPrivate["state"], "InvalidStateError");
                 }
                 if (XMLHttpRequestPrivate["sendFlag"]) {
                     throw new DOMException ("XMLHttpRequest sendFlag is set", "InvalidStateError");
                 }
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["requestMethod"] == 'GET' || XMLHttpRequestPrivate["requestMethod"] == 'HEAD') {
                     body = null;
                 }
@@ -579,6 +602,7 @@
                             contentTypeValue = XMLHttpRequestPrivate["requestHeaders"]["content-type"][contentTypePos];
                             specifiedMimeType = parseContentType (contentTypeValue);
                             if (specifiedMimeType) {
+                                // @disable-check M126
                                 if (specifiedMimeType["mimeType"] && specifiedMimeType["charset"] != encoding) {
                                     XMLHttpRequestPrivate["requestHeaders"]["content-type"][contentTypePos] = contentTypeValue.replace (/\s*;\s*charset\s*=\s*([\w-]+|"([^"\\]|\\.)*")\s*/gi, '; charset="' + encoding.replace(/["\\]/g, '\\$1').replace(/\$/g, '$$') + '"');
                                 }
@@ -601,6 +625,7 @@
                 XMLHttpRequestPrivate["sendFlag"] = true;
                 // From step 11 onwards, let the C++ stack assume the control
                 sendCallback (this, getPrivateData1, setPrivateData1, getPrivateData2, setPrivateData2);
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["synchronousFlag"] && XMLHttpRequestPrivate["responseObject"]["type"] == "failure") {
                     var exception = XMLHttpRequestPrivate["responseObject"]["value"];
                     var colonPos = exception.indexOf(":");
@@ -652,6 +677,7 @@
                 return (output);
             })},
             "overrideMimeType"     : { "value": (function (mime) {
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["state"] == status_LOADING || XMLHttpRequestPrivate["state"] == status_DONE) {
                     throw new DOMException ("XMLHttpRequest state is " + XMLHttpRequestPrivate["state"], "InvalidStateError");
                 } else {
@@ -673,8 +699,10 @@
             "responseType"         : { "get": (function () {
                 return (XMLHttpRequestPrivate["responseType"]);
             }), "set": (function (value) {
+                // @disable-check M126
                 if (value == "document") {
                     // Terminate these steps
+                // @disable-check M126
                 } else if (XMLHttpRequestPrivate["state"] == status_LOADING || XMLHttpRequestPrivate["state"] == status_DONE) {
                     throw new DOMException ("XMLHttpRequest state is " + XMLHttpRequestPrivate["state"], "InvalidStateError");
                 } else {
@@ -693,24 +721,32 @@
                 }
             })},
             "response"             : { "get": (function () {
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["responseType"] == "" || XMLHttpRequestPrivate["responseType"] == "text") {
+                    // @disable-check M126
                     if (XMLHttpRequestPrivate["state"] != status_LOADING && XMLHttpRequestPrivate["state"] != status_DONE) {
                         return ("");
                     } else {
                         return (getTextResponse ());
                     }
                 } else {
+                    // @disable-check M126
                     if (XMLHttpRequestPrivate["state"] != status_DONE) {
                         return (null);
+                    // @disable-check M126
                     } else if (XMLHttpRequestPrivate["responseObject"]["type"] == "failure") {
                         return (null);
                     } else {
+                        // @disable-check M126
                         if (XMLHttpRequestPrivate["responseType"] == "arraybuffer") {
                             return (getArrayBufferResponse ());
+                        // @disable-check M126
                         } else if (XMLHttpRequestPrivate["responseType"] == "blob") {
                             return (getBlobResponse ());
+                        // @disable-check M126
                         } else if (XMLHttpRequestPrivate["responseType"] == "document") {
                             return (getDocumentResponse ());
+                        // @disable-check M126
                         } else if (XMLHttpRequestPrivate["responseType"] == "json") {
                             return (getJsonResponse ());
                         } else {
@@ -720,8 +756,10 @@
                 }
             })},
             "responseText"         : { "get": (function () {
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["responseType"] != "" && XMLHttpRequestPrivate["responseType"] != "text") {
                     throw new DOMException ("XMLHttpRequest responseType is " + XMLHttpRequestPrivate["responseType"], "InvalidStateError");
+                // @disable-check M126
                 } else if (XMLHttpRequestPrivate["state"] != status_LOADING && XMLHttpRequestPrivate["state"] != status_DONE) {
                     return ("");
                 } else {
@@ -729,8 +767,10 @@
                 }
             })},
             "responseXML"          : { "get": (function () {
+                // @disable-check M126
                 if (XMLHttpRequestPrivate["responseType"] != "" && XMLHttpRequestPrivate["responseType"] != "document") {
                     throw new DOMException ("XMLHttpRequest responseType is " + XMLHttpRequestPrivate["responseType"], "InvalidStateError");
+                // @disable-check M126
                 } else if (XMLHttpRequestPrivate["state"] != status_DONE || XMLHttpRequestPrivate["responseObject"]["type"] != "failure") {
                     return (null);
                 } else if (XMLHttpRequestPrivate["responseObject"]["type"] !== "null") {

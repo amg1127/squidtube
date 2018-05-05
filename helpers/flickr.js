@@ -39,6 +39,7 @@ function getObjectFromUrl (returnValue, url) {
     } else if ((captures = webPageURLs.exec (url)) != null) {
         userId = captures[4];
         photoId = captures[6];
+        // @disable-check M126
         if (photoId == "sets" || photoId == "albums") {
             photoId = null;
             photosetId = captures[8];
@@ -75,6 +76,7 @@ function getObjectFromUrl (returnValue, url) {
 
 function getPropertiesFromObject (returnValue, className, id) {
     var method = "flickr." + className + ".getInfo";
+    // @disable-check M126
     if (className == "userIdByUrl") {
         method = "flickr.urls.lookupUser";
     }
@@ -88,9 +90,13 @@ function getPropertiesFromObject (returnValue, className, id) {
         returnValue (flickrFixJSONFormatting (data));
     }, className, id, getPropertiesFromObjectCache);
     jsonResolver.setErrorHandler (function (step, residual) {
+        // @disable-check M126
         if (step == 1) {
+            // @disable-check M126
             if (residual["stat"] == "fail") {
+                // @disable-check M126
                 if ((className == "people" && residual["code"] == 1) ||
+                    // @disable-check M126
                     (className == "photosets" && residual["code"] == 2)) {
                     console.log ("Flickr API did not find an user with (nsid='" + idObj.user_id + "'). Calling 'urls.lookupUser' in order to get the actual 'nsid'...");
                     getPropertiesFromObjectCache (function (data) {
@@ -109,6 +115,7 @@ function getPropertiesFromObject (returnValue, className, id) {
     jsonResolver.get (flickrURL)
         .test ({"stat":"ok"})
         .remove ("stat");
+    // @disable-check M126
     if (className == "photos") {
         jsonResolver.add ({"photo.owner": function (data) {
             return ({
@@ -118,6 +125,7 @@ function getPropertiesFromObject (returnValue, className, id) {
                 })
             });
         }});
+    // @disable-check M126
     } else if (className == "photosets") {
         jsonResolver.add ({"photoset.owner": function (data) {
             return ({
@@ -138,7 +146,7 @@ function flickrFixJSONFormatting (jsonObject) {
         } else if ((typeof jsonObject) == 'object') {
             keys = Object.keys (jsonObject);
             keysLength = keys.length;
-            keyPos;
+            // @disable-check M126
             if (keysLength == 1 && keys[0] == '_content') {
                 return (flickrFixJSONFormatting (jsonObject['_content']));
             } else {

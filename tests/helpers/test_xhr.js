@@ -83,6 +83,7 @@ function getPropertiesFromObject (returnValue, className, id) {
     if (postData) {
         postData = postData[1].split("&").filter(function (currentValue) {
             // Filter "expect" GET parameters
+            // @disable-check M126
             return (currentValue.substring(0, 7) == "expect=" || currentValue.substring(0, 9) == "expect[]=" || (currentValue.substring(0, 6) == "expect" && currentValue.substring(6, 13).toUpperCase() == "%5B%5D="));
         }).map(function (currentValue) {
             // Extract and decode their values
