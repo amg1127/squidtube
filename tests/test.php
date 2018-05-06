@@ -182,7 +182,15 @@ function cli_sapi () {
     foreach (array ('', '-wal', '-shm') as $suffix) {
         removeFile ($databaseFile . $suffix);
     }
-    $GLOBALS['projectProcess'] = proc_open (escapeshellarg(__DIR__ . "/../" . $projectName) . " --main.loglevel=DEBUG --config " . escapeshellarg (__DIR__ . "/test_config.conf") . " --db.name " . escapeshellarg ($databaseFile), array (
+    $helperName = 'testhelper';
+    $GLOBALS['projectProcess'] = proc_open (
+        escapeshellarg (__DIR__ . "/../" . $projectName) . " " .
+        "--main.loglevel=DEBUG " .
+        "--config " . escapeshellarg (__DIR__ . "/test_config.conf") . " " .
+        "--db.name " . escapeshellarg ($databaseFile) . " " .
+        "--" . $helperName . ".notsosimpleglobalvariable " . escapeshellarg ("simple value actually") . " " .
+        "--" . $helperName . ".commandlineglobalvariable " . escapeshellarg ("command-line value")
+    , array (
         0 => array ("pipe", "rb"),
         1 => array ("pipe", "wt"),
         2 => array ("file", $projectLogFile, "wt")

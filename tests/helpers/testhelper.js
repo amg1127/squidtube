@@ -2,6 +2,14 @@ if (simpleglobalvariable != "simple value") {
     throw new ReferenceError ("'simpleglobalvalue' does not store the expected value!");
 }
 
+if (notsosimpleglobalvariable != "simple value actually") {
+    throw new ReferenceError ("'notsosimpleglobalvariable' does not store the expected value!");
+}
+
+if (commandlineglobalvariable != "command-line value") {
+    throw new ReferenceError ("'commandlineglobalvariable' does not store the expected value!");
+}
+
 var counter = 0;
 
 function getSupportedUrls (returnValue) {

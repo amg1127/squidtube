@@ -12,7 +12,7 @@ QMAKE_EXTRA_TARGETS += test build
 DISTFILES += \
     test.php \
     test_config.conf \
-    helpers/test_xhr.js \
-    suite/*.php
+    suite/*.php \
+    helpers/testhelper.js
 
 QMAKE_CLEAN += test.stdin test.stdout test.log test.sqlite  test.sqlite-shm  test.sqlite-wal
