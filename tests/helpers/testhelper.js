@@ -11,6 +11,7 @@ if (commandlineglobalvariable != "command-line value") {
 }
 
 var counter = 0;
+var xhr = null;
 
 function getSupportedUrls (returnValue) {
     returnValue ([/^http:\/\/localhost(|:\d+)\//]);
@@ -26,68 +27,66 @@ function getObjectFromUrl (returnValue, url) {
 }
 
 function getPropertiesFromObject (returnValue, className, id) {
-    var xhr = new XMLHttpRequest ();
+    var url, timeoutConfig, abortConfig, asyncConfig, postData;
 
-    var printProgress = function (eventName) {
-        return (function (eventData) {
-            console.log ("XHR-EVENT-" + eventName.toUpperCase());
-            console.log ("|    className='" + className + "'");
-            console.log ("|    id='" + id + "'");
-            console.log ("|    lengthComputable=" + eventData.lengthComputable);
-            console.log ("|    loaded=" + eventData.loaded);
-            console.log ("|    total=" + eventData.total);
-            console.log ("|    XHR.status=" + xhr.status);
-            console.log ("|    XHR.statusText='" + xhr.statusText + "'");
-        });
-    };
-
-    xhr.upload.onloadstart = printProgress ("upload-loadstart");
-    xhr.upload.onprogress = printProgress ("upload-progress");
-    xhr.upload.onabort = printProgress ("upload-abort");
-    xhr.upload.onerror = printProgress ("upload-error");
-    xhr.upload.onload = printProgress ("upload-load");
-    xhr.upload.ontimeout = printProgress ("upload-timeout");
-    xhr.upload.onloadend = printProgress ("upload-loadend");
-
-    xhr.onloadstart = printProgress ("loadstart");
-    xhr.onprogress = printProgress ("progress");
-    xhr.onabort = printProgress ("abort");
-    xhr.onerror = printProgress ("error");
-    xhr.onload = printProgress ("load");
-    xhr.ontimeout = printProgress ("timeout");
-    xhr.onloadend = (function (eventData) {
-        (printProgress ("loadend")) (eventData);
-        returnValue (xhr.response);
-    });
-
-    xhr.onreadystatechange = function () {
-        console.log ("XHR-EVENT-READYSTATECHANGE");
-        console.log ("|    className='" + className + "'");
-        console.log ("|    id='" + id + "'");
-        console.log ("|    readyState=" + xhr.readyState);
+    if (! (xhr && (counter % 32))) {
+        xhr = new XMLHttpRequest ();
     }
 
-    var url = id;
+    xhr.upload.onloadstart = printProgress (xhr, className, id, "upload-loadstart");
+    xhr.upload.onprogress = printProgress (xhr, className, id, "upload-progress");
+    xhr.upload.onabort = printProgress (xhr, className, id, "upload-abort");
+    xhr.upload.onerror = printProgress (xhr, className, id, "upload-error");
+    xhr.upload.onload = printProgress (xhr, className, id, "upload-load");
+    xhr.upload.ontimeout = printProgress (xhr, className, id, "upload-timeout");
+    xhr.upload.onloadend = printProgress (xhr, className, id, "upload-loadend");
 
-    var timeoutConfig = (/^[^\?#]+\/timeout\/(\d+)(|\D.*)$/i).exec (url);
+    xhr.onloadstart = printProgress (xhr, className, id, "loadstart");
+    xhr.onprogress = printProgress (xhr, className, id, "progress");
+    xhr.onabort = printProgress (xhr, className, id, "abort");
+    xhr.onerror = printProgress (xhr, className, id, "error");
+    xhr.onload = printProgress (xhr, className, id, "load");
+    xhr.ontimeout = printProgress (xhr, className, id, "timeout");
+
+    xhr.onreadystatechange = (function (xhrObj, _className, _id) {
+        return (function () {
+            console.log ("XHR-EVENT-READYSTATECHANGE");
+            console.log ("|    className='" + _className + "'");
+            console.log ("|    id='" + _id + "'");
+            console.log ("|    readyState=" + xhrObj.readyState);
+        });
+    }) (xhr, className, id);
+
+    xhr.onloadend = (function (xhrObj, _className, _id) {
+        return (function (eventData) {
+            (printProgress (xhrObj, _className, _id, "loadend")) (eventData);
+            returnValue (xhrObj.response);
+        });
+    }) (xhr, className, id);
+
+    url = id;
+
+    timeoutConfig = (/^[^\?#]+\/timeout\/(\d+)(|\D.*)$/i).exec (url);
     if (timeoutConfig) {
         xhr.timeout = timeoutConfig[1];
     }
 
-    var abortConfig = (/^[^\?#]+\/abort\/(\d+)(|\D.*)$/i).exec (url);
+    abortConfig = (/^[^\?#]+\/abort\/(\d+)(|\D.*)$/i).exec (url);
     if (abortConfig) {
-        setTimeout (function () {
-            xhr.abort ();
-        }, abortConfig[1]);
+        setTimeout ((function (xhrObj) {
+            return (function () {
+                xhrObj.abort ();
+            });
+        }) (xhr), abortConfig[1]);
     }
 
     if (! (timeoutConfig || abortConfig)) {
         xhr.timeout = 120000;
     }
 
-    var asyncConfig = ((/^[^\?#]+\/sync\//i).exec (url) === null);
+    asyncConfig = ((/^[^\?#]+\/sync\//i).exec (url) === null);
 
-    var postData = (/^[^\?#]+\?(([^#&=]+=[^#&=]*&)*([^#&=]+=[^#&=]*)?)(|#.*)$/).exec (url);
+    postData = (/^[^\?#]+\?(([^#&=]+=[^#&=]*&)*([^#&=]+=[^#&=]*)?)(|#.*)$/).exec (url);
     if (postData) {
         postData = postData[1].split("&").filter(function (currentValue) {
             // Filter "expect" GET parameters
@@ -123,4 +122,17 @@ function getPropertiesFromObject (returnValue, className, id) {
             returnValue (null);
         }
     }
+}
+
+function printProgress (xhrObj, className, id, eventName) {
+    return (function (eventData) {
+        console.log ("XHR-EVENT-" + eventName.toUpperCase());
+        console.log ("|    className='" + className + "'");
+        console.log ("|    id='" + id + "'");
+        console.log ("|    lengthComputable=" + eventData.lengthComputable);
+        console.log ("|    loaded=" + eventData.loaded);
+        console.log ("|    total=" + eventData.total);
+        console.log ("|    XHR.status=" + xhrObj.status);
+        console.log ("|    XHR.statusText='" + xhrObj.statusText + "'");
+    });
 }

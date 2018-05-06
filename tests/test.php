@@ -104,6 +104,10 @@ function cli_server_sapi () {
 function cli_sapi () {
     // Default exit code
     $GLOBALS['exitCode'] = 1;
+    // An invalid address for simulation of network problems
+    $GLOBALS['v4Socket'] = null;
+    $GLOBALS['v6Socket'] = null;
+    $GLOBALS['invalidAddress'] = null;
     // Server address
     $GLOBALS['serverAddress'] = null;
     // Server process descriptor
@@ -132,6 +136,35 @@ function cli_sapi () {
         msg_fatal ("Unable to retrieve the project name!");
     } else {
         $projectName = $GLOBALS['argv'][1];
+    }
+
+    // I need two sockets bound to a fixed port in order to simulate network errors
+    for ($socketTry = 1; (! $GLOBALS['invalidAddress']) && $socketTry <= 5; $socketTry++) {
+        $serverPort = rand (1024, 65535);
+        foreach (array ('v4Socket' => AF_INET, 'v6Socket' => AF_INET6) as $key => $family) {
+            msg_log ("[" . $socketTry . "] Trying to bind " . $key . "/TCP port " . $serverPort . "...");
+            $GLOBALS[$key] = socket_create ($family, SOCK_STREAM, SOL_TCP);
+            if ($GLOBALS[$key]) {
+                if (! socket_bind ($GLOBALS[$key], "localhost", $serverPort)) {
+                    $errNo = socket_last_error ($GLOBALS[$key]);
+                    msg_warning ("'socket_bind (" . $key . ", " . $serverPort . ")' failed: " . $errNo . ": " . socket_strerror ($errNo));
+                    $GLOBALS[$key] = null;
+                }
+            } else {
+                $errNo = socket_last_error ();
+                msg_warning ("'socket_create (" . $key . ")' failed: " . $errNo . ": " . socket_strerror ($errNo));
+            }
+            if (! $GLOBALS[$key]) {
+                break;
+            }
+        }
+        if ($GLOBALS['v4Socket'] && $GLOBALS['v6Socket']) {
+            $GLOBALS['invalidAddress'] = "http://localhost:" . $serverPort;
+            break;
+        }
+    }
+    if (! $GLOBALS['invalidAddress']) {
+        msg_fatal ("Unable to create local sockets for network error simulation!");
     }
 
     // Try to launch a local web server using PHP's builtin one
@@ -168,6 +201,8 @@ function cli_sapi () {
     }
 
     if (! $GLOBALS['serverProcess']) {
+        socket_close ($GLOBALS['v4Socket']);
+        socket_close ($GLOBALS['v6Socket']);
         msg_fatal ("Unable to launch a local web server!");
     }
 
@@ -175,6 +210,8 @@ function cli_sapi () {
     removeFile ($projectLogFile);
     if (file_put_contents ($projectLogFile, '') !== 0) {
         shutdownProcess ($GLOBALS['serverProcess']);
+        socket_close ($GLOBALS['v4Socket']);
+        socket_close ($GLOBALS['v6Socket']);
         msg_fatal ("Unable to create log file '" . $projectLogFile . "'!");
     }
 
@@ -198,6 +235,8 @@ function cli_sapi () {
     if (! $GLOBALS['projectProcess']) {
         shutdownProcess ($GLOBALS['serverProcess']);
         unlink ($projectLogFile);
+        socket_close ($GLOBALS['v4Socket']);
+        socket_close ($GLOBALS['v6Socket']);
         msg_fatal ("Unable to launch the project executable!");
     }
     $GLOBALS['projectSTDIN'] = $pipes[0];
@@ -209,8 +248,10 @@ function cli_sapi () {
         if (waitGracefulFinish () === false) {
             shutdownProcess ($GLOBALS['projectProcess']);
         }
-        unlink ($projectLogFile);
         shutdownProcess ($GLOBALS['serverProcess']);
+        unlink ($projectLogFile);
+        socket_close ($GLOBALS['v4Socket']);
+        socket_close ($GLOBALS['v6Socket']);
         msg_fatal ("Unable to open log file '" . $projectLogFile . "' for reading!");
     }
     foreach (array ($GLOBALS['projectSTDOUT'], $GLOBALS['projectSTDERR']) as $fd) {
@@ -249,6 +290,8 @@ function cli_sapi () {
             }
         }
         shutdownProcess ($GLOBALS['serverProcess'], "Tests finished.");
+        socket_close ($GLOBALS['v4Socket']);
+        socket_close ($GLOBALS['v6Socket']);
         msg_log ("Test program exited with status code #" . $GLOBALS['exitCode'] . ".");
         exit ($GLOBALS['exitCode']);
     });
@@ -544,6 +587,9 @@ function stderrExpect ($regexp, $timeout = null) {
         $line = trim (preg_replace ('/^\\s*\\[\\d\\d\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(|\\.\\d+)[^\\]]*\\]\\s+(|0[xX][a-fA-F0-9]+\\s+)(\\w+\\s*:\\s)/', '\\3', $line));
         if (preg_match ('/^' . $regexp . '/', $line)) {
             return (true);
+        } else if (preg_match ('/^\\w+:\\s*(|A\\s+)Javascript\\s+exception\\s+/i', $line)) {
+            msg_warning ($line);
+            break;
         }
     }
     msg_warning ("Pattern was not found on messages coming from STDERR: '" . $regexp . "'!");
