@@ -47,8 +47,9 @@
     }) (arguments[0], arguments[1]);
 
     return ((function () {
-        /* var global_variable_a = decodeURIComponent ('foo'); */
-        /* var global_variable_b = decodeURIComponent ('bar'); */
+        /* var global_variable_a = decodeURIComponent ('foo'); var global_variable_b = decodeURIComponent ('bar'); */
+
+        // https://stackoverflow.com/q/21726948/7184009
 
         /* Helper code goes here - this placeholder must not be removed! */
 

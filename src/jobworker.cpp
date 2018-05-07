@@ -592,6 +592,7 @@ JobWorker::~JobWorker () {
     if ((! (this->runningRequests.isEmpty() && this->finishRequested && this->incomingRequests.isEmpty ())) || this->retryTimer->isActive ()) {
         qFatal ("Program tried to destruct a JobWorker unexpectedly!");
     }
+    this->runtimeEnvironment->collectGarbage ();
     while (! this->helperInstances.isEmpty ()) {
         AppHelperInfo* appHelperInfo (this->helperInstances.takeLast ());
         delete (appHelperInfo->memoryCache);

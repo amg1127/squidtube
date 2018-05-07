@@ -36,6 +36,7 @@ function getObjectFromUrl (returnValue, url) {
     if (helperRegExp.test (url)) {
         var answer, dir, subdir, pos, answerClassName, answerId;
         var urlObj = new URL (url);
+        // @disable-check M126
         if (urlObj.pathname.substring (0, 1) == "/") {
             pos = urlObj.pathname.indexOf ("/", 1);
             if (pos >= 0) {
@@ -45,12 +46,15 @@ function getObjectFromUrl (returnValue, url) {
                     pos = urlObj.pathname.length;
                 }
                 subdir = urlObj.pathname.substring (dir.length + 2, pos);
+                // @disable-check M126
                 if (dir == "user" || dir == "channel") {
                     answerClassName = dir + "s";
                     answerId = subdir;
+                // @disable-check M126
                 } else if (dir == "v" || (dir == "embed" && subdir != "videoseries")) {
                     answerClassName = "videos";
                     answerId = subdir;
+                // @disable-check M126
                 } else if (dir == "embed" && subdir == "videoseries") {
                     answerClassName = "playlists";
                     answerId = urlObj.searchParams.getAll("list").slice(-1)[0];
@@ -58,12 +62,15 @@ function getObjectFromUrl (returnValue, url) {
             } else {
                 dir = urlObj.pathname.substring (1);
             }
+            // @disable-check M126
             if (dir == "watch") {
                 answerClassName = "videos";
                 answerId = urlObj.searchParams.getAll("v").slice(-1)[0];
+            // @disable-check M126
             } else if (dir == "get_video_info") {
                 answerClassName = "videos";
                 answerId = urlObj.searchParams.getAll("video_id").slice(-1)[0];
+            // @disable-check M126
             } else if (urlObj.hostname == "youtu.be") {
                 answerClassName = "videos";
                 answerId = dir;
@@ -84,6 +91,7 @@ function getObjectFromUrl (returnValue, url) {
 function getPropertiesFromObject (returnValue, className, id) {
     var path = className;
     var param = "id";
+    // @disable-check M126
     if (className == "users") {
         path = "channels";
         param = "forUsername";
@@ -94,6 +102,7 @@ function getPropertiesFromObject (returnValue, className, id) {
     jsonResolver.get (youtubeURL)
         .extract ("items")
         .extract (0);
+    // @disable-check M126
     if (className == "videos") {
         jsonResolver.add ({
             "snippet.category": {

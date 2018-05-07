@@ -298,7 +298,7 @@ bool loadRuntimeVariables () {
         QHash<QString,QString>::iterator helperCode (AppRuntime::helperSourcesByName.insert ((*helper), QStringLiteral("")));
         for (QHash<QString,QString>::const_iterator variable = globalVariables.constBegin(); variable != globalVariables.constEnd(); variable++) {
             if (variable.key().startsWith ((*helper) + QStringLiteral("."))) {
-                helperCode.value() += QStringLiteral("var ") + variable.key().mid(helper->length() + 1) + QStringLiteral(" = decodeURIComponent ('") + QString::fromUtf8(QUrl::toPercentEncoding (variable.value())) + QStringLiteral("');\n");
+                helperCode.value() += QStringLiteral("var ") + variable.key().mid(helper->length() + 1) + QStringLiteral(" = decodeURIComponent ('") + QString::fromUtf8(QUrl::toPercentEncoding (variable.value())) + QStringLiteral("'); ");
             }
         }
     }
@@ -400,9 +400,9 @@ bool loadRuntimeVariables () {
             int numNewLines = helperJailTemplateBegin.count(QLatin1Char('\n'));
             int numCarriageReturns = helperJailTemplateBegin.count(QLatin1Char('\r'));
             if (numNewLines > numCarriageReturns) {
-                AppRuntime::helperSourcesStartLine = -2 - numNewLines;
+                AppRuntime::helperSourcesStartLine = -1 - numNewLines;
             } else {
-                AppRuntime::helperSourcesStartLine = -2 - numCarriageReturns;
+                AppRuntime::helperSourcesStartLine = -1 - numCarriageReturns;
             }
             int helperPlaceHolderEnd = helperJailTemplate.indexOf (QStringLiteral("*/"));
             if (helperPlaceHolderEnd >= 0) {
