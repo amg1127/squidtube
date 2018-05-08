@@ -43,7 +43,7 @@ $answer = ($answer && stdoutExpectError ());
 $numericFlags = array ("<", "-lt", "<=", "-le", "=", "==", "-eq", "<>", "!=", "-ne", ">", "-gt", ">=", "-ge");
 $stringFlags = array ("-f", "--fixed", "-w", "--wildcard");
 
-msg_log ("  +---+ Lines that mix numeric and string comparision flags");
+msg_log ("  +---+ Lines that mix numeric and string comparison flags");
 foreach ($numericFlags as $numericFlag) {
     foreach ($stringFlags as $stringFlag) {
         $answer = ($answer && stdinSend (randomChannel (), '/', array("foo" => "bar"), 'property', $numericFlag . " " . $stringFlag, 'criteria'));
@@ -60,7 +60,7 @@ foreach ($numericFlags as $numericFlag) {
     }
 }
 
-msg_log ("  +---+ Lines with an invalid string comparision flags combination");
+msg_log ("  +---+ Lines with an invalid string comparison flags combination");
 foreach (array ('', '! ') as $negateFlag) {
     foreach (array ('', '-i ', '--ignorecase ') as $caseFlag) {
         foreach (array ('-f ', '--fixed ') as $fixedFlag) {

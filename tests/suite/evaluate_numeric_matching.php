@@ -152,10 +152,10 @@ foreach (array ('', '-w', '-f', '--wildcard', '--fixed') as $op) {
     foreach (array ('', '-i', '--ignorecase') as $caseFlag) {
         foreach ($numberSets as $numberSet) {
             foreach ($jsonData['numberSets'][$numberSet] as $testNumber) {
-                $answer = ($answer && matchingTest (randomChannel (), '/', $jsonData, 'numberSets.' . $numberSet . '.[]', $caseFlag . ' ' . $op, $testNumber, array(), STDOUT_EXPECT_NOMATCH));
+                $answer = ($answer && matchingTest (randomChannel (), '/', $jsonData, 'numberSets.' . $numberSet . '.[]', $caseFlag . ' ' . $op, $testNumber, array(), STDOUT_EXPECT_NOMATCH, STDERR_EXPECT_INVALID_COMPARISON_OPERATOR));
                 if (! $answer) { break; }
             }
-            $answer = ($answer && matchingTest (randomChannel (), '/', $jsonData, 'numberSets.' . $numberSet . '.[]', $caseFlag . ' ' . $op, $jsonData['numberSets'][$numberSet], array(), STDOUT_EXPECT_NOMATCH));
+            $answer = ($answer && matchingTest (randomChannel (), '/', $jsonData, 'numberSets.' . $numberSet . '.[]', $caseFlag . ' ' . $op, $jsonData['numberSets'][$numberSet], array(), STDOUT_EXPECT_NOMATCH, STDERR_EXPECT_INVALID_COMPARISON_OPERATOR));
             if (! $answer) { break; }
         }
         if (! $answer) { break; }

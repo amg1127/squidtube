@@ -60,7 +60,7 @@ foreach ($jsonData as $evalString => $evalBoolean) {
         foreach ($invalidOperators as $operator) {
             foreach ($jsonData as $criteriaString => $criteriaBoolean) {
                 foreach ($expressions[$criteriaString] as $expression) {
-                    $answer = $answer && matchingTest (randomChannel (), '/', $jsonData, $evalString, $operator . $caseFlag, $expression, array (), STDOUT_EXPECT_NOMATCH);
+                    $answer = $answer && matchingTest (randomChannel (), '/', $jsonData, $evalString, $operator . $caseFlag, $expression, array (), STDOUT_EXPECT_NOMATCH, STDERR_EXPECT_INVALID_COMPARISON_OPERATOR);
                 }
             }
         }

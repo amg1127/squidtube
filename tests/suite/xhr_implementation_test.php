@@ -1,12 +1,28 @@
 <?php
 
 $answer = true;
+$jsonData = array (
+    'number' => array (
+        'negative' => -4,
+        'zero' => 0,
+        'positive' => 4
+    ), 'string' => array (
+        'lower' => 'bear',
+        'upper' => 'BULL'
+    ), 'boolean' => array (
+        'true'  => true,
+        'false' => false
+    )
+);
 
 ##################################################################
 msg_log ("  +---+ Testing XHR implementation without body upload:");
 
 msg_log ("  +---+---+ Synchronous mode for a successful request...");
 // TODO: test HTTP codes 200, 204, 403, 404, 500 and 503
+foreach (array (200, 204, 403, 404, 500, 503) as $httpStatus) {
+    $answer = ($answer && stdinSend (randomChannel (), '/', $jsonData, 'number.zero', '==', '0', array ('response' => $httpStatus), STDOUT_EXPECT_MATCH, array (STDERR_EXPECT_XHR_EVENT_LOADEND, sprintf (STDERR_EXPECT_XHR_STATUS_format, $httpStatus))));
+}
 
 msg_log ("  +---+---+ Synchronous mode for a failed request...");
 

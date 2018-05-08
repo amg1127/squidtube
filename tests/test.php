@@ -131,6 +131,12 @@ function cli_sapi () {
     define ('STDOUT_EXPECT_ERROR', 'BH');
     define ('EXPECT_DEFAULT_TIMEOUT', 30);
 
+    // Some frequently-expected regular expressions...
+    define ('STDERR_EXPECT_INVALID_COMPARISON_OPERATOR', '(INFO|DEBUG):\\s*\\[\\w+#\\d+\\]\\s*Unable\\s+to\\s+apply\\s+selected\\s+comparison\\s+operator\\s+');
+    define ('STDERR_EXPECT_XHR_EVENT_LOADEND', 'DEBUG:\\s*(|QJS\s*:\s+)XHR-EVENT-LOADEND\\s*\\(');
+    define ('STDERR_EXPECT_XHR_STATUS_format', 'DEBUG:\\s*(|QJS\s*:\s+)\\|\\s+XHR\\.status\\s*=\\s*%03d\\s*\\(');
+
+
     // The project name is expected to be supplied by "qmake"...
     if (empty ($GLOBALS['argv'][1])) {
         msg_fatal ("Unable to retrieve the project name!");
@@ -403,7 +409,7 @@ function swapValues (&$a, &$b) {
     $b = $temp;
 }
 
-function matchingTest ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options = array (), $expectedResult = null, $timeout = null) {
+function matchingTest ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options = array (), $expectedResult = null, $expectedMessages = null, $timeout = null) {
     // https://en.wikipedia.org/wiki/Heap%27s_algorithm
     $heap_A = preg_split ('/\\s/', $testFlags, -1, PREG_SPLIT_NO_EMPTY);
     $heap_n = count ($heap_A);
@@ -414,10 +420,10 @@ function matchingTest ($channel, $urlPath, $jsonData, $testProperty, $testFlags,
     } else if ($expectedResult === STDOUT_EXPECT_NOMATCH) {
         $invertedResult = STDOUT_EXPECT_MATCH;
     }
-    if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options, $expectedResult, $timeout) === false) {
+    if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options, $expectedResult, $expectedMessages, $timeout) === false) {
         return (false);
     }
-    if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, '! ' . $testFlags, $testCriteria, $options, $invertedResult, $timeout) === false) {
+    if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, '! ' . $testFlags, $testCriteria, $options, $invertedResult, $expectedMessages, $timeout) === false) {
         return (false);
     }
     $heap_i = 0;
@@ -429,10 +435,10 @@ function matchingTest ($channel, $urlPath, $jsonData, $testProperty, $testFlags,
                 swapValues ($heap_A[0], $heap_A[$heap_i]);
             }
             $testFlags = implode (' ', $heap_A);
-            if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options, $expectedResult, $timeout) === false) {
+            if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options, $expectedResult, $expectedMessages, $timeout) === false) {
                 return (false);
             }
-            if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, '! ' . $testFlags, $testCriteria, $options, $invertedResult, $timeout) === false) {
+            if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, '! ' . $testFlags, $testCriteria, $options, $invertedResult, $expectedMessages, $timeout) === false) {
                 return (false);
             }
             $heap_c[$heap_i] += 1;
@@ -445,7 +451,7 @@ function matchingTest ($channel, $urlPath, $jsonData, $testProperty, $testFlags,
     return (true);
 }
 
-function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options = array (), $expectedResult = null, $timeout = null) {
+function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options = array (), $expectedResult = null, $expectedMessages = null, $timeout = null) {
     $mirror = rawurlencode (json_encode ($jsonData));
     $expect = array ();
     if (! empty ($options['expect'])) {
@@ -476,11 +482,22 @@ function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $t
         $answer = stdoutExpect ($expectedResult, $timeout);
         if ($answer === false) {
             return (false);
-        } else if (stderrExpectAnswer ($timeout)) {
-            return ($answer);
         } else {
-            return (false);
+            if ($expectedMessages !== null) {
+                if (! is_array ($expectedMessages)) {
+                    $expectedMessages = array ($expectedMessages);
+                }
+                foreach ($expectedMessages as $expectedMessage) {
+                    if (! stderrExpect ($expectedMessage, $timeout)) {
+                        return (false);
+                    }
+                }
+            }
+            if (stderrExpectAnswer ($timeout)) {
+                return ($answer);
+            }
         }
+        return (false);
     } else {
         return (true);
     }
