@@ -94,6 +94,10 @@ private:
     inline bool isFinalAnswer () {
         return (! (this->maxRedirects && (this->isRedirectWithMethodChange() || this->isRedirectWithoutMethodChange())));
     }
+    // HTTP errors are expected to be handled by XMLHttpRequest users, but QNetworkAccessManager handles some errors by itself...
+    inline bool httpResponseOk () {
+        return (this->networkReply->error() == QNetworkReply::NoError || (this->responseStatus >= 400 && this->responseStatus < 600));
+    }
 private slots:
     void networkReplyUploadProgress (qint64 bytesSent, qint64 bytesTotal);
     void networkReplyDownloadProgress (qint64 bytesReceived, qint64 bytesTotal);

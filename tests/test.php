@@ -133,6 +133,7 @@ function cli_sapi () {
 
     // Some frequently-expected regular expressions...
     define ('STDERR_EXPECT_INVALID_COMPARISON_OPERATOR', '(INFO|DEBUG):\\s*\\[\\w+#\\d+\\]\\s*Unable\\s+to\\s+apply\\s+selected\\s+comparison\\s+operator\\s+');
+    define ('STDERR_EXPECT_XHR_EXCEPTION', 'DEBUG:\\s*(|QJS\s*:\s+)XHR-EXCEPTION\\s*\\(');
     define ('STDERR_EXPECT_XHR_EVENT_LOADEND', 'DEBUG:\\s*(|QJS\s*:\s+)XHR-EVENT-LOADEND\\s*\\(');
     define ('STDERR_EXPECT_XHR_STATUS_format', 'DEBUG:\\s*(|QJS\s*:\s+)\\|\\s+XHR\\.status\\s*=\\s*%03d\\s*\\(');
 
@@ -414,7 +415,7 @@ function matchingTest ($channel, $urlPath, $jsonData, $testProperty, $testFlags,
     $heap_A = preg_split ('/\\s/', $testFlags, -1, PREG_SPLIT_NO_EMPTY);
     $heap_n = count ($heap_A);
     $heap_c = array_fill (0, $heap_n, 0);
-    $invertedResult = null;
+    $invertedResult = $expectedResult;
     if ($expectedResult === STDOUT_EXPECT_MATCH) {
         $invertedResult = STDOUT_EXPECT_NOMATCH;
     } else if ($expectedResult === STDOUT_EXPECT_NOMATCH) {
@@ -466,7 +467,14 @@ function stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $t
     foreach ($options as $k => $v) {
         $optionsData .= rawurlencode ($k) . "=" . rawurlencode ($v) . "&";
     }
-    $line = ((int) $channel) . " " . $GLOBALS['serverAddress'] . $urlPath . "?" . implode ("", array_map (function ($item) {
+    $server = $GLOBALS['serverAddress'] . '/';
+    foreach (array ('invalidAddress', 'serverAddress') as $variable) {
+        if (! strncasecmp ($GLOBALS[$variable] . '/', $urlPath, strlen ($GLOBALS[$variable]) + 1)) {
+            $server = '';
+            break;
+        }
+    }
+    $line = ((int) $channel) . " " . $server . $urlPath . "?" . implode ("", array_map (function ($item) {
         return (rawurlencode ("expect[]") . "=" . rawurlencode ($item) . "&");
     }, $expect)) . $optionsData . "mirror=" . $mirror . " " . rawurlencode ($testProperty) . " " .
     implode (" ", array_map ('rawurlencode', preg_split ('/\\s/', $testFlags, -1, PREG_SPLIT_NO_EMPTY))) . " -- ";

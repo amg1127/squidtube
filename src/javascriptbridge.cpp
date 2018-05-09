@@ -277,14 +277,12 @@ void JavascriptNetworkRequest::appendResponseBuffer () {
         QJSValue responseBuffer;
         if (this->getPrivateData (QStringLiteral("responseBuffer"), responseBuffer)) {
             this->setPrivateData (QStringLiteral("responseBuffer"), JavascriptBridge::QByteArray2ArrayBuffer ((*(this->jsEngine)), JavascriptBridge::ArrayBuffer2QByteArray ((*(this->jsEngine)), responseBuffer) + this->networkReply->readAll ()));
-
-            this->getPrivateData (QStringLiteral("responseBuffer"), responseBuffer);
         }
     }
 }
 
 void JavascriptNetworkRequest::networkReplyUploadProgress (qint64 bytesSent, qint64 bytesTotal) {
-    if (this->networkReply->error() == QNetworkReply::NoError) {
+    if (this->httpResponseOk ()) {
         this->fireProgressEvent (true, QStringLiteral("onprogress"), bytesSent, bytesTotal);
         if (bytesTotal >= 0 && bytesSent == bytesTotal) {
             this->setPrivateData (QStringLiteral("uploadCompleteFlag"), true);
@@ -298,7 +296,7 @@ void JavascriptNetworkRequest::networkReplyDownloadProgress (qint64 bytesReceive
     if (! this->responseStatus) {
         this->responseStatus = this->networkReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     }
-    if (this->networkReply->error() == QNetworkReply::NoError && this->isFinalAnswer ()) {
+    if (this->httpResponseOk () && this->isFinalAnswer ()) {
         if (! this->downloadStarted) {
             this->downloadStarted = true;
             QJSValue state (JavascriptNetworkRequest::status_HEADERS_RECEIVED);
@@ -346,10 +344,11 @@ void JavascriptNetworkRequest::networkReplyDownloadProgress (qint64 bytesReceive
 
 void JavascriptNetworkRequest::networkReplyFinished () {
     this->requestBodyBuffer.close ();
-    QNetworkReply::NetworkError networkError = this->networkReply->error ();
-    if (this->isFinalAnswer() || networkError != QNetworkReply::NoError) {
+    bool hasHttpError = (! this->httpResponseOk ());
+    if (this->isFinalAnswer() || hasHttpError) {
         this->appendResponseBuffer ();
-        if (networkError != QNetworkReply::NoError) {
+        if (hasHttpError) {
+            QNetworkReply::NetworkError networkError = this->networkReply->error ();
             qInfo ("[XHR#%u] Network request finished unexpectedly: %d: %s", this->networkRequestId, networkError, this->networkReply->errorString().toLatin1().constData());
             QJSValue sendFlag;
             if (this->getPrivateData (QStringLiteral("sendFlag"), sendFlag)) {
@@ -909,18 +908,22 @@ QString JavascriptBridge::QJS2QString (const QJSValue& value) {
 }
 
 QJSValue JavascriptBridge::QByteArray2ArrayBuffer (QJSEngine& jsEngine, const QByteArray& value) {
-    uint length = static_cast <uint> (value.size ());
     QJSValue answer = QVariant(value).value<QJSValue>();
-    if (answer.property(QStringLiteral("byteLength")).toUInt() != length) {
-        QJSValue uInt8Array (jsEngine.globalObject().property(QStringLiteral("Uint8Array")).callAsConstructor(QJSValueList() << length));
-        if (! JavascriptBridge::warnJsError (jsEngine, uInt8Array, "Uncaught exception while creating 'Uint8Array' object!")) {
-            if (uInt8Array.isObject ()) {
-                for (uint pos = 0; pos < length; pos++) {
-                    uInt8Array.setProperty (pos, static_cast<unsigned> (value[pos]));
+    uint length = static_cast <uint> (value.size ());
+    if (length) {
+        if (answer.property(QStringLiteral("byteLength")).toUInt() != length) {
+            QJSValue uInt8Array (jsEngine.globalObject().property(QStringLiteral("Uint8Array")).callAsConstructor(QJSValueList() << length));
+            if (! JavascriptBridge::warnJsError (jsEngine, uInt8Array, "Uncaught exception while creating 'Uint8Array' object!")) {
+                if (uInt8Array.isObject ()) {
+                    for (uint pos = 0; pos < length; pos++) {
+                        uInt8Array.setProperty (pos, static_cast<unsigned> (value[pos]));
+                    }
+                    answer = uInt8Array.property(QStringLiteral("buffer"));
                 }
-                answer = uInt8Array.property(QStringLiteral("buffer"));
             }
         }
+    } else {
+        answer = jsEngine.globalObject().property(QStringLiteral("ArrayBuffer")).callAsConstructor (QJSValueList() << 0);
     }
     return (answer);
 }
