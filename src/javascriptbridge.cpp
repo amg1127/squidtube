@@ -919,9 +919,9 @@ QString JavascriptBridge::QJS2QString (const QJSValue& value) {
 }
 
 QJSValue JavascriptBridge::QByteArray2ArrayBuffer (QJSEngine& jsEngine, const QByteArray& value) {
-    QJSValue answer = QVariant(value).value<QJSValue>();
     uint length = static_cast <uint> (value.size ());
     if (length) {
+        QJSValue answer = jsEngine.toScriptValue<QByteArray> (value);
         if (answer.property(QStringLiteral("byteLength")).toUInt() != length) {
             QJSValue uInt8Array (jsEngine.globalObject().property(QStringLiteral("Uint8Array")).callAsConstructor(QJSValueList() << length));
             if (! JavascriptBridge::warnJsError (jsEngine, uInt8Array, "Uncaught exception while creating 'Uint8Array' object!")) {
@@ -933,10 +933,10 @@ QJSValue JavascriptBridge::QByteArray2ArrayBuffer (QJSEngine& jsEngine, const QB
                 }
             }
         }
+        return (answer);
     } else {
-        answer = jsEngine.globalObject().property(QStringLiteral("ArrayBuffer")).callAsConstructor (QJSValueList() << 0);
+        return (jsEngine.globalObject().property(QStringLiteral("ArrayBuffer")).callAsConstructor (QJSValueList() << 0));
     }
-    return (answer);
 }
 
 QByteArray JavascriptBridge::ArrayBuffer2QByteArray (QJSEngine&, const QJSValue& value) {

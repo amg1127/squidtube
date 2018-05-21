@@ -91,7 +91,7 @@ foreach ($httpStatusCodes as $httpStatus) {
     )));
 }
 
-msg_log ("  +---+---+ XHR 'onloadstart', 'onprogress' and 'onload' events using a big response content...");
+msg_log ("  +---+---+ XHR 'onloadstart', 'onprogress' and 'onload' events while downloading large data volume...");
 foreach ($httpStatusCodes as $httpStatus) {
     msg_log ("  +---+---+---+ " . $httpStatus . "...");
     $answer = ($answer && stdinSend (randomChannel (), '/async/timeout/600000/', $jsonData, 'number.zero', '==', '0', array ('response' => ($httpStatus . ' XHR test'), 'bigdata' => 'true'), STDOUT_EXPECT_MATCH, array (
@@ -179,7 +179,7 @@ msg_log ("  +---+---+ XHR 'onloadend' event for a failed request...");
 
 msg_log ("  +---+---+ XHR 'onloadstart', 'onprogress' and 'onload' events...");
 
-msg_log ("  +---+---+ XHR 'onloadstart', 'onprogress' and 'onload' using with a big response content...");
+msg_log ("  +---+---+ XHR 'onloadstart', 'onprogress' and 'onload' events while downloading large data volume...");
 
 msg_log ("  +---+---+ XHR 'ontimeout' event...");
 
