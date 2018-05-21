@@ -89,7 +89,7 @@ function cli_server_sapi () {
         $mb = 96;
         for ($i = 0; $i < $mb; $i++) {
             echo (str_repeat (str_repeat (' ', 1023) . "\n", 1024));
-            usleep (30 * 1000000 / $mb);
+            usleep (10 * 1000000 / $mb);
         }
     }
 

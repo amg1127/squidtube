@@ -87,7 +87,7 @@ foreach ($httpStatusCodes as $httpStatus) {
         xhrProp ('total', '\\d+'),
         xhrFact ('event-load'),
         xhrProp ('loaded', '\\d+'),
-        xhrProp ('total', '\\d+'),
+        xhrProp ('total', '\\d+')
     )));
 }
 
@@ -109,17 +109,45 @@ foreach ($httpStatusCodes as $httpStatus) {
         xhrProp ('total', '\\d+'),
         xhrFact ('event-load'),
         xhrProp ('loaded', '\\d+'),
-        xhrProp ('total', '\\d+'),
+        xhrProp ('total', '\\d+')
     ), 300));
 }
 
 msg_log ("  +---+---+ XHR 'ontimeout' event...");
+$answer = ($answer && stdinSend (randomChannel (), '/async/timeout/10000/', $jsonData, 'number.zero', '==', '0', array ('pause' => 15), STDOUT_EXPECT_NOHELPER, array (
+    xhrFact ('event-readystatechange'),
+    xhrProp ('XHR.readyState', '4'),
+    xhrFact ('event-timeout'),
+    xhrProp ('loaded', '0'),
+    xhrProp ('total', '0'),
+    xhrFact ('event-loadend'),
+    xhrProp ('loaded', '0'),
+    xhrProp ('total', '0')
+)));
 
 msg_log ("  +---+---+ XHR 'onabort' event...");
+$answer = ($answer && stdinSend (randomChannel (), '/async/abort/10000/', $jsonData, 'number.zero', '==', '0', array ('pause' => 15), STDOUT_EXPECT_NOHELPER, array (
+    xhrFact ('event-readystatechange'),
+    xhrProp ('XHR.readyState', '4'),
+    xhrFact ('event-abort'),
+    xhrProp ('loaded', '0'),
+    xhrProp ('total', '0'),
+    xhrFact ('event-loadend'),
+    xhrProp ('loaded', '0'),
+    xhrProp ('total', '0')
+)));
 
 msg_log ("  +---+---+ XHR 'onerror' event...");
-
-msg_log ("  +---+---+ XHR 'onerror' event...");
+$answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . '/async/', $jsonData, 'number.zero', '==', '0', array (), STDOUT_EXPECT_NOHELPER, array (
+    xhrFact ('event-readystatechange'),
+    xhrProp ('XHR.readyState', '4'),
+    xhrFact ('event-error'),
+    xhrProp ('loaded', '0'),
+    xhrProp ('total', '0'),
+    xhrFact ('event-loadend'),
+    xhrProp ('loaded', '0'),
+    xhrProp ('total', '0')
+)));
 
 msg_log ("  +---+---+ HTTP status 301 handling...");
 
@@ -156,8 +184,6 @@ msg_log ("  +---+---+ XHR 'onloadstart', 'onprogress' and 'onload' using with a 
 msg_log ("  +---+---+ XHR 'ontimeout' event...");
 
 msg_log ("  +---+---+ XHR 'onabort' event...");
-
-msg_log ("  +---+---+ XHR 'onerror' event...");
 
 msg_log ("  +---+---+ XHR 'onerror' event...");
 
