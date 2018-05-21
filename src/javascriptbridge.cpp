@@ -183,6 +183,9 @@ void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkMan
                 if (! this->requestBodyBuffer.open (QIODevice::ReadOnly)) {
                     qCritical ("[XHR#%u] Internal error while allocating request body buffer: %s", this->networkRequestId, this->requestBodyBuffer.errorString().toLatin1().constData());
                 }
+                if (! this->responseBodyBuffer.open (QIODevice::WriteOnly | QIODevice::Truncate)) {
+                    qCritical ("[XHR#%u] Internal error while allocating response body buffer: %s", this->networkRequestId, this->responseBodyBuffer.errorString().toLatin1().constData());
+                }
                 bool uploadCompleteFlagBool = _uploadCompleteFlag.toBool();
                 qint64 requestBodySize = this->requestBodyBuffer.size();
                 if (! this->isGetOrHeadRequest ()) {
@@ -272,15 +275,6 @@ void JavascriptNetworkRequest::fireEvent (const QString& callback) {
     }
 }
 
-void JavascriptNetworkRequest::appendResponseBuffer () {
-    if (this->networkReply->isOpen ()) {
-        QJSValue responseBuffer;
-        if (this->getPrivateData (QStringLiteral("responseBuffer"), responseBuffer)) {
-            this->setPrivateData (QStringLiteral("responseBuffer"), JavascriptBridge::QByteArray2ArrayBuffer ((*(this->jsEngine)), JavascriptBridge::ArrayBuffer2QByteArray ((*(this->jsEngine)), responseBuffer) + this->networkReply->readAll ()));
-        }
-    }
-}
-
 void JavascriptNetworkRequest::networkReplyUploadProgress (qint64 bytesSent, qint64 bytesTotal) {
     if (this->httpResponseOk ()) {
         this->fireProgressEvent (true, QStringLiteral("onprogress"), bytesSent, bytesTotal);
@@ -326,12 +320,13 @@ void JavascriptNetworkRequest::networkReplyDownloadProgress (qint64 bytesReceive
                 this->setPrivateData (QStringLiteral("state"), JavascriptNetworkRequest::status_LOADING);
             }
         }
-        this->appendResponseBuffer ();
+        this->responseBodyBuffer.write (this->networkReply->readAll ());
         if (bytesReceived > 0 || bytesTotal > 0) {
             this->fireEvent (QStringLiteral("onreadystatechange"));
             this->fireProgressEvent (false, QStringLiteral("onprogress"), bytesReceived, bytesTotal);
         }
         if (bytesReceived == bytesTotal) {
+            this->setPrivateData (QStringLiteral("responseBuffer"), JavascriptBridge::QByteArray2ArrayBuffer ((*(this->jsEngine)), this->responseBuffer ()));
             this->setPrivateData (QStringLiteral("state"), JavascriptNetworkRequest::status_DONE);
             this->setPrivateData (QStringLiteral("sendFlag"), false);
             this->setPrivateData (QStringLiteral("responseObject"), QStringLiteral("type"), QStringLiteral("object")); // The XMLHttpRequest specification did not rule this...
@@ -346,7 +341,11 @@ void JavascriptNetworkRequest::networkReplyFinished () {
     this->requestBodyBuffer.close ();
     bool hasHttpError = (! this->httpResponseOk ());
     if (this->isFinalAnswer() || hasHttpError) {
-        this->appendResponseBuffer ();
+        if (hasHttpError) {
+            this->responseBodyBuffer.write (this->networkReply->readAll ());
+            this->setPrivateData (QStringLiteral("responseBuffer"), JavascriptBridge::QByteArray2ArrayBuffer ((*(this->jsEngine)), this->responseBuffer ()));
+        }
+        this->responseBodyBuffer.close ();
         if (hasHttpError) {
             QNetworkReply::NetworkError networkError = this->networkReply->error ();
             qInfo ("[XHR#%u] Network request finished unexpectedly: %d: %s", this->networkRequestId, networkError, this->networkReply->errorString().toLatin1().constData());
@@ -402,6 +401,7 @@ void JavascriptNetworkRequest::networkReplyFinished () {
         }
         this->cancelRequest (true);
     } else {
+        this->responseBodyBuffer.close ();
         // Handle the URL redirect
         if (this->isRedirectWithMethodChange()) {
             if (! this->isGetOrHeadRequest ()) {
@@ -642,6 +642,7 @@ JavascriptBridge::JavascriptBridge (QJSEngine& _jsEngine, const QString& _reques
                     << this->myself.property (QStringLiteral("xmlHttpRequest_send"))
                     << this->myself.property (QStringLiteral("xmlHttpRequest_abort"))
                     << this->myself.property (QStringLiteral("xmlHttpRequest_setTimeout"))
+                    << this->myself.property (QStringLiteral("xmlHttpRequest_getResponseBuffer"))
                     << xmlHttpRequest_statusCodes
                 );
                 if (! JavascriptBridge::warnJsError (_jsEngine, xmlHttpRequest, "Unable to retrieve the 'XMLHttpRequest' object constructor from the QJSEngine environment!")) {
@@ -798,6 +799,16 @@ void JavascriptBridge::xmlHttpRequest_setTimeout (const unsigned int _networkReq
     QMap<unsigned int, JavascriptNetworkRequest*>::iterator networkRequest = this->pendingNetworkRequests.find (_networkRequestId);
     if (networkRequest != this->pendingNetworkRequests.end ()) {
         (*networkRequest)->setTimerInterval (msec);
+    }
+}
+
+QJSValue JavascriptBridge::xmlHttpRequest_getResponseBuffer (const unsigned int _networkRequestId) {
+    QMap<unsigned int, JavascriptNetworkRequest*>::iterator networkRequest = this->pendingNetworkRequests.find (_networkRequestId);
+    if (networkRequest != this->pendingNetworkRequests.end ()) {
+        return (JavascriptBridge::QByteArray2ArrayBuffer ((*(this->jsEngine)), (*networkRequest)->responseBuffer ()));
+    } else {
+        qCritical ("Invalid procedure call: unknown networkRequestId #%u!", _networkRequestId);
+        return (QJSValue::NullValue);
     }
 }
 

@@ -66,6 +66,7 @@ private:
     QNetworkReply* networkReply;
     QTimer timeoutTimer;
     bool downloadStarted;
+    QBuffer responseBodyBuffer;
     bool getPrivateData (const QString& key, QJSValue& value);
     bool setPrivateData (const QString& key, const QJSValue& value);
     bool getPrivateData (const QString& key, const QString& subKey, QJSValue& value);
@@ -75,7 +76,6 @@ private:
     void fireProgressEvent (bool isUpload, const QString& callback, qint64 transmitted, qint64 length);
     void fireProgressEvent (QJSValue& callback, qint64 transmitted, qint64 length);
     void fireEvent (const QString& callback);
-    void appendResponseBuffer ();
     inline bool isGetOrHeadRequest () {
         return (! (this->requestMethod.compare(QStringLiteral("GET"), Qt::CaseInsensitive) &&
                    this->requestMethod.compare(QStringLiteral("HEAD"), Qt::CaseInsensitive)));
@@ -123,6 +123,9 @@ public:
     }
     void start (QNetworkAccessManager& networkManager, unsigned int _networkRequestId);
     void abort ();
+    inline const QByteArray responseBuffer () {
+        return (this->responseBodyBuffer.data ());
+    }
 signals:
     void networkRequestFinished (unsigned int requestId);
 };
@@ -160,6 +163,7 @@ public:
     Q_INVOKABLE void xmlHttpRequest_send (const QJSValue& object, const QJSValue& getPrivateData1, const QJSValue& setPrivateData1, const QJSValue& getPrivateData2, const QJSValue& setPrivateData2);
     Q_INVOKABLE void xmlHttpRequest_abort (const unsigned int _networkRequestId);
     Q_INVOKABLE void xmlHttpRequest_setTimeout (const unsigned int _networkRequestId, const int msec);
+    Q_INVOKABLE QJSValue xmlHttpRequest_getResponseBuffer (const unsigned int _networkRequestId);
     Q_INVOKABLE QString textDecode (const QJSValue& bytes, const QString& fallbackCharset);
     Q_INVOKABLE QJSValue textEncode (const QString& string, const QString& charset);
     Q_INVOKABLE void getPropertiesFromObjectCache (unsigned int context, const QJSValue& returnValue);

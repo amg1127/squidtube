@@ -3,7 +3,7 @@
 // http://tobyho.com/2010/11/22/javascript-constructors-and/
 
 // @disable-check M127
-(function (sendCallback, abortCallback, setTimeoutCallback, validStatusCodes) {
+(function (sendCallback, abortCallback, setTimeoutCallback, getResponseBufferCallback, validStatusCodes) {
 
     function DOMException (message, name) {
         Object.defineProperties (this, {
@@ -149,6 +149,12 @@
             return (XMLHttpRequestPrivate["responseBuffer"].slice(0));
         };
 
+        var updateArrayBufferResponse = function () {
+            if (XMLHttpRequestPrivate["requestId"] && XMLHttpRequestPrivate["sendFlag"]) {
+                XMLHttpRequestPrivate["responseBuffer"] = getResponseBufferCallback (XMLHttpRequestPrivate["requestId"]);
+            }
+        };
+
         var getFinalMimeType = function () {
             var finalMimeType = "text/xml";
             var finalCharset = null;
@@ -209,6 +215,7 @@
 
         var getBlobResponse = function () {
             var finalMimeType = getFinalMimeType ();
+            updateArrayBufferResponse ();
             if (XMLHttpRequestPrivate["responseBlob"]) {
                 // @disable-check M126
                 if (XMLHttpRequestPrivate["responseBlob"].size == XMLHttpRequestPrivate["responseBuffer"].byteLength) {
@@ -265,6 +272,7 @@
         var bomMasksKeysLength = bomMasksKeys.length;
         var xmlHeaderParser = /^<\?xml(|.*(\s+encoding=['"]?([^'"\?\s>]+)['"]?(|\s+.*)))\?>/m;
         var getTextResponse = function () {
+            updateArrayBufferResponse ();
             if (XMLHttpRequestPrivate["responseText"] && XMLHttpRequestPrivate["responseTextLength"]) {
                 // @disable-check M126
                 if (XMLHttpRequestPrivate["responseTextLength"] == XMLHttpRequestPrivate["responseBuffer"].byteLength) {
@@ -336,6 +344,7 @@
         }
 
         var getJsonResponse = function () {
+            updateArrayBufferResponse ();
             if (XMLHttpRequestPrivate["responseJson"] && XMLHttpRequestPrivate["responseJsonLength"]) {
                 // @disable-check M126
                 if (XMLHttpRequestPrivate["responseJsonLength"] == XMLHttpRequestPrivate["responseBuffer"].byteLength) {

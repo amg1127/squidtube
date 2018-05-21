@@ -53,7 +53,7 @@ function getPropertiesFromObject (returnValue, className, id) {
             console.log ("XHR-EVENT-READYSTATECHANGE");
             console.log ("|    className='" + _className + "'");
             console.log ("|    id='" + _id + "'");
-            console.log ("|    readyState=" + xhrObj.readyState);
+            console.log ("|    XHR.readyState=" + xhrObj.readyState);
         });
     }) (xhr, className, id);
 

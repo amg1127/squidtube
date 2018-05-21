@@ -86,9 +86,10 @@ function cli_server_sapi () {
     }
 
     if (! empty ($_GET['bigdata'])) {
-        for ($i = 0; $i < 256; $i++) {
+        $mb = 96;
+        for ($i = 0; $i < $mb; $i++) {
             echo (str_repeat (str_repeat (' ', 1023) . "\n", 1024));
-            usleep (30 * 1000000 / 256);
+            usleep (30 * 1000000 / $mb);
         }
     }
 
@@ -133,10 +134,6 @@ function cli_sapi () {
 
     // Some frequently-expected regular expressions...
     define ('STDERR_EXPECT_INVALID_COMPARISON_OPERATOR', '(INFO|DEBUG):\\s*\\[\\w+#\\d+\\]\\s*Unable\\s+to\\s+apply\\s+selected\\s+comparison\\s+operator\\s+');
-    define ('STDERR_EXPECT_XHR_EXCEPTION', 'DEBUG:\\s*(|\\[QJS\\]\s+)XHR-EXCEPTION\\s*\\(');
-    define ('STDERR_EXPECT_XHR_EVENT_LOADEND', 'DEBUG:\\s*(|\\[QJS\\]\s+)XHR-EVENT-LOADEND\\s*\\(');
-    define ('STDERR_EXPECT_XHR_STATUS_format', 'DEBUG:\\s*(|\\[QJS\\]\s+)\\|\\s+XHR\\.status\\s*=\\s*%03d\\s*\\(');
-
 
     // The project name is expected to be supplied by "qmake"...
     if (empty ($GLOBALS['argv'][1])) {
