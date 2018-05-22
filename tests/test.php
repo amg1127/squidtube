@@ -50,13 +50,18 @@ function cli_server_sapi () {
         $queryString .= "&pause=" . rawurlencode ($_GET['pause']);
     }
 
-    $redirects = 0;
+    $redirects = -1;
     if (! empty ($_GET['redirects'])) {
         $redirects = (int) $_GET['redirects'];
-        $queryString .= "&redirects=" . rawurlencode ($_GET['redirects']);
+        if ((--$redirects) >= 0) {
+            $queryString .= "&redirects=" . rawurlencode ('' . $redirects);
+        }
     }
 
     if (! empty ($_GET['expect'])) {
+        if (! is_array ($_GET['expect'])) {
+            $_GET['expect'] = array ($_GET['expect']);
+        }
         $expectCount = count ($_GET['expect']);
         for ($pos = 0; $pos < $expectCount; $pos++) {
             $pair = $_GET['expect'][$pos];
@@ -79,9 +84,12 @@ function cli_server_sapi () {
     }
 
     if ($response) {
-        header (substr ($response, 4), true, (int) (substr ($response, 0, 3)));
-        if (substr ($response, 0, 1) == '3' && $redirects > 0) {
-            header ("Location: " . $_SERVER["SCRIPT_FILENAME"] . "?" . substr ($queryString, 1), true);
+        $ch = substr ($response, 0, 1);
+        if ($ch != '3' || $redirects >= 0) {
+            header ($_SERVER["SERVER_PROTOCOL"] . ' ' . $response);
+        }
+        if ($ch == '3' && $redirects >= 0) {
+            header ("Location: " . $_SERVER["SCRIPT_NAME"] . "?" . substr ($queryString, 1), true);
         }
     }
 

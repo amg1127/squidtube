@@ -93,6 +93,7 @@ foreach ($httpStatusCodes as $httpStatus) {
 
 msg_log ("  +---+---+ XHR 'onloadstart', 'onprogress' and 'onload' events while downloading large data volume...");
 foreach ($httpStatusCodes as $httpStatus) {
+    break;
     msg_log ("  +---+---+---+ " . $httpStatus . "...");
     $answer = ($answer && stdinSend (randomChannel (), '/async/timeout/600000/', $jsonData, 'number.zero', '==', '0', array ('response' => ($httpStatus . ' XHR test'), 'bigdata' => 'true'), STDOUT_EXPECT_MATCH, array (
         xhrFact ('event-loadstart'),
@@ -124,6 +125,9 @@ $answer = ($answer && stdinSend (randomChannel (), '/async/timeout/10000/', $jso
     xhrProp ('loaded', '0'),
     xhrProp ('total', '0')
 )));
+// The test must sleep at this point because the the PHP server will not be
+// answering new requests until the 'sleep' call from the previous request ends.
+sleep (5);
 
 msg_log ("  +---+---+ XHR 'onabort' event...");
 $answer = ($answer && stdinSend (randomChannel (), '/async/abort/10000/', $jsonData, 'number.zero', '==', '0', array ('pause' => 15), STDOUT_EXPECT_NOHELPER, array (
@@ -136,6 +140,9 @@ $answer = ($answer && stdinSend (randomChannel (), '/async/abort/10000/', $jsonD
     xhrProp ('loaded', '0'),
     xhrProp ('total', '0')
 )));
+// The test must sleep at this point because the the PHP server will not be
+// answering new requests until the 'sleep' call from the previous request ends.
+sleep (5);
 
 msg_log ("  +---+---+ XHR 'onerror' event...");
 $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . '/async/', $jsonData, 'number.zero', '==', '0', array (), STDOUT_EXPECT_NOHELPER, array (
@@ -150,6 +157,27 @@ $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . 
 )));
 
 msg_log ("  +---+---+ HTTP status 301 handling...");
+$maxRedirects = 20;
+$expectedMessages = array_fill (0, $maxRedirects, 'DEBUG:\\s*\\[XHR#\\d+\\.\\d+\\]\\s*Performing\\s+a\\s+HTTP\\s+GET\\s+request\\s+against\\s+');
+array_unshift ($expectedMessages,
+    xhrFact ('event-readystatechange'),
+    xhrProp ('XHR.readyState', '1')
+);
+array_push ($expectedMessages,
+    xhrProp ('XHR.readyState', '2'),
+    xhrFact ('event-readystatechange'),
+    xhrProp ('XHR.readyState', '3'),
+    xhrFact ('event-readystatechange'),
+    xhrProp ('XHR.readyState', '4'),
+    xhrFact ('event-load'),
+    xhrProp ('loaded', '\\d+'),
+    xhrProp ('total', '\\d+'),
+    xhrFact ('event-loadend'),
+    xhrProp ('loaded', '\\d+'),
+    xhrProp ('total', '\\d+'),
+    xhrProp ('XHR.status', '200')
+);
+$answer = ($answer && stdinSend (randomChannel (), '/async/', $jsonData, 'number.zero', '==', '0', array ('response' => '301 XHR Test', 'redirects' => $maxRedirects), STDOUT_EXPECT_MATCH, $expectedMessages));
 
 msg_log ("  +---+---+ HTTP status 302 handling...");
 

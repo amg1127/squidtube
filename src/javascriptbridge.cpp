@@ -52,7 +52,7 @@ const short int JavascriptNetworkRequest::status_DONE = 4;
 
 bool JavascriptNetworkRequest::getPrivateData (const QString& key, QJSValue& value) {
     if (this->getPrivateDataCallback1.isCallable ()) {
-        return (! JavascriptBridge::warnJsError ((*(this->jsEngine)), value = this->getPrivateDataCallback1.call (QJSValueList() << key), QByteArray("[XHR#") + QByteArray::number (this->networkRequestId) + "] Internal error while getting XMLHttpRequestPrivate." + key.toUtf8() + "!"));
+        return (! JavascriptBridge::warnJsError ((*(this->jsEngine)), value = this->getPrivateDataCallback1.call (QJSValueList() << key), QByteArray("[XHR#") + QByteArray::number (this->networkRequestId) + "." + QByteArray::number(this->maxRedirects) + "] Internal error while getting XMLHttpRequestPrivate." + key.toUtf8() + "!"));
     } else {
         return (false);
     }
@@ -60,7 +60,7 @@ bool JavascriptNetworkRequest::getPrivateData (const QString& key, QJSValue& val
 
 bool JavascriptNetworkRequest::setPrivateData (const QString& key, const QJSValue& value) {
     if (this->setPrivateDataCallback1.isCallable ()) {
-        return (! JavascriptBridge::warnJsError ((*(this->jsEngine)), this->setPrivateDataCallback1.call (QJSValueList() << key << value), QByteArray("[XHR#") + QByteArray::number (this->networkRequestId) + "] Internal error while setting XMLHttpRequestPrivate." + key.toUtf8() + "!"));
+        return (! JavascriptBridge::warnJsError ((*(this->jsEngine)), this->setPrivateDataCallback1.call (QJSValueList() << key << value), QByteArray("[XHR#") + QByteArray::number (this->networkRequestId) + "." + QByteArray::number(this->maxRedirects) + "] Internal error while setting XMLHttpRequestPrivate." + key.toUtf8() + "!"));
     } else {
         return (false);
     }
@@ -68,7 +68,7 @@ bool JavascriptNetworkRequest::setPrivateData (const QString& key, const QJSValu
 
 bool JavascriptNetworkRequest::getPrivateData (const QString& key, const QString& subKey, QJSValue& value) {
     if (this->getPrivateDataCallback2.isCallable ()) {
-        return (! JavascriptBridge::warnJsError ((*(this->jsEngine)), value = this->getPrivateDataCallback2.call (QJSValueList() << key << subKey), QByteArray("[XHR#") + QByteArray::number (this->networkRequestId) + "] Internal error while getting XMLHttpRequestPrivate." + key.toUtf8() + "." + subKey.toUtf8() + "!"));
+        return (! JavascriptBridge::warnJsError ((*(this->jsEngine)), value = this->getPrivateDataCallback2.call (QJSValueList() << key << subKey), QByteArray("[XHR#") + QByteArray::number (this->networkRequestId) + "." + QByteArray::number(this->maxRedirects) + "] Internal error while getting XMLHttpRequestPrivate." + key.toUtf8() + "." + subKey.toUtf8() + "!"));
     } else {
         return (false);
     }
@@ -76,7 +76,7 @@ bool JavascriptNetworkRequest::getPrivateData (const QString& key, const QString
 
 bool JavascriptNetworkRequest::setPrivateData (const QString& key, const QString& subKey, const QJSValue& value) {
     if (this->setPrivateDataCallback2.isCallable ()) {
-        return (! JavascriptBridge::warnJsError ((*(this->jsEngine)), this->setPrivateDataCallback2.call (QJSValueList() << key << subKey << value), QByteArray("[XHR#") + QByteArray::number (this->networkRequestId) + "] Internal error while setting XMLHttpRequestPrivate." + key.toUtf8() + "." + subKey.toUtf8() + "!"));
+        return (! JavascriptBridge::warnJsError ((*(this->jsEngine)), this->setPrivateDataCallback2.call (QJSValueList() << key << subKey << value), QByteArray("[XHR#") + QByteArray::number (this->networkRequestId) + "." + QByteArray::number(this->maxRedirects) + "] Internal error while setting XMLHttpRequestPrivate." + key.toUtf8() + "." + subKey.toUtf8() + "!"));
     } else {
         return (false);
     }
@@ -98,6 +98,7 @@ void JavascriptNetworkRequest::cancelRequest (bool emitNetworkRequestFinished) {
          *
          */
         QCoreApplication::processEvents ();
+        this->networkReply->close ();
         this->networkReply->deleteLater ();
         this->networkReply = Q_NULLPTR;
     }
@@ -112,7 +113,7 @@ void JavascriptNetworkRequest::cancelRequest (bool emitNetworkRequestFinished) {
     }
 }
 
-void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkManager) {
+void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkManager, bool invokeLoadStart) {
     this->cancelRequest ();
     QJSValue _requestMethod;
     QJSValue _requestUrl;
@@ -181,10 +182,10 @@ void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkMan
             if (! this->requestMethod.isEmpty()) {
                 this->requestBodyBuffer.setData (JavascriptBridge::ArrayBuffer2QByteArray ((*(this->jsEngine)), _requestBuffer));
                 if (! this->requestBodyBuffer.open (QIODevice::ReadOnly)) {
-                    qCritical ("[XHR#%u] Internal error while allocating request body buffer: %s", this->networkRequestId, this->requestBodyBuffer.errorString().toLatin1().constData());
+                    qCritical ("[XHR#%u.%u] Internal error while allocating request body buffer: %s", this->networkRequestId, this->maxRedirects, this->requestBodyBuffer.errorString().toLatin1().constData());
                 }
                 if (! this->responseBodyBuffer.open (QIODevice::WriteOnly | QIODevice::Truncate)) {
-                    qCritical ("[XHR#%u] Internal error while allocating response body buffer: %s", this->networkRequestId, this->responseBodyBuffer.errorString().toLatin1().constData());
+                    qCritical ("[XHR#%u.%u] Internal error while allocating response body buffer: %s", this->networkRequestId, this->maxRedirects, this->responseBodyBuffer.errorString().toLatin1().constData());
                 }
                 bool uploadCompleteFlagBool = _uploadCompleteFlag.toBool();
                 qint64 requestBodySize = this->requestBodyBuffer.size();
@@ -193,18 +194,20 @@ void JavascriptNetworkRequest::fulfillRequest (QNetworkAccessManager& networkMan
                         networkRequest.setRawHeader ("content-length", QString::number(requestBodySize).toLocal8Bit());
                     }
                 }
-                this->fireProgressEvent (false, QStringLiteral("onloadstart"), 0, 0);
-                if (! uploadCompleteFlagBool) {
-                    this->fireProgressEvent (true, QStringLiteral("onloadstart"), 0, requestBodySize);
-                    QJSValue state, sendFlag;
-                    bool fetchedState = (this->getPrivateData (QStringLiteral("state"), state) && this->getPrivateData (QStringLiteral("sendFlag"), sendFlag));
-                    if ((! fetchedState) || state.toInt() != JavascriptNetworkRequest::status_OPENED || (! sendFlag.toBool())) {
-                        this->cancelRequest (true);
-                        return;
+                if (invokeLoadStart) {
+                    this->fireProgressEvent (false, QStringLiteral("onloadstart"), 0, 0);
+                    if (! uploadCompleteFlagBool) {
+                        this->fireProgressEvent (true, QStringLiteral("onloadstart"), 0, requestBodySize);
+                        QJSValue state, sendFlag;
+                        bool fetchedState = (this->getPrivateData (QStringLiteral("state"), state) && this->getPrivateData (QStringLiteral("sendFlag"), sendFlag));
+                        if ((! fetchedState) || state.toInt() != JavascriptNetworkRequest::status_OPENED || (! sendFlag.toBool())) {
+                            this->cancelRequest (true);
+                            return;
+                        }
                     }
                 }
                 int msec = _requestTimeout.toInt ();
-                qDebug ("[XHR#%u] Performing a HTTP %s request against '%s'...", this->networkRequestId, this->requestMethod.toLatin1().constData(), url.toDisplayString(QUrl::PrettyDecoded | QUrl::RemoveUserInfo | QUrl::RemoveQuery).toLatin1().constData());
+                qDebug ("[XHR#%u.%u] Performing a HTTP %s request against '%s'...", this->networkRequestId, this->maxRedirects, this->requestMethod.toLatin1().constData(), url.toDisplayString(QUrl::PrettyDecoded | QUrl::RemoveUserInfo | QUrl::RemoveQuery).toLatin1().constData());
                 this->downloadStarted = false;
                 this->responseStatus = 0;
                 this->networkReply = networkManager.sendCustomRequest (networkRequest, this->requestMethod.toLocal8Bit(), &(this->requestBodyBuffer));
@@ -254,7 +257,7 @@ void JavascriptNetworkRequest::fireProgressEvent (QJSValue& callback, qint64 tra
                 progressEvent.setProperty (QStringLiteral("loaded"), static_cast<uint> (transmitted));
                 progressEvent.setProperty (QStringLiteral("total"), total);
                 progressEvent.setProperty (QStringLiteral("lengthComputable"), static_cast<bool> (total));
-                JavascriptBridge::warnJsError ((*(this->jsEngine)), callback.callWithInstance (this->xmlHttpRequestObject, QJSValueList() << progressEvent), QByteArray("[XHR#") + QByteArray::number (this->networkRequestId) + "] Uncaught exception received while firing a ProgressEvent!");
+                JavascriptBridge::warnJsError ((*(this->jsEngine)), callback.callWithInstance (this->xmlHttpRequestObject, QJSValueList() << progressEvent), QByteArray("[XHR#") + QByteArray::number (this->networkRequestId) + "." + QByteArray::number(this->maxRedirects) + "] Uncaught exception received while firing a ProgressEvent!");
             }
         }
     }
@@ -266,7 +269,7 @@ void JavascriptNetworkRequest::fireEvent (const QString& callback) {
             QJSValue _networkRequestId;
             if (this->getPrivateData (QStringLiteral("requestId"), _networkRequestId)) {
                 if (_networkRequestId.toUInt() == this->networkRequestId) {
-                    JavascriptBridge::warnJsError ((*(this->jsEngine)), this->xmlHttpRequestObject.property(callback).callWithInstance (this->xmlHttpRequestObject), QByteArray("[XHR#") + QByteArray::number(this->networkRequestId) + "] Uncaught exception received while firing the '" + callback.toUtf8() + "' event!");
+                    JavascriptBridge::warnJsError ((*(this->jsEngine)), this->xmlHttpRequestObject.property(callback).callWithInstance (this->xmlHttpRequestObject), QByteArray("[XHR#") + QByteArray::number(this->networkRequestId) + "." + QByteArray::number(this->maxRedirects) + "] Uncaught exception received while firing the '" + callback.toUtf8() + "' event!");
                 }
             }
         } else {
@@ -348,7 +351,7 @@ void JavascriptNetworkRequest::networkReplyFinished () {
         this->responseBodyBuffer.close ();
         if (hasHttpError) {
             QNetworkReply::NetworkError networkError = this->networkReply->error ();
-            qInfo ("[XHR#%u] Network request finished unexpectedly: %d: %s", this->networkRequestId, networkError, this->networkReply->errorString().toLatin1().constData());
+            qInfo ("[XHR#%u.%u] Network request finished unexpectedly: %d: %s", this->networkRequestId, this->maxRedirects, networkError, this->networkReply->errorString().toLatin1().constData());
             QJSValue sendFlag;
             if (this->getPrivateData (QStringLiteral("sendFlag"), sendFlag)) {
                 if (! sendFlag.toBool ()) {
@@ -419,12 +422,12 @@ void JavascriptNetworkRequest::networkReplyFinished () {
         }
         QString location (QString::fromUtf8 (this->networkReply->rawHeader ("location")));
         if (location.isEmpty()) {
-            qInfo ("[XHR#%u] Server replied HTTP status '%d %s' and did not send a 'Location:' header. I will fetch the same URL again!", this->networkRequestId, this->responseStatus, this->networkReply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toByteArray().constData());
+            qInfo ("[XHR#%u.%u] Server replied HTTP status '%d %s' and did not send a 'Location:' header. I will fetch the same URL again!", this->networkRequestId, this->maxRedirects, this->responseStatus, this->networkReply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toByteArray().constData());
         } else {
             this->setPrivateData (QStringLiteral("requestUrl"), this->networkReply->url().resolved(location).toString());
         }
         this->maxRedirects--;
-        this->fulfillRequest (*(this->networkReply->manager ()));
+        this->fulfillRequest ((*(this->networkReply->manager ())), false);
     }
 }
 
@@ -468,7 +471,7 @@ void JavascriptNetworkRequest::start (QNetworkAccessManager& networkManager, uns
     this->responseStatus = 0;
     this->downloadStarted = false;
     if (this->setPrivateData (QStringLiteral("requestId"), _networkRequestId)) {
-        this->fulfillRequest (networkManager);
+        this->fulfillRequest (networkManager, true);
     } else {
         this->cancelRequest (true);
     }

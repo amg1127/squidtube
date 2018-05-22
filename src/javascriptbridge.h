@@ -72,7 +72,7 @@ private:
     bool getPrivateData (const QString& key, const QString& subKey, QJSValue& value);
     bool setPrivateData (const QString& key, const QString& subKey, const QJSValue& value);
     void cancelRequest (bool emitNetworkRequestFinished = false);
-    void fulfillRequest (QNetworkAccessManager& networkManager);
+    void fulfillRequest (QNetworkAccessManager& networkManager, bool invokeLoadStart);
     void fireProgressEvent (bool isUpload, const QString& callback, qint64 transmitted, qint64 length);
     void fireProgressEvent (QJSValue& callback, qint64 transmitted, qint64 length);
     void fireEvent (const QString& callback);
