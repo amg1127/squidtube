@@ -156,36 +156,40 @@ $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . 
     xhrProp ('total', '0')
 )));
 
-msg_log ("  +---+---+ HTTP status 301 handling...");
 $maxRedirects = 20;
-$expectedMessages = array_fill (0, $maxRedirects, 'DEBUG:\\s*\\[XHR#\\d+\\.\\d+\\]\\s*Performing\\s+a\\s+HTTP\\s+GET\\s+request\\s+against\\s+');
-array_unshift ($expectedMessages,
-    xhrFact ('event-readystatechange'),
-    xhrProp ('XHR.readyState', '1')
-);
-array_push ($expectedMessages,
-    xhrProp ('XHR.readyState', '2'),
-    xhrFact ('event-readystatechange'),
-    xhrProp ('XHR.readyState', '3'),
-    xhrFact ('event-readystatechange'),
-    xhrProp ('XHR.readyState', '4'),
-    xhrFact ('event-load'),
-    xhrProp ('loaded', '\\d+'),
-    xhrProp ('total', '\\d+'),
-    xhrFact ('event-loadend'),
-    xhrProp ('loaded', '\\d+'),
-    xhrProp ('total', '\\d+'),
-    xhrProp ('XHR.status', '200')
-);
-$answer = ($answer && stdinSend (randomChannel (), '/async/', $jsonData, 'number.zero', '==', '0', array ('response' => '301 XHR Test', 'redirects' => $maxRedirects), STDOUT_EXPECT_MATCH, $expectedMessages));
+$excess = 5;
+$expectedMessages = array ();
+foreach (array ($maxRedirects, $maxRedirects + $excess) as $pos) {
+    $expectedMessages[$pos] = array_fill (0, $maxRedirects, 'DEBUG:\\s*\\[XHR#\\d+\\.\\d+\\]\\s*Performing\\s+a\\s+HTTP\\s+GET\\s+request\\s+against\\s+');
+    array_unshift ($expectedMessages[$pos],
+        xhrFact ('event-readystatechange'),
+        xhrProp ('XHR.readyState', '1')
+    );
+    array_push ($expectedMessages[$pos],
+        xhrProp ('XHR.readyState', '2'),
+        xhrFact ('event-readystatechange'),
+        xhrProp ('XHR.readyState', '3'),
+        xhrFact ('event-readystatechange'),
+        xhrProp ('XHR.readyState', '4'),
+        xhrFact ('event-load'),
+        xhrProp ('loaded', '\\d+'),
+        xhrProp ('total', '\\d+'),
+        xhrFact ('event-loadend'),
+        xhrProp ('loaded', '\\d+'),
+        xhrProp ('total', '\\d+'),
+        xhrProp ('XHR.status', '200')
+    );
+}
+array_splice ($expectedMessages[$maxRedirects + $excess], 3, 0, array ($expectedMessages[$maxRedirects + $excess][3]));
 
-msg_log ("  +---+---+ HTTP status 302 handling...");
+foreach (array ('301', '307', '308', '302', '303') as $redirectCode) {
+    msg_log ("  +---+---+ HTTP status " . $redirectCode . " handling...");
 
-msg_log ("  +---+---+ HTTP status 303 handling...");
+    $answer = ($answer && stdinSend (randomChannel (), '/async/', $jsonData, 'number.zero', '==', '0', array ('response' => ($redirectCode . ' XHR Test'), 'redirects' => $maxRedirects), STDOUT_EXPECT_MATCH, $expectedMessages[$maxRedirects]));
 
-msg_log ("  +---+---+ HTTP status 307 handling...");
-
-msg_log ("  +---+---+ HTTP status 308 handling...");
+    array_splice ($expectedMessages[$maxRedirects + $excess], -1, 1, array (xhrProp ('XHR.status', $redirectCode)));
+    $answer = ($answer && stdinSend (randomChannel (), '/async/', $jsonData, 'number.zero', '==', '0', array ('response' => ($redirectCode . ' XHR Test'), 'redirects' => ($maxRedirects + $excess)), STDOUT_EXPECT_MATCH, $expectedMessages[$maxRedirects + $excess]));
+}
 
 ##################################################################
 

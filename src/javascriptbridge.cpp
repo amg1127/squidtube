@@ -439,9 +439,6 @@ JavascriptNetworkRequest::JavascriptNetworkRequest (QJSEngine& _jsEngine, QObjec
     QObject (_parent),
     jsEngine (&_jsEngine),
     networkReply (Q_NULLPTR) {
-    if (this->jsEngine == Q_NULLPTR) {
-        qFatal ("JavascriptBridge object must be bound to a QJSEngine! Invoke 'QJSEngine::newQObject();'!");
-    }
     this->timeoutTimer.setSingleShot (true);
     QObject::connect (&(this->timeoutTimer), &QTimer::timeout, this, &JavascriptNetworkRequest::timeoutTimerTimeout);
 }
@@ -621,6 +618,7 @@ JavascriptBridge::JavascriptBridge (QJSEngine& _jsEngine, const QString& _reques
     consoleObj.setProperty (QStringLiteral("info"), this->myself.property (QStringLiteral("console_info")));
     consoleObj.setProperty (QStringLiteral("warn"), this->myself.property (QStringLiteral("console_warn")));
     _jsEngine.globalObject().setProperty (QStringLiteral("console"), consoleObj);
+    _jsEngine.globalObject().setProperty (QStringLiteral("print"), this->myself.property (QStringLiteral("console_log")));
  #endif
     // Interface for data conversion to and from Unicode
     // My XMLHttpRequest implementation need it
