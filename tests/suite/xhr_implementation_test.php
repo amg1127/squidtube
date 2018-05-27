@@ -196,7 +196,9 @@ foreach (array ('301', '307', '308', '302', '303') as $redirectCode) {
 msg_log ("  +---+ Testing XHR implementation with body upload:");
 
 msg_log ("  +---+---+ Synchronous mode for a successful request...");
-// TODO: test HTTP codes 200, 203, 403, 404, 500 and 503
+foreach ($httpStatusCodes as $httpStatus) {
+    $answer = ($answer && stdinSend (randomChannel (), '/sync/', $jsonData, 'number.zero', '==', '0', array ('response' => ($httpStatus . ' XHR test')), STDOUT_EXPECT_MATCH, array (xhrFact ('event-loadend'), xhrProp ('XHR.status', $httpStatus))));
+}
 
 msg_log ("  +---+---+ Synchronous mode for a failed request...");
 
