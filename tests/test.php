@@ -29,7 +29,7 @@ function cli_server_sapi () {
     *  it sends a redirect response to a constructed URL with 'redirects=' variable decremented by 1
     *
     * 'expect' => expects an array of "key=value" pairs. If present, the script tests
-    *  if $_POST['key'] == 'value' and returns a HTTP 500 Server Error if the test does not succeed
+    *  if $_POST['key'] == 'value' and returns a HTTP 500 Server Error and an empty body if the test does not succeed
     *
     * 'mirror' => response body that is going to be sent
     *
@@ -58,6 +58,7 @@ function cli_server_sapi () {
         }
     }
 
+    $expectSucceeded = true;
     if (! empty ($_GET['expect'])) {
         if (! is_array ($_GET['expect'])) {
             $_GET['expect'] = array ($_GET['expect']);
@@ -75,6 +76,7 @@ function cli_server_sapi () {
 
             if (empty($_POST[$key]) || ($_POST[$key] != $value)) {
                 $response = '500 Server Error';
+                $expectSucceeded = false;
             }
         }
     }
@@ -103,10 +105,15 @@ function cli_server_sapi () {
         }
     }
 
-    if (empty ($_GET['mirror'])) {
-        echo ("{}\n");
+    if ($expectSucceeded) {
+        if (empty ($_GET['mirror'])) {
+            echo ("{}\n");
+        } else {
+            echo ($_GET['mirror'] . "\n");
+        }
     } else {
-        echo ($_GET['mirror'] . "\n");
+        # TODO: a HTTP 500 code without body triggers a QNetworkReply bug: an 'uploadProgress()' event is being fired instead of 'downloadProgress()'
+        // echo (' ');
     }
 
     return (true);

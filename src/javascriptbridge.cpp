@@ -285,6 +285,7 @@ void JavascriptNetworkRequest::networkReplyUploadProgress (qint64 bytesSent, qin
             this->setPrivateData (QStringLiteral("uploadCompleteFlag"), true);
             this->fireProgressEvent (true, QStringLiteral("onload"), bytesSent, bytesTotal);
             this->fireProgressEvent (true, QStringLiteral("onloadend"), bytesSent, bytesTotal);
+            QObject::disconnect (this->networkReply, &QNetworkReply::uploadProgress, this, &JavascriptNetworkRequest::networkReplyUploadProgress);
         }
     }
 }
