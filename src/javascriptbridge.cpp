@@ -320,12 +320,10 @@ void JavascriptNetworkRequest::networkReplyDownloadProgress (qint64 bytesReceive
                     return;
                 }
             }
-            if (bytesReceived > 0 || bytesTotal > 0) {
-                this->setPrivateData (QStringLiteral("state"), JavascriptNetworkRequest::status_LOADING);
-            }
+            this->setPrivateData (QStringLiteral("state"), JavascriptNetworkRequest::status_LOADING);
         }
         this->responseBodyBuffer.write (this->networkReply->readAll ());
-        if (bytesReceived > 0 || bytesTotal > 0) {
+        if (bytesReceived > 0 || bytesTotal >= 0) {
             this->fireEvent (QStringLiteral("onreadystatechange"));
             this->fireProgressEvent (false, QStringLiteral("onprogress"), bytesReceived, bytesTotal);
         }

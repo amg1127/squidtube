@@ -130,9 +130,10 @@ foreach (array ('without body' => false, 'with body' => true) as $testType => $b
     }
 
     msg_log ("  +---+---+ XHR 'onloadstart', 'onprogress' and 'onload' events while downloading large data volume...");
+    $channel = randomChannel ();
     foreach ($httpStatusCodes as $httpStatus) {
         msg_log ("  +---+---+---+ " . $httpStatus . "...");
-        $answer = ($answer && stdinSend (randomChannel (), '/async/timeout/600000/onloadstart/onprogress/onload/', $jsonData, 'number.zero', '==', '0', array ('response' => ($httpStatus . ' XHR test'), 'bigdata' => 'true', 'expect' => $expectArray), STDOUT_EXPECT_MATCH, array_merge (
+        $answer = ($answer && stdinSend ($channel, '/async/timeout/600000/onloadstart/onprogress/onload/', $jsonData, 'number.zero', '==', '0', array ('response' => ($httpStatus . ' XHR test'), 'bigdata' => 'true', 'expect' => $expectArray), STDOUT_EXPECT_MATCH, array_merge (
             array (
                 xhrFact ('event-loadstart'),
                 xhrProp ('loaded', '0'),

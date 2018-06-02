@@ -111,9 +111,6 @@ function cli_server_sapi () {
         } else {
             echo ($_GET['mirror'] . "\n");
         }
-    } else {
-        # TODO: a HTTP 500 code without body triggers a QNetworkReply bug: an 'uploadProgress()' event is being fired instead of 'downloadProgress()'
-        // echo (' ');
     }
 
     return (true);
