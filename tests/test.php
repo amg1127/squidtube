@@ -98,7 +98,7 @@ function cli_server_sapi () {
     if (! empty ($_GET['bigdata'])) {
         # Under a 32-bit environment, sending 96 MB of data leads to
         # allocation of more than 4GB of memory, resulting in a 'std::bad_alloc' exception.
-        $mb = ((PHP_INT_MAX > 1e12) ? 96 : 16);
+        $mb = ((PHP_INT_MAX > 1e12) ? 96 : 8);
         for ($i = 0; $i < $mb; $i++) {
             echo (str_repeat (str_repeat (' ', 1023) . "\n", 1024));
             usleep (10 * 1000000 / $mb);
