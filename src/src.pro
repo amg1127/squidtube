@@ -82,6 +82,7 @@ DEFINES += APP_project_name=\"\\\"$${project_name}\\\"\" \
 
 # Install binaries
 target.path = $${install_bin_dir}
+INSTALLS += target
 
 # Install configuration files
 configfiles.path = $${install_etc_dir}
