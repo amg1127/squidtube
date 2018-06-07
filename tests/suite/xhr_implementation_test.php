@@ -18,11 +18,11 @@ $jsonData = array (
 $httpStatusCodes = array ('200', '203', '403', '404', '500', '503');
 
 function xhrFact ($eventName) {
-    return ('DEBUG:\\s*(|\\[QJS\\]\s+)XHR-' . strtoupper ($eventName) . '\\s*\\(');
+    return ('DEBUG:\\s*(|\\[QJS\\]\s+)XHR-' . strtoupper ($eventName) . '\\s*(|\\(.*)$');
 }
 
 function xhrProp ($propertyName, $propertyValue) {
-    return ('DEBUG:\\s*(|\\[QJS\\]\s+)\\|\\s+' . str_replace ('.', '\\.', $propertyName) . '\\s*=\\s*' . $propertyValue . '\\s*\\(');
+    return ('DEBUG:\\s*(|\\[QJS\\]\s+)\\|\\s+' . str_replace ('.', '\\.', $propertyName) . '\\s*=\\s*' . $propertyValue . '\\s*(|\\(.*)$');
 }
 
 ##################################################################
