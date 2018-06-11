@@ -150,10 +150,12 @@ void JobWorker::processObjectFromUrl (unsigned int _requestId, const QJSValue& a
                             squidRequest->data.mathMatchOperator,
                             squidRequest->data.caseSensitivity,
                             squidRequest->data.patternSyntax,
-                            squidRequest->data.invertMatch,
                             squidRequest->data.criteria,
                             objectData
                         );
+                        if (squidRequest->data.invertedMatch) {
+                            matchResult = (! matchResult);
+                        }
                         this->squidResponseOut (requestIdIterator, squidRequest, QStringLiteral("Cached data from the object with (className='%1', id='%2') %3 specified criteria").arg(request->object.className, request->object.id, ((matchResult) ? QStringLiteral("matches") : QStringLiteral("does not match"))), matchResult);
                     } else {
                         qFatal ("Unexpected code flow!");
@@ -261,10 +263,12 @@ void JobWorker::processPropertiesFromObject (unsigned int _requestId, const QJSV
                         squidRequest->data.mathMatchOperator,
                         squidRequest->data.caseSensitivity,
                         squidRequest->data.patternSyntax,
-                        squidRequest->data.invertMatch,
                         squidRequest->data.criteria,
                         objectData
                     );
+                    if (squidRequest->data.invertedMatch) {
+                        matchResult = (! matchResult);
+                    }
                     this->squidResponseOut (requestIdIterator, squidRequest, QStringLiteral("Retrieved data from the object with (className='%1', id='%2') %3 specified criteria").arg(request->object.className, request->object.id, ((matchResult) ? QStringLiteral("matches") : QStringLiteral("does not match"))), matchResult);
                 } else {
                     this->tryNextHelper (requestIdIterator);
@@ -309,7 +313,6 @@ bool JobWorker::processCriteria (
     const AppSquidMathMatchOperator& requestMathMatchOperator,
     const Qt::CaseSensitivity& requestCaseSensitivity,
     const QRegExp::PatternSyntax& requestPatternSyntax,
-    bool requestInvertMatch,
     const QStringList& requestCriteria,
     const QJsonDocument& jsonDocumentInformation) {
     bool answer;
@@ -341,11 +344,7 @@ bool JobWorker::processCriteria (
         qInfo ("[%s#%u] Unexpected JSON format while parsing '%s'.", requestHelperName.toLatin1().constData(), _requestId, requestPropertiesIterator->componentName.toLatin1().constData());
         answer = false;
     }
-    if (requestInvertMatch) {
-        return (! answer);
-    } else {
-        return (answer);
-    }
+    return (answer);
 }
 
 bool JobWorker::processCriteria (
@@ -677,7 +676,11 @@ void JobWorker::processIncomingRequest () {
                     this->startRetryTimer ();
                 } else {
                     QMap<unsigned int,AppJobRequest*>::iterator end(this->runningRequests.end());
-                    this->squidResponseOut (end, squidRequest, QStringLiteral("Unable to find a helper that can handle the requested URL"), false);
+                    if (squidRequest->data.invertedMatch) {
+                        this->squidResponseOut (end, squidRequest, QStringLiteral("Unable to find a helper that can handle the requested URL; sending a MATCH response as fallback"), true);
+                    } else {
+                        this->squidResponseOut (end, squidRequest, QStringLiteral("Unable to find a helper that can handle the requested URL; sending a NOMATCH response as fallback"), false);
+                    }
                 }
             } else {
                 qFatal ("Unexpected code flow!");

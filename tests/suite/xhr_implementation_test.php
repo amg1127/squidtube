@@ -41,7 +41,8 @@ foreach (array ('without body' => false, 'with body' => true) as $testType => $b
     }
 
     msg_log ("  +---+---+ Synchronous mode for a failed request...");
-    $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . '/sync/fail/', $jsonData, 'number.zero', '==', '0', array ('expect' => $expectArray), STDOUT_EXPECT_NOHELPER, xhrFact ('exception')));
+    $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . '/sync/fail/', $jsonData, 'number.zero', '==', '0', array ('expect' => $expectArray), STDOUT_EXPECT_NOHELPER_FALSE, xhrFact ('exception')));
+    $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . '/sync/fail/', $jsonData, 'number.zero', '! ==', '0', array ('expect' => $expectArray), STDOUT_EXPECT_NOHELPER_TRUE, xhrFact ('exception')));
 
     msg_log ("  +---+---+ XHR 'onreadystatechange' event for a successful request...");
     foreach ($httpStatusCodes as $httpStatus) {
@@ -58,7 +59,13 @@ foreach (array ('without body' => false, 'with body' => true) as $testType => $b
     }
 
     msg_log ("  +---+---+ XHR 'onreadystatechange' event for a failed request...");
-    $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . '/async/onreadystatechange/fail/', $jsonData, 'number.zero', '==', '0', array ('expect' => $expectArray), STDOUT_EXPECT_NOHELPER, array (
+    $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . '/async/onreadystatechange/fail/', $jsonData, 'number.zero', '==', '0', array ('expect' => $expectArray), STDOUT_EXPECT_NOHELPER_FALSE, array (
+        xhrFact ('event-readystatechange'),
+        xhrProp ('XHR.readyState', '1'),
+        xhrFact ('event-readystatechange'),
+        xhrProp ('XHR.readyState', '4')
+    )));
+    $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . '/async/onreadystatechange/fail/', $jsonData, 'number.zero', '! ==', '0', array ('expect' => $expectArray), STDOUT_EXPECT_NOHELPER_TRUE, array (
         xhrFact ('event-readystatechange'),
         xhrProp ('XHR.readyState', '1'),
         xhrFact ('event-readystatechange'),
@@ -84,7 +91,7 @@ foreach (array ('without body' => false, 'with body' => true) as $testType => $b
     }
 
     msg_log ("  +---+---+ XHR 'onloadend' event for a failed request...");
-    $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . '/async/onloadend/fail/', $jsonData, 'number.zero', '==', '0', array ('expect' => $expectArray), STDOUT_EXPECT_NOHELPER, array_merge (
+    $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . '/async/onloadend/fail/', $jsonData, 'number.zero', '==', '0', array ('expect' => $expectArray), STDOUT_EXPECT_NOHELPER_FALSE, array_merge (
         (
             ($bodyUploadFlag) ? array (
                 xhrFact ('event-upload-loadend'),
@@ -168,7 +175,7 @@ foreach (array ('without body' => false, 'with body' => true) as $testType => $b
     }
 
     msg_log ("  +---+---+ XHR 'ontimeout' event...");
-    $answer = ($answer && stdinSend (randomChannel (), '/async/timeout/10000/', $jsonData, 'number.zero', '==', '0', array ('pause' => 15, 'expect' => $expectArray), STDOUT_EXPECT_NOHELPER, array_merge (
+    $answer = ($answer && stdinSend (randomChannel (), '/async/timeout/10000/', $jsonData, 'number.zero', '==', '0', array ('pause' => 15, 'expect' => $expectArray), STDOUT_EXPECT_NOHELPER_FALSE, array_merge (
         (
             ($bodyUploadFlag) ? array (
                 xhrFact ('event-upload-loadstart'),
@@ -202,7 +209,7 @@ foreach (array ('without body' => false, 'with body' => true) as $testType => $b
     }
 
     msg_log ("  +---+---+ XHR 'onabort' event...");
-    $answer = ($answer && stdinSend (randomChannel (), '/async/abort/10000/', $jsonData, 'number.zero', '==', '0', array ('pause' => 15, 'expect' => $expectArray), STDOUT_EXPECT_NOHELPER, array_merge (
+    $answer = ($answer && stdinSend (randomChannel (), '/async/abort/10000/', $jsonData, 'number.zero', '==', '0', array ('pause' => 15, 'expect' => $expectArray), STDOUT_EXPECT_NOHELPER_FALSE, array_merge (
         (
             ($bodyUploadFlag) ? array (
                 xhrFact ('event-upload-loadstart'),
@@ -236,7 +243,7 @@ foreach (array ('without body' => false, 'with body' => true) as $testType => $b
     }
 
     msg_log ("  +---+---+ XHR 'onerror' event...");
-    $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . '/async/onerror/', $jsonData, 'number.zero', '==', '0', array ('expect' => $expectArray), STDOUT_EXPECT_NOHELPER, array_merge (
+    $answer = ($answer && stdinSend (randomChannel (), $GLOBALS['invalidAddress'] . '/async/onerror/', $jsonData, 'number.zero', '==', '0', array ('expect' => $expectArray), STDOUT_EXPECT_NOHELPER_FALSE, array_merge (
         array (
             xhrFact ('event-readystatechange'),
             xhrProp ('XHR.readyState', '4')
@@ -318,7 +325,7 @@ foreach (array ('without body' => false, 'with body' => true) as $testType => $b
 
         if ($bodyUploadFlag && $redirectMethodChange) {
 
-            $answer = ($answer && stdinSend (randomChannel (), '/async/redirectMethodChange/', $jsonData, 'number.zero', '==', '0', array ('response' => ($redirectCode . ' XHR Test'), 'redirects' => $maxRedirects, 'expect' => $expectArray), STDOUT_EXPECT_NOHELPER, $expectedMessages[2]));
+            $answer = ($answer && stdinSend (randomChannel (), '/async/redirectMethodChange/', $jsonData, 'number.zero', '==', '0', array ('response' => ($redirectCode . ' XHR Test'), 'redirects' => $maxRedirects, 'expect' => $expectArray), STDOUT_EXPECT_NOHELPER_FALSE, $expectedMessages[2]));
 
         } else if ($redirectCode == '300' || ($bodyUploadFlag && $redirectCode == '301')) {
 

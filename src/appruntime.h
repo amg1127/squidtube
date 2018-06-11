@@ -157,7 +157,7 @@ public:
     AppSquidMathMatchOperator mathMatchOperator;
     Qt::CaseSensitivity caseSensitivity;
     QRegExp::PatternSyntax patternSyntax;
-    bool invertMatch;
+    bool invertedMatch;
     QStringList criteria;
 };
 

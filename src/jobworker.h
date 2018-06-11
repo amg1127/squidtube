@@ -65,7 +65,6 @@ private:
         const AppSquidMathMatchOperator& requestMathMatchOperator,
         const Qt::CaseSensitivity& requestCaseSensitivity,
         const QRegExp::PatternSyntax& requestPatternSyntax,
-        bool requestInvertMatch,
         const QStringList& requestCriteria,
         const QJsonDocument& jsonDocumentInformation);
     static bool processCriteria (

@@ -57,7 +57,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
         request->data.mathMatchOperator = OperatorString;
         request->data.caseSensitivity = Qt::CaseSensitive;
         request->data.patternSyntax = QRegExp::RegExp;
-        request->data.invertMatch = false;
+        request->data.invertedMatch = false;
         // Evaluate and transform the property that the administrator wants to compare
         QStringList propertyItems (QUrl::fromPercentEncoding(request->data.criteria.takeFirst().toUtf8()).split(QStringLiteral("."), QString::KeepEmptyParts));
         // Dear supporter of the website https://regexr.com/ : thank you for your site. It helped me a lot!
@@ -123,7 +123,7 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
         // Will the match be negated?
         if (! request->data.criteria.isEmpty ()) {
             if (request->data.criteria[0] == QStringLiteral("!")) {
-                request->data.invertMatch = true;
+                request->data.invertedMatch = true;
                 request->data.criteria.removeFirst ();
             }
         }

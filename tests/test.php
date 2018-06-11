@@ -143,6 +143,8 @@ function cli_sapi () {
     define ('STDOUT_EXPECT_MATCH', 'MATCH');
     define ('STDOUT_EXPECT_NOMATCH', 'NOMATCH');
     define ('STDOUT_EXPECT_NOHELPER', 'NOHELPER');
+    define ('STDOUT_EXPECT_NOHELPER_FALSE', 'NOHELPER0');
+    define ('STDOUT_EXPECT_NOHELPER_TRUE', 'NOHELPER1');
     define ('STDOUT_EXPECT_ERROR', 'BH');
     define ('EXPECT_DEFAULT_TIMEOUT', 30);
 
@@ -431,6 +433,9 @@ function matchingTest ($channel, $urlPath, $jsonData, $testProperty, $testFlags,
         $invertedResult = STDOUT_EXPECT_NOMATCH;
     } else if ($expectedResult === STDOUT_EXPECT_NOMATCH) {
         $invertedResult = STDOUT_EXPECT_MATCH;
+    } else if ($expectedResult === STDOUT_EXPECT_NOHELPER) {
+        $expectedResult = STDOUT_EXPECT_NOHELPER_FALSE;
+        $invertedResult = STDOUT_EXPECT_NOHELPER_TRUE;
     }
     if (stdinSend ($channel, $urlPath, $jsonData, $testProperty, $testFlags, $testCriteria, $options, $expectedResult, $expectedMessages, $timeout) === false) {
         return (false);
@@ -648,7 +653,9 @@ function stdoutExpect ($what, $timeout = null) {
                 return ($matches[1]);
             } else if ($what == STDOUT_EXPECT_NOMATCH && $matches[3] == "ERR" && preg_match ('/^\\[[^\\]]+#\\d+\\]\\s+(Cached|Retrieved)\\s+data\\s+from\\s+.*\\)\\s+does\\s+not\\s+match\\s+specified\\s+criteria\\.?$/', $decodedAnswer)) {
                 return ($matches[1]);
-            } else if ($what == STDOUT_EXPECT_NOHELPER && $matches[3] == "ERR" && preg_match ('/^Unable\\s+to\\s+find\\s+a\\s+helper\\s+/', $decodedAnswer)) {
+            } else if ($what == STDOUT_EXPECT_NOHELPER_FALSE && $matches[3] == "ERR" && preg_match ('/^Unable\\s+to\\s+find\\s+a\\s+helper\\s+that\\s+can\\s+handle\\s+the\\s+requested\\s+URL\\s*;\\s+sending\\s+a\\s+NOMATCH\\s+response\\s+/', $decodedAnswer)) {
+                return ($matches[1]);
+            } else if ($what == STDOUT_EXPECT_NOHELPER_TRUE && $matches[3] == "OK" && preg_match ('/^Unable\\s+to\\s+find\\s+a\\s+helper\\s+that\\s+can\\s+handle\\s+the\\s+requested\\s+URL\\s*;\\s+sending\\s+a\\s+MATCH\\s+response\\s+/', $decodedAnswer)) {
                 return ($matches[1]);
             } else if ($what == STDOUT_EXPECT_ERROR && $matches[3] == "BH") {
                 return ($matches[1]);
@@ -671,12 +678,20 @@ function stderrExpectAnswer ($timeout = null) {
     return (stderrExpect('INFO:\\s*Channel\\s+#\\d*\\s+answered\\s*:\\s+', $timeout));
 }
 
-function stdoutExpectNoHelper ($timeout = null) {
+function stdoutExpectNoHelperFalse ($timeout = null) {
     if (empty ($timeout)) {
         $timeout = EXPECT_DEFAULT_TIMEOUT;
     }
-    return (stdoutExpect (STDOUT_EXPECT_NOHELPER, $timeout) !== false && stderrExpectAnswer ($timeout));
+    return (stdoutExpect (STDOUT_EXPECT_NOHELPER_FALSE, $timeout) !== false && stderrExpectAnswer ($timeout));
 }
+
+function stdoutExpectNoHelperTrue ($timeout = null) {
+    if (empty ($timeout)) {
+        $timeout = EXPECT_DEFAULT_TIMEOUT;
+    }
+    return (stdoutExpect (STDOUT_EXPECT_NOHELPER_TRUE, $timeout) !== false && stderrExpectAnswer ($timeout));
+}
+
 function stdoutExpectError ($timeout = null) {
     if (empty ($timeout)) {
         $timeout = EXPECT_DEFAULT_TIMEOUT;
