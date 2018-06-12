@@ -22,6 +22,10 @@ bool loadRuntimeVariables ();
 void unloadRuntimeVariables ();
 
 int main(int argc, char *argv[]) {
+    // This may sacrifice performance. I am interested in thread safety though.
+    // http://en.cppreference.com/w/cpp/io/ios_base/sync_with_stdio
+    std::ios::sync_with_stdio (true);
+
     qInstallMessageHandler (messageHandlerFunction);
 
     QCoreApplication::setApplicationName(QStringLiteral(APP_project_name));
