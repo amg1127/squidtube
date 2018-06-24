@@ -1,3 +1,22 @@
+/*
+ * squidtube - An external Squid ACL class helper that provides control over access to videos
+ * Copyright (C) 2018  Anderson M. Gomes
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 #include "appruntime.h"
 #include "appconfig.h"
 #include "jobdispatcher.h"
@@ -145,7 +164,14 @@ bool loadRuntimeVariables () {
     qDebug ("Parsing command line options...");
     QStringList arguments(QCoreApplication::arguments());
     QCommandLineParser optionsParser;
-    optionsParser.setApplicationDescription (QStringLiteral("An external Squid ACL class helper that provides control over access to videos (through own helpers).\nSee more information at: " APP_project_url));
+    optionsParser.setApplicationDescription (QStringLiteral(
+        "An external Squid ACL class helper that provides control over access to videos (through own helpers).\n"
+        "See more information at: " APP_project_url "\n\n"
+        "Copyright (C) 2018  Anderson M. Gomes\n"
+        "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\n"
+        "This is free software: you are free to change and redistribute it.\n"
+        "There is NO WARRANTY, to the extent permitted by law."
+    ));
     optionsParser.addOption (QCommandLineOption (QStringLiteral("config"), QStringLiteral("Path of the program configuration file."), QStringLiteral("config"), QStringLiteral(APP_install_etc_dir "/" APP_project_name ".conf")));
     for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
         optionsParser.addOption (QCommandLineOption (i->configSection + QStringLiteral(".") + i->configName, i->configDescription, i->configName, *(i->configValue)));
