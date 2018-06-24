@@ -82,7 +82,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 DEFINES += QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII QT_NO_CAST_FROM_BYTEARRAY
 
 # Defines the C++ standard
-QMAKE_CXXFLAGS += -std=c++11 -pedantic
+CONFIG += c++11
 
 ###########################
 # Make project variables available inside the C++ code
