@@ -78,47 +78,48 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
         request->data.patternSyntax = QRegExp::RegExp;
         request->data.invertedMatch = false;
         // Evaluate and transform the property that the administrator wants to compare
-        QStringList propertyItems (QUrl::fromPercentEncoding(request->data.criteria.takeFirst().toUtf8()).split(QStringLiteral("."), QString::KeepEmptyParts));
+        QString propertyItems (QUrl::fromPercentEncoding(request->data.criteria.takeFirst().toUtf8()) + QStringLiteral("."));
+        int propertyItemsLen (propertyItems.length ());
         // Dear supporter of the website https://regexr.com/ : thank you for your site. It helped me a lot!
-        static QRegExp objectPropertyMatch (QStringLiteral("(([A-Za-z_]\\w*)|\\[\"(\\S+)\"\\])"));
-        static QRegExp arrayPropertyMatch (QStringLiteral("([<\\[])(|(-?\\d+(|:-?\\d+))(,-?\\d+(|:-?\\d+))*)([\\]>])"));
+        static QRegExp propertyItemMatch (QStringLiteral("^("
+            /* Property name */
+            "(([A-Za-z_]\\w*)?)|"
+            /* Quoted property name */
+            "(\\[\"(([^\"\\\\]|\\\\.)*)\"\\])|"
+            /* Array members selection */
+            "([<\\[])(|(-?\\d+(|:-?\\d+))(,-?\\d+(|:-?\\d+))*)([\\]>])"
+        ")\\."));
 #ifndef QT_NO_DEBUG
         // A sanity check...
-        if (! objectPropertyMatch.isValid()) {
-            qFatal ("'objectPropertyMatch' regular expression did not compile: '%s'", objectPropertyMatch.errorString().toLocal8Bit().constData());
-        }
-        if (! arrayPropertyMatch.isValid()) {
-            qFatal ("'arrayPropertyMatch' regular expression did not compile: '%s'", arrayPropertyMatch.errorString().toLocal8Bit().constData());
+        if (! propertyItemMatch.isValid()) {
+            qFatal ("'propertyItemMatch' regular expression did not compile: '%s'", propertyItemMatch.errorString().toLocal8Bit().constData());
         }
 #endif
-        QStringList propertyCapturedItems;
-        for (QStringList::iterator token = propertyItems.begin(); token != propertyItems.end(); token++) {
-            if (objectPropertyMatch.exactMatch (*token)) {
-                propertyCapturedItems = objectPropertyMatch.capturedTexts ();
-                AppSquidPropertyMatch propertyMatch;
-                propertyMatch.matchType = MatchObject;
-                propertyMatch.componentName = propertyCapturedItems.value (2);
-                if (propertyMatch.componentName.isEmpty ()) {
-                    propertyMatch.componentName = QUrl::fromPercentEncoding(propertyCapturedItems.value(3).toLocal8Bit());
-                }
-                request->data.properties.append (propertyMatch);
-            } else if (arrayPropertyMatch.exactMatch (*token)) {
-                propertyCapturedItems = arrayPropertyMatch.capturedTexts ();
-                AppSquidPropertyMatch propertyMatch;
+        int pos = 0;
+        while (pos < propertyItemsLen) {
+            pos = propertyItemMatch.indexIn (propertyItems, pos, QRegExp::CaretAtOffset);
+            if (pos < 0) {
+                this->writeAnswerLine (requestChannel, QStringLiteral("ACL has an invalid property syntax"), true, false);
+                return;
+            }
+            QStringList propertyCapturedItems (propertyItemMatch.capturedTexts ());
+            pos += propertyItemMatch.matchedLength ();
+            AppSquidPropertyMatch propertyMatch;
+            if (! propertyCapturedItems.value(7).isEmpty()) {
                 propertyMatch.matchType = MatchArray;
-                propertyMatch.componentName = propertyCapturedItems.value(1) + propertyCapturedItems.value(7);
+                propertyMatch.componentName = propertyCapturedItems.value(7) + propertyCapturedItems.value(13);
                 if (propertyMatch.componentName == QStringLiteral("<>")) {
                     propertyMatch.matchQuantity = MatchAll;
                 } else if (propertyMatch.componentName == QStringLiteral("[]")) {
                     propertyMatch.matchQuantity = MatchAny;
                 } else {
-                    this->writeAnswerLine (requestChannel, QStringLiteral("ACL interval evaluation specification is not valid"), true, false);
+                    this->writeAnswerLine (requestChannel, QStringLiteral("ACL property specification contains an indeterminate truth function"), true, false);
                     return;
                 }
-                if (propertyCapturedItems.value(2).isEmpty ()) {
+                if (propertyCapturedItems.value(8).isEmpty ()) {
                     propertyMatch.matchIntervals.append (QPair<int,int> (0, -1));
                 } else {
-                    QStringList matchIntervalSpecs = propertyCapturedItems.value(2).split(QStringLiteral(","));
+                    QStringList matchIntervalSpecs = propertyCapturedItems.value(8).split(QStringLiteral(","));
                     for (QStringList::const_iterator matchIntervalSpec = matchIntervalSpecs.constBegin(); matchIntervalSpec != matchIntervalSpecs.constEnd(); matchIntervalSpec++) {
                         QStringList matchIntervalPair = matchIntervalSpec->split(QStringLiteral(":"));
                         if (matchIntervalPair.count() == 2) {
@@ -130,9 +131,14 @@ void JobDispatcher::squidRequest (const int requestChannelNumber, const QString&
                     }
                 }
                 request->data.properties.append (propertyMatch);
+            } else if (! propertyCapturedItems.value(4).isEmpty()) {
+                propertyMatch.matchType = MatchObject;
+                propertyMatch.componentName = propertyCapturedItems.value(5).replace(QRegExp(QStringLiteral("\\(.)")), QStringLiteral("\\1"));
+                request->data.properties.append (propertyMatch);
             } else {
-                this->writeAnswerLine (requestChannel, QStringLiteral("ACL has an invalid property syntax"), true, false);
-                return;
+                propertyMatch.matchType = MatchObject;
+                propertyMatch.componentName = propertyCapturedItems.value(2);
+                request->data.properties.append (propertyMatch);
             }
         }
         // Decode the tokens

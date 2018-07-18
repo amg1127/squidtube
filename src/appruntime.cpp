@@ -31,7 +31,7 @@ QString AppRuntime::helpers(QStringLiteral(""));
 QString AppRuntime::positiveTTL(QStringLiteral("2592000"));
 QString AppRuntime::negativeTTL(QStringLiteral("600"));
 QString AppRuntime::squidProtocol(QStringLiteral("3.4"));
-QString AppRuntime::dbDriver(QStringLiteral("QSQLITE"));
+QString AppRuntime::dbDriver(QStringLiteral("QSQLITE3"));
 QString AppRuntime::dbHost(QStringLiteral(""));
 QString AppRuntime::dbPort(QStringLiteral("0"));
 QString AppRuntime::dbUser(QStringLiteral(""));

@@ -1,3 +1,5 @@
+//////////////////////////////////////////////////////////////////
+
 /*
  * squidtube - An external Squid ACL class helper that provides control over access to videos
  * Copyright (C) 2018  Anderson M. Gomes
@@ -17,6 +19,8 @@
  *
  */
 
+//////////////////////////////////////////////////////////////////
+
 // API reference: https://www.flickr.com/services/api/
 
 // Required global variables
@@ -30,7 +34,6 @@ if (! api_key) {
 // Optional global variables
 
 // Internal variables
-
 // Reference: https://www.flickr.com/services/api/misc.urls.html
 var photoSourceURLs = /^https?:\/\/[^\.\/]+\.static\.?flickr\.com(|:[0-9]+)\/+[^\/?]+\/+([^\/_?]+)(_[^\/_?])+\.\w+(|\?.*)$/i;
 var webPageURLs = /^https?:\/\/(|www\.)flickr\.com(:[0-9]+)?\/+(people|photos)\/+([^\/?]+)(|\/+(sets|[^\/?]+)(|\/+([^\/?]+)(|\/+[^?]*)))(|\?.*)$/i;
@@ -177,3 +180,5 @@ function flickrFixJSONFormatting (jsonObject) {
     }
     return (jsonObject);
 }
+
+//////////////////////////////////////////////////////////////////

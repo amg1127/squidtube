@@ -27,7 +27,7 @@ QList<AppConfigValidSetting> AppConfig::AppConfigValidSettings = QList<AppConfig
     << AppConfigValidSetting(QStringLiteral("main"), QStringLiteral("loglevel"), QStringLiteral("Logging level used by the program. One of: DEBUG, INFO, WARNING, ERROR"),
         QRegExp(QStringLiteral("(DEBUG|INFO|WARNING|ERROR)")), AppRuntime::loglevel)
 
-    << AppConfigValidSetting(QStringLiteral("main"), QStringLiteral("helpers"), QStringLiteral("Comma-separated list of helpers that the program will load from the architecture independent data directory."),
+    << AppConfigValidSetting(QStringLiteral("main"), QStringLiteral("helpers"), QStringLiteral("Comma-separated list of helpers that the program will load from either the architecture-independent data directory or from the configuration directory. The latter overrides the former."),
         QRegExp(QStringLiteral("\\s*([a-zA-Z_]\\w*(\\s*,\\s*[a-zA-Z_]\\w*)*)?\\s*")), AppRuntime::helpers)
 
     << AppConfigValidSetting(QStringLiteral("main"), QStringLiteral("positiveTTL"), QStringLiteral("Video information collected from helpers are saved into the application database. This value specifies how many seconds the information is valid for."),
@@ -36,11 +36,11 @@ QList<AppConfigValidSetting> AppConfig::AppConfigValidSettings = QList<AppConfig
     << AppConfigValidSetting(QStringLiteral("main"), QStringLiteral("negativeTTL"), QStringLiteral("When a failure is registered while collecting video information from helpers, this value specifies how many seconds that failure registry is valid for."),
         QRegExp(QStringLiteral("\\d+")), AppRuntime::negativeTTL)
 
-    << AppConfigValidSetting(QStringLiteral("main"), QStringLiteral("protocol"), QStringLiteral("Sets the protocol compatibility mode to use while retrieving and answering request from Squid. Set '3.4' if using Squid >= 3.4 or '3.0' if using Squid >= 3.0 and < 3.4. Squid 2.x is not supported."),
+    << AppConfigValidSetting(QStringLiteral("main"), QStringLiteral("protocol"), QStringLiteral("Sets the protocol compatibility mode to use while retrieving and answering requests from Squid. Set it to '3.4' if using Squid >= 3.4 or '3.0' if using Squid >= 3.0 and < 3.4. Squid 2.x is not supported."),
         QRegExp(QStringLiteral("(3\\.0|3\\.4)")), AppRuntime::squidProtocol)
 
     << AppConfigValidSetting(QStringLiteral("db"), QStringLiteral("driver"), QStringLiteral("SQL driver to use for database access. See documentation for QSqlDatabase::addDatabase() for driver names."),
-        QRegExp(QStringLiteral("Q[A-Z]+")), AppRuntime::dbDriver)
+        QRegExp(QStringLiteral("Q\\w+")), AppRuntime::dbDriver)
 
     << AppConfigValidSetting(QStringLiteral("db"), QStringLiteral("hostname"), QStringLiteral("Hostname that the database driver will connect to."),
         QRegExp(QStringLiteral(".*")), AppRuntime::dbHost)
@@ -54,17 +54,17 @@ QList<AppConfigValidSetting> AppConfig::AppConfigValidSettings = QList<AppConfig
     << AppConfigValidSetting(QStringLiteral("db"), QStringLiteral("password"),  QStringLiteral("Database user's password."),
         QRegExp(QStringLiteral(".*")),AppRuntime::dbPassword)
 
-    << AppConfigValidSetting(QStringLiteral("db"), QStringLiteral("options"), QStringLiteral("Database-specific options that the driver will use. See documentation for QSqlDatabase::setConnectionOptions() for details."),
+    << AppConfigValidSetting(QStringLiteral("db"), QStringLiteral("options"), QStringLiteral("Database-specific connection options that the driver will use. See documentation for QSqlDatabase::setConnectOptions() for details."),
         QRegExp(QStringLiteral(".*")), AppRuntime::dbOptions)
 
     << AppConfigValidSetting(QStringLiteral("db"), QStringLiteral("name"), QStringLiteral("Name of the database that the driver will connect to."),
         QRegExp(QStringLiteral(".*")), AppRuntime::dbName)
 
-    << AppConfigValidSetting(QStringLiteral("db"), QStringLiteral("startup"), QStringLiteral("Semicolon-separated list of SQL queries that the database driver will run before issuing normal queries."),
-        QRegExp(QStringLiteral(".*")), AppRuntime::dbStartupQuery)
-
     << AppConfigValidSetting(QStringLiteral("db"), QStringLiteral("tableprefix"), QStringLiteral("Prefix used to name tables managed by the program."),
-        QRegExp(QStringLiteral("[a-zA-Z_]\\w*")), AppRuntime::dbTblPrefix);
+        QRegExp(QStringLiteral("[a-zA-Z_]\\w*")), AppRuntime::dbTblPrefix)
+
+    << AppConfigValidSetting(QStringLiteral("db"), QStringLiteral("startup"), QStringLiteral("Semicolon-separated list of SQL queries that the database driver will run before issuing normal queries."),
+        QRegExp(QStringLiteral(".*")), AppRuntime::dbStartupQuery);
 
 // Rules that dictate valid configuration parameters and their syntaxes go above
 

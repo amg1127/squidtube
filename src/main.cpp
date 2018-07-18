@@ -172,7 +172,7 @@ bool loadRuntimeVariables () {
         "This is free software: you are free to change and redistribute it.\n"
         "There is NO WARRANTY, to the extent permitted by law."
     ));
-    optionsParser.addOption (QCommandLineOption (QStringLiteral("config"), QStringLiteral("Path of the program configuration file."), QStringLiteral("config"), QStringLiteral(APP_install_etc_dir "/" APP_project_name ".conf")));
+    optionsParser.addOption (QCommandLineOption (QStringLiteral("config"), QStringLiteral("Path of the program's configuration file."), QStringLiteral("config"), QStringLiteral(APP_install_etc_dir "/" APP_project_name ".conf")));
     for (QList<AppConfigValidSetting>::const_iterator i = AppConfig::AppConfigValidSettings.constBegin(); i != AppConfig::AppConfigValidSettings.constEnd(); i++) {
         optionsParser.addOption (QCommandLineOption (i->configSection + QStringLiteral(".") + i->configName, i->configDescription, i->configName, *(i->configValue)));
     }

@@ -1,3 +1,5 @@
+//////////////////////////////////////////////////////////////////
+
 /*
  * squidtube - An external Squid ACL class helper that provides control over access to videos
  * Copyright (C) 2018  Anderson M. Gomes
@@ -16,6 +18,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  *
  */
+
+//////////////////////////////////////////////////////////////////
 
 // API reference: https://developers.google.com/youtube/v3/docs/
 
@@ -103,7 +107,7 @@ function getObjectFromUrl (returnValue, url) {
         }
         returnValue (answer);
     } else {
-        throw new URIError ("Invalid URL: '" + url + "'!");
+        returnValue (null);
     }
 }
 
@@ -132,3 +136,5 @@ function getPropertiesFromObject (returnValue, className, id) {
         });
     }
 }
+
+//////////////////////////////////////////////////////////////////

@@ -92,7 +92,7 @@ foreach (array ('', '! ') as $negateFlag) {
     }
 }
 
-msg_log ("  +---+ Line with more than one numeric operator");
+msg_log ("  +---+ Lines with more than one numeric operator");
 foreach (array ('', '! ') as $negateFlag) {
     foreach ($numericFlags as $numericFlagA) {
         foreach ($numericFlags as $numericFlagB) {
@@ -101,4 +101,5 @@ foreach (array ('', '! ') as $negateFlag) {
         }
     }
 }
+
 return ($answer);
