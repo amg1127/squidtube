@@ -120,7 +120,13 @@ function getPropertiesFromObject (returnValue, className, id) {
         param = "forUsername";
     }
     // "snippet" part is required!
-    var youtubeURL = "https://www.googleapis.com/youtube/v3/" + path + "?" + param + "=" + encodeURIComponent(id) + "&part=" + encodeURIComponent("snippet," + part) + "&key=" + encodeURIComponent (v3ApiKey);
+    // For "videoCategories", only "snippet" is accepted as "part" argument
+    var _part = "snippet," + part;
+    // @disable-check M126
+    if (className == "videoCategories") {
+        _part = "snippet";
+    }
+    var youtubeURL = "https://www.googleapis.com/youtube/v3/" + path + "?" + param + "=" + encodeURIComponent(id) + "&part=" + encodeURIComponent(_part) + "&key=" + encodeURIComponent (v3ApiKey);
     var jsonResolver = new GenericJsonResolver (returnValue, className, id, getPropertiesFromObjectCache);
     jsonResolver.get (youtubeURL)
         .extract ("items")
