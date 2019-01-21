@@ -100,7 +100,7 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
 #endif
     static QMutex m (QMutex::Recursive);
     QMutexLocker m_lck (&m);
-    QByteArray prefix;
+    QByteArray prefix ("UNKNOWN");
     switch (type) {
     case QtFatalMsg:
         prefix = "FATAL" ; break;
@@ -112,8 +112,6 @@ void messageHandlerFunction (QtMsgType type, const QMessageLogContext& context, 
         prefix = "INFO" ; break;
     case QtDebugMsg:
         prefix = "DEBUG" ; break;
-    default:
-        prefix = "UNKNOWN";
     }
     static QByteArray possibleLevels ("DIWEFU");
     if (! (possibleLevels.indexOf (AppRuntime::loglevel[0].toLatin1()) > possibleLevels.indexOf (prefix[0]))) {

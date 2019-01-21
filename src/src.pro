@@ -68,7 +68,6 @@ QMAKE_CXXFLAGS += -Wall -Wextra -Wconversion
         -Wno-c++98-compat \
         -Wno-exit-time-destructors \
         -Wno-global-constructors \
-        -Wno-covered-switch-default \
         -Wno-padded -Wno-switch-enum \
         -Wno-redundant-parens
 }
