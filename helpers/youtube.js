@@ -26,7 +26,7 @@
 // Required global variables
 
 // This helper requires a global variable named 'v3ApiKey', which stores the API key created
-// using instructions located in https://developers.google.com/youtube/registering_an_application#Create_API_Keys
+// using instructions located at https://developers.google.com/youtube/registering_an_application#Create_API_Keys
 if (! v3ApiKey) {
     throw new ReferenceError ("Global variable 'v3ApiKey' must be set in configuration!");
 }
