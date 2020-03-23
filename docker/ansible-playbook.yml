@@ -1,0 +1,228 @@
+---
+- hosts: localhost
+  become_method: su
+  become_flags: '-s /bin/bash'
+  gather_facts: no
+  tasks:
+  - name: Configuration of a persistent AUFS cache directory for squid
+    block:
+    - name: Create squid cache directory
+      file:
+        path: "{{ lookup('env', 'squidData') }}/cache"
+        state: directory
+        owner: "{{ lookup('env', 'squidUser') }}"
+        group: "{{ lookup('env', 'squidGroup') }}"
+        mode: "0700"
+    - name: Create squid PID file
+      file:
+        path: "/run/squid.pid"
+        state: touch
+        owner: "{{ lookup('env', 'squidUser') }}"
+        group: "{{ lookup('env', 'squidGroup') }}"
+        mode: "0600"
+    - name: Configure squid cache directory
+      replace:
+        path: "{{ lookup('env', 'squidConf') }}"
+        regexp: '^[\s#]*cache_dir\s+.*$'
+        replace: "cache_dir aufs {{ lookup('env', 'squidData') }}/cache 500 16 256"
+    - name: Initialize squid cache directory
+      command:
+        argv:
+        - /usr/sbin/squid
+        - -N
+        - -z
+        - -F
+      become: yes
+      become_user: squid
+  - name: Setup of a persistent database for squidtube
+    block:
+    - name: Create squidtube data directory
+      file:
+        path: "{{ lookup('env', 'squidtubeData') }}"
+        state: directory
+        owner: "{{ lookup('env', 'squidUser') }}"
+        group: "{{ lookup('env', 'squidGroup') }}"
+        mode: "0700"
+    - name: Set squidtube database driver and location
+      ini_file:
+        path: "{{ lookup('env', 'squidtubeConf') }}/squidtube.conf"
+        section: "db"
+        option: "{{ item.key }}"
+        value: "{{ item.value }}"
+      with_dict:
+      - driver: "QSQLITE"
+      - name: "{{ lookup('env', 'squidtubeData') }}/data.sqlite"
+  - name: Deployment of a CA certificate for Squid HTTPS traffic decryption
+    block:
+    - name: Create CA private key
+      openssl_privatekey:
+        path: "{{ lookup('env', 'squidCA') }}.key"
+        group: "{{ lookup('env', 'squidGroup') }}"
+        mode: "0640"
+    - name: Create CA certificate request
+      openssl_csr:
+        path: "{{ lookup('env', 'squidCA') }}.csr"
+        privatekey_path: "{{ lookup('env', 'squidCA') }}.key"
+        CN: "Squid CA"
+        basic_constraints: "CA:TRUE"
+        basic_constraints_critical: yes
+    - name: Self-sign CA certificate request
+      openssl_certificate:
+        path: "{{ lookup('env', 'squidCA') }}.crt"
+        provider: selfsigned
+        privatekey_path: "{{ lookup('env', 'squidCA') }}.key"
+        csr_path: "{{ lookup('env', 'squidCA') }}.csr"
+        mode: "0644"
+  - name: squid SslPeekAndSplice configuration
+    block:
+    - name: Configure site names to be decrypted
+      blockinfile:
+        path: "{{ lookup('env', 'squidConf') }}"
+        marker: "# {mark} URL lists for SslPeekAndSplice and squidtube filtering"
+        insertbefore: BOF
+        block: |
+          acl squidtubeURLs ssl::server_name_regex \.youtu\.be$
+          acl squidtubeURLs ssl::server_name_regex \.youtube\.com$
+          acl squidtubeURLs ssl::server_name_regex \.youtube\.com\.[a-z][a-z]$
+    - name: Create squid.conf placeholder for SslPeekAndSplice block
+      replace:
+        path: "{{ lookup('env', 'squidConf') }}"
+        regexp: '^([\s#]*http_port\s+\d+.*)$'
+        replace: '# \1 # SslPeekAndSplice configuration'
+    - name: Insert SslPeekAndSplice configuration block
+      blockinfile:
+        path: "{{ lookup('env', 'squidConf') }}"
+        marker: "# {mark} SslPeekAndSplice configuration block"
+        insertafter: '(?i)^[\s#]*http_port\s+\d+.*# SslPeekAndSplice\s+configuration(\s.*)?$'
+        block: |
+          http_port 3128 ssl-bump generate-host-certificates=on tls-cert={{ lookup('env', 'squidCA') }}.crt tls-key={{ lookup('env', 'squidCA') }}.key
+
+          acl IPv4addr ssl::server_name_regex ^[0-9]+(\.[0-9]+){0,3}$
+          acl IPv6addr ssl::server_name_regex ^[a-fA-F0-9]{0,4}(::?[a-fA-F0-9]{0,4}){0,7}$
+
+          acl TCPConnection  at_step SslBump1
+          acl TLSClientHello at_step SslBump2
+          acl TLSServerHello at_step SslBump3
+
+          ssl_bump peek SSL_ports TCPConnection squidtubeURLs
+          ssl_bump peek SSL_ports TCPConnection IPv4addr
+          ssl_bump peek SSL_ports TCPConnection IPv6addr
+
+          ssl_bump bump  SSL_ports TLSClientHello squidtubeURLs
+          ssl_bump stare SSL_ports TLSClientHello IPv4addr
+          ssl_bump stare SSL_ports TLSClientHello IPv6addr
+
+          ssl_bump bump      SSL_ports TLSServerHello squidtubeURLs
+          ssl_bump terminate SSL_ports TLSServerHello IPv4addr
+          ssl_bump terminate SSL_ports TLSServerHello IPv6addr
+
+          # https://wiki.squid-cache.org/Features/DynamicSslCert
+          sslcrtd_program {{ lookup('env', 'squidHelpers') }}/security_file_certgen -s {{ lookup('env', 'squidData') }}/ssl_db -M 4MB
+    - name: Initialize squid SSL database directory
+      command:
+        argv:
+        - "{{ lookup('env', 'squidHelpers') }}/security_file_certgen"
+        - -c
+        - -s
+        - "{{ lookup('env', 'squidData') }}/ssl_db"
+        - -M
+        - 4MB
+      become: yes
+      become_user: squid
+  - name: Configuration of squidtube as a squid ACL external helper
+    lineinfile:
+      path: "{{ lookup('env', 'squidConf') }}"
+      insertbefore: BOF
+      line: "external_acl_type squidtube ipv4 children-max=2 concurrency=4 %URI {{ lookup('env', 'squidtubeBin') }}/squidtube --main.loglevel DEBUG"
+  - name: Disable strip_query_terms in squid
+    lineinfile:
+      path: "{{ lookup('env', 'squidConf') }}"
+      insertbefore: BOF
+      line: "strip_query_terms off"
+  - name: Configuration of some ACL examples
+    block:
+    - name: Create squid/files directory
+      file:
+        path: /etc/squid/files
+        state: directory
+        group: "{{ lookup('env', 'squidGroup') }}"
+        mode: "0750"
+    - name: Create an example list of blocked channels
+      copy:
+        dest: /etc/squid/files/YouTube-BlockedChannels.txt
+        content: |
+          # Rebecca Black's channel
+          rebecca
+
+          # KondZilla's channel
+          UCffDXn7ycAzwL2LDlbyWOTw
+        group: "{{ lookup('env', 'squidGroup') }}"
+        mode: "0640"
+    - name: Insert example squidtube ACL's
+      blockinfile:
+        path: "{{ lookup('env', 'squidConf') }}"
+        marker: "# {mark} squidtube ACL configuration block"
+        insertafter: '(?i)^\s*#.*\s*INSERT\s+YOUR\s+(.*\s)?RULE\S*\s+HERE(\s.*)?$'
+        block: |
+          # Block videos whose category is "Gaming" (ID=20)
+          acl GamingVideo external squidtube snippet.categoryId = 20
+          http_access deny squidtubeURLs GamingVideo
+
+          # Block videos whose duration is at least 10 minutes
+          # https://developers.google.com/youtube/v3/docs/videos#contentDetails.duration
+          # https://en.wikipedia.org/wiki/ISO_8601#Durations
+          acl BigVideo external squidtube contentDetails.duration ^P(\d+Y|\d+M|\d+D|T\d+H|T\d\d+M)
+          http_access deny squidtubeURLs BigVideo
+
+          # Block videos tagged with "NSFW"
+          acl NSFWTitle external squidtube snippet.title -i \bnsfw\b
+          acl NSFWTag   external squidtube snippet.tags.[] -i \bnsfw\b
+          http_access deny squidtubeURLs NSFWTitle
+          http_access deny squidtubeURLs NSFWTag
+
+          # Block videos published by a blocked YouTube channel
+          acl BlockedChannelsID   external squidtube snippet.channelId    "/etc/squid/files/YouTube-BlockedChannels.txt"
+          acl BlockedChannelsName external squidtube snippet.channelTitle "/etc/squid/files/YouTube-BlockedChannels.txt"
+          http_access deny squidtubeURLs BlockedChannelsID
+          http_access deny squidtubeURLs BlockedChannelsName
+
+          # Block live videos
+          acl LiveVideo external squidtube snippet.liveBroadcastContent live upcoming
+          http_access deny squidtubeURLs LiveVideo
+
+          # Block age-restricted videos
+          acl AgeRestrictedVideo external squidtube contentDetails.contentRating.ytRating -i AgeRestrict
+          http_access deny squidtubeURLs AgeRestrictedVideo
+  - name: Demonstration purposes - Enable youtube squidtube helper only and change the 'part' parameter to include contentDetails
+    ini_file:
+      path: "{{ lookup('env', 'squidtubeConf') }}/squidtube.conf"
+      section: "{{ item.section }}"
+      option: "{{ item.option }}"
+      value: "{{ item.value }}"
+    with_items:
+    - { section: "main", option: "helpers", value: "\"youtube\"" }
+    - { section: "youtube", option: "part", value: "\"snippet,contentDetails\"" }
+  - name: Deployment of a reminder script
+    copy:
+      dest: /etc/profile.d/reminder.sh
+      content: |
+        #!/bin/bash
+
+        cat <<'NOTE'
+        **** NOTE ****
+
+        Three additional steps are required in order to have squidtube working:
+
+        1. Get a YouTube API key using instructions located at https://developers.google.com/youtube/registering_an_application#Create_API_Keys
+        2. In "{{ lookup('env', 'squidtubeConf') }}/squidtube.conf", set the parameter "v3ApiKey" in section "youtube" to that API key and reload squid (squid -k reconfigure)
+        3. Configure your browser to use container's squid instance as HTTP proxy and trust the certificate authority below.
+
+        Squid MITM CA certificate:
+
+        NOTE
+
+        cat "{{ lookup('env', 'squidCA') }}.crt"
+
+        echo
+      mode: "0755"
+
